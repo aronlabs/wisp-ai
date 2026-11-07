@@ -572,6 +572,81 @@ local function makeRow(parent)
     return row
 end
 C.MakeMessageRow = makeRow
+function C.MessageSpeaker(message)
+    return (message.role == "tool" or message.role == "assistant") and "assistant" or message.role
+end
+function C.RenderMessageRow(row, chat, message, width, showAuthor)
+    local tool = message.tool
+    local signature = (message.role or "")
+        .. "\31"
+        .. (message.text or "")
+        .. "\31"
+        .. (tool and tool.status or "")
+        .. "\31"
+        .. width
+        .. "\31"
+        .. itemRevision
+        .. "\31"
+        .. referenceSignature(message.references)
+        .. "\31"
+        .. (C.RichSignature and C.RichSignature(message.ui) or "")
+        .. "\31"
+        .. (chat.status or "")
+        .. "\31"
+        .. tostring(showAuthor)
+    if row.signature ~= signature then
+        row.signature = signature
+        row:SetWidth(width)
+        row.text:ClearAllPoints()
+        local top = showAuthor and 20 or 0
+        row.author:SetShown(showAuthor)
+        setText(
+            row.author,
+            message.role == "user" and "You" or (message.role == "system" and "Notice" or "Wisp AI")
+        )
+        if message.role == "tool" then
+            if row.rich then
+                row.rich:Hide()
+            end
+            row.icon:ClearAllPoints()
+            row.icon:SetPoint("TOPLEFT", 0, -top - 1)
+            row.icon:Show()
+            local state = tool and tool.status or "completed"
+            row.icon:SetTexture(
+                state == "completed" and "Interface\\RaidFrame\\ReadyCheck-Ready"
+                    or (
+                        state == "running" and "Interface\\RaidFrame\\ReadyCheck-Waiting"
+                        or "Interface\\RaidFrame\\ReadyCheck-NotReady"
+                    )
+            )
+            row.text:SetPoint("TOPLEFT", 21, -top)
+            row.text:SetWidth(width - 21)
+            row.text:SetTextColor(unpack(MUTED))
+            local suffix = state == "running" and "  |cffe0c070Running|r"
+                or (state == "completed" and "" or "  |cffd98575Failed|r")
+            setText(row.text, formatted(tool and tool.label or message.text) .. suffix)
+            row.height = top + math.max(18, row.text:GetStringHeight()) + 7
+        else
+            row.icon:Hide()
+            row.text:SetPoint("TOPLEFT", 0, -top)
+            row.text:SetWidth(width)
+            row.text:SetTextColor(unpack(message.role == "system" and MUTED or TEXT))
+            setText(row.text, formatted(message.text, message.references, message.role == "user"))
+            row.height = top
+                + math.max(1, message.text ~= "" and row.text:GetStringHeight() or 0)
+                + 10
+            if C.RenderRichUI then
+                row.rich = row.rich or CreateFrame("Frame", nil, row)
+                row.rich:Show()
+                row.rich:ClearAllPoints()
+                row.rich:SetPoint("TOPLEFT", 0, -row.height)
+                row.height = row.height + C.RenderRichUI(row.rich, chat, message, width)
+            end
+            row.height = row.height + 8
+        end
+        row:SetHeight(row.height)
+    end
+end
 local function renderTranscript(chat)
     local id = chat and chat.id or "empty"
     local switched = renderedChat ~= id
@@ -588,6 +663,7 @@ local function renderTranscript(chat)
     end
     local width = math.max(100, transcript:GetWidth() - 6)
     local y, used = 0, {}
+    local previousSpeaker
     for index, message in ipairs(chat and chat.messages or {}) do
         if message.role ~= "tool" or C.db.showTools then
             local key = id .. ":" .. (message.id or tostring(index))
@@ -597,73 +673,10 @@ local function renderTranscript(chat)
                 rows[key] = row
             end
             used[key] = true
-            local tool = message.tool
-            local signature = (message.role or "")
-                .. "\31"
-                .. (message.text or "")
-                .. "\31"
-                .. (tool and tool.status or "")
-                .. "\31"
-                .. width
-                .. "\31"
-                .. itemRevision
-                .. "\31"
-                .. referenceSignature(message.references)
-                .. "\31"
-                .. (C.RichSignature and C.RichSignature(message.ui) or "")
-                .. "\31"
-                .. (chat.status or "")
-            if row.signature ~= signature then
-                row.signature = signature
-                row:SetWidth(width)
-                row.text:ClearAllPoints()
-                if message.role == "tool" then
-                    row.author:Hide()
-                    row.icon:Show()
-                    local state = tool and tool.status or "completed"
-                    row.icon:SetTexture(
-                        state == "completed" and "Interface\\RaidFrame\\ReadyCheck-Ready"
-                            or (
-                                state == "running"
-                                    and "Interface\\RaidFrame\\ReadyCheck-Waiting"
-                                or "Interface\\RaidFrame\\ReadyCheck-NotReady"
-                            )
-                    )
-                    row.text:SetPoint("TOPLEFT", 21, 0)
-                    row.text:SetWidth(width - 21)
-                    row.text:SetTextColor(unpack(MUTED))
-                    local suffix = state == "running" and "  |cffe0c070Running|r"
-                        or (state == "completed" and "" or "  |cffd98575Failed|r")
-                    setText(row.text, formatted(tool and tool.label or message.text) .. suffix)
-                    row.height = math.max(18, row.text:GetStringHeight()) + 7
-                else
-                    row.icon:Hide()
-                    row.author:Show()
-                    setText(
-                        row.author,
-                        message.role == "user" and "You"
-                            or (message.role == "system" and "Notice" or "Wisp AI")
-                    )
-                    row.text:SetPoint("TOPLEFT", 0, -20)
-                    row.text:SetWidth(width)
-                    row.text:SetTextColor(unpack(message.role == "system" and MUTED or TEXT))
-                    setText(
-                        row.text,
-                        formatted(message.text, message.references, message.role == "user")
-                    )
-                    row.height = 20
-                        + math.max(1, message.text ~= "" and row.text:GetStringHeight() or 0)
-                        + 10
-                    if C.RenderRichUI then
-                        row.rich = row.rich or CreateFrame("Frame", nil, row)
-                        row.rich:ClearAllPoints()
-                        row.rich:SetPoint("TOPLEFT", 0, -row.height)
-                        row.height = row.height + C.RenderRichUI(row.rich, chat, message, width)
-                    end
-                    row.height = row.height + 8
-                end
-                row:SetHeight(row.height)
-            end
+            local speaker = C.MessageSpeaker(message)
+            local showAuthor = speaker ~= "assistant" or previousSpeaker ~= speaker
+            C.RenderMessageRow(row, chat, message, width, showAuthor)
+            previousSpeaker = speaker
             if row.y ~= y then
                 row.y = y
                 row:ClearAllPoints()
@@ -676,6 +689,17 @@ local function renderTranscript(chat)
         end
     end
     if chat and chat.status == "working" then
+        local showAuthor = previousSpeaker ~= "assistant"
+        if progress.showAuthor ~= showAuthor then
+            progress.showAuthor = showAuthor
+            progress.author:SetShown(showAuthor)
+            progress:SetHeight(showAuthor and 54 or 34)
+            progress.title:ClearAllPoints()
+            progress.title:SetPoint("TOPLEFT", 0, showAuthor and -20 or 0)
+            progress.title:SetPoint("RIGHT", -65, 0)
+            progress.elapsed:ClearAllPoints()
+            progress.elapsed:SetPoint("TOPRIGHT", -2, showAuthor and -20 or 0)
+        end
         progress:SetWidth(width)
         if progress.y ~= y then
             progress.y = y

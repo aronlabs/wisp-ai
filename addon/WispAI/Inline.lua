@@ -183,6 +183,7 @@ function C.RefreshInline()
     end
     local chat = C.InlineCurrent()
     local y, used = 0, {}
+    local previousSpeaker
     local width = math.max(180, scroll:GetWidth() - 6)
     local previousRange = scroll:GetVerticalScrollRange()
     local offset = scroll:GetVerticalScroll()
@@ -197,36 +198,11 @@ function C.RefreshInline()
                 rows[key] = row
             end
             used[key] = true
-            row:SetWidth(width)
-            row.icon:Hide()
-            row.author:Show()
-            set(
-                row.author,
-                message.role == "user" and "You"
-                    or (
-                        message.role == "tool" and "Tool"
-                        or (message.role == "system" and "Notice" or "Wisp")
-                    )
-            )
-            row.text:ClearAllPoints()
-            row.text:SetPoint("TOPLEFT", 0, -20)
-            row.text:SetWidth(width)
-            set(
-                row.text,
-                C.FormatText(message.text, message.references, message.role == "user")
-                    .. (
-                        message.role == "tool"
-                            and message.tool
-                            and message.tool.status == "running"
-                            and "  Running..."
-                        or ""
-                    )
-            )
-            local h = 20 + math.max(1, row.text:GetStringHeight()) + 8
-            row.rich:ClearAllPoints()
-            row.rich:SetPoint("TOPLEFT", 0, -h)
-            h = h + C.RenderRichUI(row.rich, chat, message, width) + 10
-            row:SetHeight(h)
+            local speaker = C.MessageSpeaker(message)
+            local showAuthor = speaker ~= "assistant" or previousSpeaker ~= speaker
+            C.RenderMessageRow(row, chat, message, width, showAuthor)
+            previousSpeaker = speaker
+            local h = row.height
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", 0, -y)
             if not row:IsShown() then
@@ -261,7 +237,7 @@ function C.RefreshInline()
                 break
             end
         end
-        set(busy, "Wisp  ·  " .. active)
+        set(busy, previousSpeaker == "assistant" and active or ("Wisp AI  ·  " .. active))
         busy:ClearAllPoints()
         busy:SetPoint("TOPLEFT", 0, -y)
         y = y + 28

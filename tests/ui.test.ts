@@ -431,7 +431,7 @@ C.chats[1].status = "working"
 C.Refresh()
 assert(
     progress:IsShown()
-        and progress.parent:GetHeight() == progress.y + 54
+        and progress.parent:GetHeight() == progress.y + progress:GetHeight()
         and #C.chats[1].messages == 1,
     "thinking occupies transcript space without becoming a saved message"
 )
