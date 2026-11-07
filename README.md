@@ -6,7 +6,7 @@ are in English; the assistant replies in the language you use.
 
 ## First use
 
-1. Open `Wisp.exe`. Release ZIPs include Node and npm; no separate Node installation is needed. Choose the WoW client folder and install/update the addon from Overview.
+1. Download and run the Windows installer (`WispAI-…-setup.exe`). Node and npm are included; no separate runtime or ZIP extraction is needed. Open Wisp from the Start menu, choose your WoW client folder and install/update the addon from Overview.
 2. In the **Connections > ChatGPT**, click **Continue with ChatGPT** and authorize Wisp in your browser. Available models load automatically after connection. Choose a model and **Set default** for new conversations; model and effort can also be chosen per chat in WoW.
 3. Fully restart WoW after the first installation so all helper files are discovered.
 4. Enable **Wisp AI** and its helper channels in AddOns.
@@ -76,12 +76,11 @@ source files are never edited. All three tools have their own capability toggle.
 
 The native Windows app has a sidebar with Overview, Connections, Tools & MCPs, Panels, Suggestions and Diagnostics. AI providers live under Connections; ChatGPT is the currently supported provider.
 It runs the bridge without a console window, minimizes to the system tray on close,
-and stops its bridge from the tray Exit command. User data stays in runtime/ beside
-the portable application. Wisp has its own Sign in with ChatGPT connection,
+and stops its bridge from the tray Exit command. User data lives in the operating system application-data directory (`%APPDATA%/com.wisp.ai` on Windows), separate from installed resources. Wisp has its own Sign in with ChatGPT connection,
 using the official OSS dynamic registration flow (PKCE and verified OpenID identity).
 No API key, shared Codex client ID, Codex installation or copied Codex auth file is used.
 Credentials are encrypted with Windows DPAPI under LocalAppData for this Windows
-user and installation path. ChatGPT model calls use the public Responses API with
+user. macOS uses Keychain in the native host. ChatGPT model calls use the public Responses API with
 store:false; Eve only receives a per-process authenticated loopback endpoint.
 
 The ChatGPT connection shows connection state and saved accounts, supports browser sign-in,
@@ -94,8 +93,7 @@ chats, memory and other applications' sessions intact. An ambiguous refresh fail
 requires sign-in again rather than retrying a potentially rotated token.
 
 Existing installs must authorize Wisp once; the previous Codex auth adapter
-has been removed. No credentials are shipped in releases. Moving the installation
-to a different folder or Windows user requires signing in again.
+has been removed. No credentials are shipped in releases. Moving between Windows users requires signing in again. Use **Import your previous installation** on first launch to migrate existing portable Wisp data.
 Official flow: https://developers.openai.com/siwc/token-sharing-open-source/sign-in
 
 MCP connections support Streamable HTTP, SSE and local stdio commands with structured
@@ -121,11 +119,11 @@ and cannot perform authored write actions during automatic turns. External MCP
 tools require an explicit readOnlyHint for automatic advice. Useful results appear
 as dismissible Read notifications; opening one promotes it into a conversation.
 
-Build the native launcher with scripts/build-desktop.ps1. scripts/package-release.ps1
-creates a Windows x64 ZIP plus SHA-256 checksum under dist/, with Node/npm, dependencies,
-licenses and corresponding source. It excludes personal config, .eve, chats, memories
-and stored credentials. The tag workflow builds a draft GitHub release; nothing is
-published from the local build. The current executable is unsigned.
+The desktop shell uses Tauri 2 and Svelte, with the existing Node/Eve bridge packaged as application resources. The frontend talks to a small allowlisted native command layer; bridge tokens and credentials are never sent to the webview. Closing the window keeps Wisp in the system tray. Exit from the tray stops the bridge first and refuses to interrupt an active turn.
+
+Build a Windows NSIS installer with `npm run build:desktop` (requires Rust, Windows C++ build tools, Node 24+, and a built simulator). The build stages production dependencies and bundled Node/npm without user data, then writes the installer and SHA-256 checksum under `dist/`. Installation is per user; updates replace app resources while preserving application data. The release workflow compiles the pinned simulator, builds the installer, tests protected credential storage and launches the installed bridge without a global Node installation. Tag builds create a draft GitHub release. Installers are currently unsigned.
+
+Windows is the currently tested distribution target. The shell and credential interface have macOS implementations, but a macOS release still requires simulator packaging, game-client validation and signing/notarization on a Mac.
 
 ## Agent and tools
 
@@ -279,7 +277,7 @@ All configurations live in the repo. `npm run lint:fix` applies safe Oxlint fixe
 `npm run check` checks formatting, lint (including warnings), and TypeScript.
 `npm test` runs the regression suite. Both PRs and pushes to main run these checks.
 
-Development uses Node 24 and, for the C# formatter, the .NET 8 runtime (not the SDK).
+Development uses Node 24. The desktop installer build also requires Rust and the Windows C++ build tools. Svelte files use Prettier; TypeScript uses Oxfmt/Oxlint.
 The CSharpier helper downloads a pinned, checksum-verified package on first use and
 caches it under node_modules/.cache; subsequent format checks run locally. These
 are development tools and do not add a runtime requirement for the released app.

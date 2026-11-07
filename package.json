@@ -23,7 +23,8 @@
     "ui:build": "vite build",
     "ui:check": "svelte-check --tsconfig app/tsconfig.json",
     "desktop:dev": "tauri dev",
-    "format:ui": "prettier --plugin prettier-plugin-svelte --write \"app/**/*.{svelte,css,html}\""
+    "format:ui": "prettier --plugin prettier-plugin-svelte --write \"app/**/*.{svelte,css,html}\"",
+    "test:ui": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.110",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@johnnymorganz/stylua-bin": "^2.6.0",
+    "@playwright/test": "^1.65.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/cli": "^2.12.4",

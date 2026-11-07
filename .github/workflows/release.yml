@@ -15,6 +15,8 @@ jobs:
           node-version: '24.22.1'
           cache: npm
       - run: npm ci
+      - run: npm run check
+      - run: npm run test:ui
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -25,9 +27,11 @@ jobs:
       - run: choco install protoc --yes --no-progress
       - run: ./scripts/build-simulator.ps1
         shell: pwsh
-      - run: npm run check
       - run: npm test
       - run: npm run build:desktop
+      - run: cargo test --release --manifest-path src-tauri/Cargo.toml
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml
+      - run: node scripts/verify-installer.ts
       - uses: actions/upload-artifact@v4
         with:
           name: Wisp-windows-x64
@@ -35,6 +39,9 @@ jobs:
             dist/*-setup.exe
             dist/*.sha256
             src-tauri/Cargo.lock
+            src-tauri/src/*.rs
+            src-tauri/build.rs
+            dist/installer-smoke.json
       - if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:

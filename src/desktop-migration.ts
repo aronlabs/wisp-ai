@@ -1,6 +1,56 @@
-import { access, cp, mkdir, readFile, readdir } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+
+async function stopPreviousBridge(source: string) {
+  let identity: { port?: number; token?: string };
+  try {
+    identity = JSON.parse(await readFile(path.join(source, 'runtime/desktop.json'), 'utf8'));
+  } catch (error) {
+    if (error instanceof SyntaxError || (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
+  if (
+    !Number.isInteger(identity.port) ||
+    identity.port! < 1 ||
+    identity.port! > 65535 ||
+    typeof identity.token !== 'string'
+  ) {
+    return;
+  }
+  try {
+    const response = await fetch('http://127.0.0.1:' + identity.port + '/stop', {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + identity.token, 'content-type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) {
+      throw Error(
+        'Close the previous Wisp application after its active reply finishes, then import again.',
+      );
+    }
+    for (let attempt = 0; attempt < 50; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      try {
+        await fetch('http://127.0.0.1:' + identity.port + '/status', {
+          headers: { authorization: 'Bearer ' + identity.token },
+          signal: AbortSignal.timeout(1000),
+        });
+      } catch {
+        return;
+      }
+    }
+    throw Error('The previous Wisp bridge is still stopping. Try again in a moment.');
+  } catch (error) {
+    if (error instanceof TypeError && /fetch failed/i.test(error.message)) {
+      return;
+    }
+    throw error;
+  }
+}
 
 export async function migrateDesktop(
   source: string,
@@ -24,6 +74,7 @@ export async function migrateDesktop(
   if (typeof config.wow !== 'string') {
     throw Error('This folder does not contain a Wisp installation.');
   }
+  await stopPreviousBridge(source);
   await mkdir(path.join(destination, 'runtime'), { recursive: true });
   const allowed = [
     'chats.json',
@@ -48,6 +99,26 @@ export async function migrateDesktop(
       }
     }
   }
+  const chatsFile = path.join(destination, 'runtime/chats.json');
+  try {
+    const chats = JSON.parse(await readFile(chatsFile, 'utf8'));
+    if (!Array.isArray(chats)) {
+      throw Error('Invalid conversation history.');
+    }
+    for (const chat of chats) {
+      if (chat && typeof chat === 'object') {
+        delete chat.eveId;
+        if (chat.status === 'working') {
+          chat.status = 'interrupted';
+        }
+      }
+    }
+    await writeFile(chatsFile, JSON.stringify(chats, null, 2));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
   if (localAppData) {
     const hash = createHash('sha256').update(source).digest('hex');
     const secrets = path.join(localAppData, 'WispAI', 'Secrets', hash);
@@ -68,7 +139,6 @@ export async function migrateDesktop(
     }
   }
   // Commit configuration last: a failed import never starts a partially migrated account.
-  const { writeFile } = await import('node:fs/promises');
   await writeFile(
     path.join(destination, 'config.local.json'),
     JSON.stringify({ wow: config.wow, model: config.model || '' }, null, 2),

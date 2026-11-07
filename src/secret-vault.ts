@@ -17,7 +17,7 @@ export class NativeVault implements SecretVault {
       let output = '';
       const timer = setTimeout(() => {
         child.kill();
-        reject(Error('Windows secret storage timed out'));
+        reject(Error('Native credential storage timed out'));
       }, 10000);
       child.stdout.on('data', (data) => {
         output += data;
@@ -36,7 +36,7 @@ export class NativeVault implements SecretVault {
         if (code === 0) {
           resolve(output);
         } else {
-          reject(Error('Windows secret storage failed'));
+          reject(Error('Native credential storage failed'));
         }
       });
       child.stdin.end(input);
