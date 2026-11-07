@@ -12,12 +12,25 @@ C.connected, C.rev = false, 0
 function C.Log(text)
     DEFAULT_CHAT_FRAME:AddMessage("|cffd5bb75Wisp:|r " .. text)
 end
+local function activityTime()
+    local latest = time() * 1000
+    for _, chat in ipairs(C.chats) do
+        latest = math.max(latest, (chat.lastActivityAt or 0) + 1)
+    end
+    return latest
+end
 function C.NewChat()
     C.chatCounter = (C.chatCounter or 0) + 1
     C.active = C.session .. "-chat-" .. C.chatCounter
     C.db.activeChat = C.active
-    C.chats[#C.chats + 1] =
-        { id = C.active, title = "New conversation", messages = {}, activity = {}, status = "idle" }
+    C.chats[#C.chats + 1] = {
+        id = C.active,
+        title = "New conversation",
+        messages = {},
+        activity = {},
+        status = "idle",
+        lastActivityAt = activityTime(),
+    }
     C.pendingChats[C.active] = C.chats[#C.chats]
     C.Send({ type = "new", chat = C.active })
     if C.Refresh then
@@ -98,6 +111,7 @@ function C.Submit()
         chat.messages = chat.messages or {}
         table.insert(chat.messages, message)
         chat.status = "working"
+        chat.lastActivityAt = activityTime()
     end
     C.draft:SetText("")
     C.db.drafts[C.active] = ""
@@ -208,6 +222,10 @@ function WispAI_Receive(json)
                         chat.messages = chat.messages or {}
                         table.insert(chat.messages, optimistic.message)
                         chat.status = "working"
+                        chat.lastActivityAt = math.max(
+                            chat.lastActivityAt or 0,
+                            (existing[chat.id] and existing[chat.id].lastActivityAt) or 0
+                        )
                     end
                 end
             end

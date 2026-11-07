@@ -8,3 +8,8 @@ This combined project is distributed under GPL-3.0-only. See LICENSE.
 
 Eve and its dependencies retain their own licenses in node_modules.
 No thott.bot logos, fonts or brand artwork are included.
+
+The local simulation engine is WoWSims Forever, using StewBagger's levelsim branch.
+Original project: https://github.com/wowsims/forever
+Level support: https://github.com/StewBagger/forever-levelsim/tree/levelsim
+WoWSims is MIT licensed. See simulator/LICENSE-WoWSims.txt and manifest.json.

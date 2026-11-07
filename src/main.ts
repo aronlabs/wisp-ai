@@ -30,9 +30,11 @@ import { safeErrorMessage } from './model-errors.ts';
 import { sendChatTurn } from './agent-session.ts';
 import { TheWoWDB, databaseRequest } from './thewowdb.ts';
 import { searchWowhead, wowheadQuery } from './wowhead-search.ts';
+import { Simulator, simulationInput } from './simulation.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = path.join(ROOT, 'runtime');
+const simulator = new Simulator(ROOT);
 await mkdir(runtime, { recursive: true });
 const memoryStore = new MemoryStore(path.join(runtime, 'memory'));
 let memoryView:
@@ -143,6 +145,7 @@ let chats: Chat[] = [];
 try {
   chats = JSON.parse(await readFile(stateFile, 'utf8'));
   for (const c of chats) {
+    c.lastActivityAt ??= c.lastUsedAt ?? 0;
     if (c.usage) {
       c.usage.compacting = false;
     }
@@ -183,6 +186,28 @@ const pending = new Map<
   }
 >();
 const client = new Client({ baseUrl: 'http://127.0.0.1:43186' });
+async function readSimulationCharacter(chat = 'desktop-simulation'): Promise<unknown> {
+  if (!activeTransport || !capabilitySettings.enabled('tool:query_character')) {
+    throw Error('Connect WoW and enable Character readings first.');
+  }
+  const id = randomUUID();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      changed();
+      reject(Error('WoW did not respond. Reload the addon and try again.'));
+    }, 30000);
+    pending.set(id, {
+      chat,
+      session: activeTransport,
+      sections: ['character', 'talents', 'spells', 'gear'],
+      resolve,
+      reject,
+      timer,
+    });
+    changed();
+  });
+}
 mcpRelay.readOnlyMode = () => chats.some((c) => c.proactive && c.status === 'working');
 const token = randomBytes(32).toString('hex');
 function log(message: string) {
@@ -196,6 +221,7 @@ function chatFor(id: string | undefined) {
 }
 function createChat(id: string) {
   const chat: Chat = {
+    lastActivityAt: Date.now(),
     id,
     title: 'New conversation',
     owner: activeTransport,
@@ -215,6 +241,7 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
   chat.owner = activeTransport;
   chat.historyVersion = 3;
   chat.lastUsedAt = Date.now();
+  chat.lastActivityAt = Date.now();
   chat.characterKey = characterIdentity(context);
   chat.messages.push({ id: messageId || randomUUID(), role: 'user', text });
   changed();
@@ -254,6 +281,7 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
         ) &&
         !chat.proactive
       ) {
+        chat.lastActivityAt = Date.now();
         changed();
       }
     }
@@ -288,6 +316,7 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
     log('Turn failed: ' + chat.id);
   } finally {
     clearInterval(streaming);
+    chat.lastActivityAt = Date.now();
     if (chat.usage) {
       chat.usage.compacting = false;
     }
@@ -724,6 +753,7 @@ const server = createServer(async (req, res) => {
       '/panels',
       '/database',
       '/wowhead',
+      '/simulate',
     ].includes(req.url || '')
   ) {
     res.writeHead(404).end();
@@ -752,6 +782,29 @@ const server = createServer(async (req, res) => {
       throw Error(
         'Automatic suggestions cannot change settings, memory, panels, macros or map markers',
       );
+    }
+    if (req.url === '/simulate') {
+      if (chat.proactive || !capabilitySettings.enabled('tool:simulate_dps')) {
+        throw Error('DPS simulation is disabled or not allowed for automatic suggestions.');
+      }
+      const { eveSession: _session, ...args } = data;
+      const input = simulationInput.parse(args);
+      const abort = new AbortController();
+      res.once('close', () => {
+        if (!res.writableEnded) {
+          abort.abort();
+        }
+      });
+      const snapshot = await readSimulationCharacter(chat.id);
+      if (
+        chat.owner !== activeTransport ||
+        (chat.characterKey && characterIdentity(snapshot) !== chat.characterKey)
+      ) {
+        throw Error('The character changed. Request a new simulation.');
+      }
+      const result = await simulator.run(snapshot, input, abort.signal);
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(result));
+      return;
     }
     if (req.url === '/database' || req.url === '/wowhead') {
       const tool =
@@ -1022,6 +1075,9 @@ const health = setInterval(
 );
 const desktopServer = await startDesktopServer(runtime, async (method, url, raw) => {
   const data = raw as Record<string, any>;
+  if (method === 'POST' && url === '/simulator/character') {
+    return readSimulationCharacter();
+  }
   if (method === 'POST' && url === '/auth/start') {
     return accountOperation(() =>
       auth.beginSignIn(
@@ -1167,13 +1223,15 @@ const publish = setInterval(() => {
             !c.tipSkipped &&
             Date.now() - (c.lastUsedAt || 0) < 900000),
       )
-      .slice(-40)
+      .sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0))
+      .slice(0, 40)
       .map((c) => ({
         id: c.id,
         title: c.title,
         status: c.status,
         unread: c.unread,
         usage: c.usage,
+        lastActivityAt: c.lastActivityAt,
         activity: c.activity,
         inline: c.inline,
         proactive: c.proactive,

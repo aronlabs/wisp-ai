@@ -784,7 +784,19 @@ function C.Refresh()
     layout()
     local sessionCount = 0
     local used = {}
-    for _, session in ipairs(C.chats) do
+    local ordered, positions = {}, {}
+    for index, session in ipairs(C.chats) do
+        ordered[#ordered + 1] = session
+        positions[session.id] = index
+    end
+    table.sort(ordered, function(a, b)
+        local aTime, bTime = a.lastActivityAt or 0, b.lastActivityAt or 0
+        if aTime == bTime then
+            return positions[a.id] < positions[b.id]
+        end
+        return aTime > bTime
+    end)
+    for _, session in ipairs(ordered) do
         if not session.inline and not session.proactive then
             sessionCount = sessionCount + 1
             local index = sessionCount

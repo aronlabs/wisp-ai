@@ -8,3 +8,4 @@ runtime-node.txt
 
 dist/
 Wisp.exe
+simulator/*.exe

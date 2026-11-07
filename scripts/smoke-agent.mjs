@@ -17,6 +17,11 @@ const { ChatGPTAuth } = await load('src/chatgpt-auth.ts'),
   { applyEvent } = await load('src/events.ts'),
   { ReplyProjection } = await load('src/reply-stream.ts');
 const { Client } = await load('node_modules/eve/dist/src/client/index.js');
+const { Simulator } = await load('src/simulation.ts');
+const simulationSnapshot = process.env.WISP_SMOKE_CHARACTER
+  ? JSON.parse(await readFile(process.env.WISP_SMOKE_CHARACTER, 'utf8'))
+  : undefined;
+const simulator = new Simulator(root);
 const config = JSON.parse(await readFile('config.local.json', 'utf8')),
   model = config.model || 'gpt-6.1-sol';
 const auth = new ChatGPTAuth(
@@ -40,7 +45,7 @@ await cp(path.join(root, 'agent'), path.join(dir, 'agent'), { recursive: true })
 await cp(path.join(root, 'src'), path.join(dir, 'src'), { recursive: true });
 await cp(path.join(root, 'package.json'), path.join(dir, 'package.json'));
 await symlink(path.join(root, 'node_modules'), path.join(dir, 'node_modules'), 'junction');
-for (const file of ['agent/agent.ts', 'src/agent-rpc.ts']) {
+for (const file of ['agent/agent.ts', 'src/agent-rpc.ts', 'agent/tools/query_character.ts']) {
   const p = path.join(dir, file);
   await writeFile(p, (await readFile(p, 'utf8')).replaceAll('43187', '43197'));
 }
@@ -68,6 +73,10 @@ const server = createServer(async (req, res) => {
     rpc.push(call);
     if (req.url === '/database') {
       value = await database.query(args);
+    } else if (req.url === '/simulate' && simulationSnapshot) {
+      value = await simulator.run(simulationSnapshot, args);
+    } else if (req.url === '/state' && simulationSnapshot) {
+      value = simulationSnapshot;
     } else if (req.url === '/wowhead') {
       value = await searchWowhead(args.query, scopedAuth, model);
     } else if (req.url === '/memory' && data.operation === 'list') {
@@ -79,6 +88,13 @@ const server = createServer(async (req, res) => {
     }
     call.status = value.status;
     call.version = value.version ?? value.source?.version;
+    if (req.url === '/simulate') {
+      call.plans = value.results?.map((r) => ({
+        label: r.label,
+        dps: r.dps.average,
+        spellIds: r.damageBySpell.map((a) => a.spellId),
+      }));
+    }
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(value));
   } catch (e) {
     res.writeHead(500).end(e.message);
@@ -168,44 +184,62 @@ try {
     assert.deepEqual(failures, [], 'real tool calls must succeed');
     return row;
   };
-  let result = await run(
-    'primary catalog',
-    '¿Qué hace Nova de Escarcha (spell 122) en Forever? Usá get_database_entity para verificar el dato en TheWoWDB y citá su fuente. No consultes mi personaje: es una pregunta general.',
-  );
-  assert.ok(result.calls.includes('get_database_entity'));
-  result = await run(
-    'Everloot complement',
-    'Para verificar la cobertura: buscá Frost Nova con search_knowledge de la conexión everloot-search de Everloot. Descubrí la herramienta con eve__search y ejecutala con eve__tool aunque TheWoWDB ya tenga el hechizo. Informá si hay coincidencias confirmadas para Forever; no guardes nada en memoria.',
-  );
-  assert.ok(
-    result.calls.some((n) => /eve__tool|search_knowledge/.test(n)),
-    'real MCP invocation',
-  );
-  result = await run(
-    'Wowhead fallback',
-    'Buscá con web_search una guía de leveleo de mago escarcha en Wowhead Forever. Usá esa herramienta de búsqueda aunque haya otras fuentes. Dame 2 consejos con enlaces de esa guía, no de Retail ni Classic.',
-  );
-  assert.ok(result.calls.includes('web_search'));
-  console.log('START manual compaction');
-  const compact = await session.compact();
-  for await (const event of compact.stream()) {
-    applyEvent(chat, event, parts);
-  }
-  const cr = await compact.result();
-  console.log(JSON.stringify({ compactionStatus: cr.status, usage: chat.usage }));
-  assert.ok(chat.usage?.compactions >= 1, 'real compaction completed');
-  result = await run(
-    'post compaction',
-    '¿Cuál era la versión del juego de las fuentes que estábamos consultando? Respondé brevemente y sin herramientas.',
-  );
-  assert.ok(result.usage.contextTokens > 0, 'usage after compact');
-  for (const endpoint of ['/database', '/wowhead']) {
-    assert.ok(
-      rpc.some(
-        (r) => r.endpoint === endpoint && r.status === 'available' && r.version === 'forever',
-      ),
-      endpoint + ' must return verified live data',
+  if (simulationSnapshot) {
+    const result = await run(
+      'current-level DPS simulation',
+      'Compará con simulate_dps, al nivel real del personaje, estas dos rotaciones de 30 segundos a 5 yardas: A) repetir Descarga de Escarcha; B) apertura una vez de Descarga de Escarcha, Nova de Escarcha, Explosión de Fuego y Misiles Arcanos, después usar la varita. Primero consultá mis hechizos para elegir sus rangos aprendidos. Usá 500 iteraciones para ambas y explicá el resultado sin fingir kiteo ni ataques del enemigo.',
     );
+    assert.ok(result.calls.includes('simulate_dps'));
+    const call = rpc.findLast((r) => r.endpoint === '/simulate');
+    assert.equal(call?.status, 'available');
+    assert.equal(call.plans.length, 2);
+    for (const id of [205, 122, 2136, 5143, 5019]) {
+      assert.ok(
+        call.plans.some((p) => p.spellIds.includes(id)),
+        'real agent comparison used spell ' + id,
+      );
+    }
+    assert.match(result.reply, /11/);
+  } else {
+    let result = await run(
+      'primary catalog',
+      '¿Qué hace Nova de Escarcha (spell 122) en Forever? Usá get_database_entity para verificar el dato en TheWoWDB y citá su fuente. No consultes mi personaje: es una pregunta general.',
+    );
+    assert.ok(result.calls.includes('get_database_entity'));
+    result = await run(
+      'Everloot complement',
+      'Para verificar la cobertura: buscá Frost Nova con search_knowledge de la conexión everloot-search de Everloot. Descubrí la herramienta con eve__search y ejecutala con eve__tool aunque TheWoWDB ya tenga el hechizo. Informá si hay coincidencias confirmadas para Forever; no guardes nada en memoria.',
+    );
+    assert.ok(
+      result.calls.some((n) => /eve__tool|search_knowledge/.test(n)),
+      'real MCP invocation',
+    );
+    result = await run(
+      'Wowhead fallback',
+      'Buscá con web_search una guía de leveleo de mago escarcha en Wowhead Forever. Usá esa herramienta de búsqueda aunque haya otras fuentes. Dame 2 consejos con enlaces de esa guía, no de Retail ni Classic.',
+    );
+    assert.ok(result.calls.includes('web_search'));
+    console.log('START manual compaction');
+    const compact = await session.compact();
+    for await (const event of compact.stream()) {
+      applyEvent(chat, event, parts);
+    }
+    const cr = await compact.result();
+    console.log(JSON.stringify({ compactionStatus: cr.status, usage: chat.usage }));
+    assert.ok(chat.usage?.compactions >= 1, 'real compaction completed');
+    result = await run(
+      'post compaction',
+      '¿Cuál era la versión del juego de las fuentes que estábamos consultando? Respondé brevemente y sin herramientas.',
+    );
+    assert.ok(result.usage.contextTokens > 0, 'usage after compact');
+    for (const endpoint of ['/database', '/wowhead']) {
+      assert.ok(
+        rpc.some(
+          (r) => r.endpoint === endpoint && r.status === 'available' && r.version === 'forever',
+        ),
+        endpoint + ' must return verified live data',
+      );
+    }
   }
   await writeFile(path.join(dir, 'report.json'), JSON.stringify({ ...report, rpc }, null, 2));
   console.log('PASS ' + dir);

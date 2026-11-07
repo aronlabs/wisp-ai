@@ -312,6 +312,46 @@ only verified Forever URLs. Both requests share one timeout budget.
 It uses the existing ChatGPT connection/model, without another API key, MCP process
 or browser. Source controls remain in Tools & MCPs.
 
+## Local DPS simulations
+
+`simulate_dps` uses the experimental WoWSims Forever levelsim fork pinned in
+`simulator/manifest.json`. The main WoWSims engine hard-codes level 60; this fork
+adds explicit player levels, base stats, spell ranks and combat tables for 1–60.
+The mage adapter compares up to three plans with a once-only ordered opener and
+a repeating priority list. Actions use learned rank IDs with optional mana
+thresholds; cooldown readiness, complete channels and wand timing follow the
+engine. It supports Frostbolt, Fireball, Fire Blast, Arcane Missiles, Frost Nova,
+Arcane Explosion, Shoot and Orc Blood Fury. Each scenario has a stationary single
+target, fixed distance, 10–180 seconds and 100–2,000 iterations. It reads the current
+character, applied talents, spellbook and equipped items itself. The model cannot
+supply a different level or gear set. Missing readings, unknown talents/items,
+pending talent changes, an unlearned engine-selected rank or a mismatched binary
+produce an unavailable result with no DPS. Settings can disable the capability.
+
+Results include level, scenario, mean/variation, damage by spell, engine source
+and assumptions. The engine applies Arcane Intellect automatically. No external
+buffs, consumables, movement, incoming attacks or latency are modeled by this
+adapter. Wand use must be explicit and assumes maximum wand skill at the level;
+current weapon skill is not yet read. All compared plans share the same snapshot,
+scenario and seed. Their differences do not establish a globally optimal rotation. These are experimental scenario estimates, not live
+combat measurements or a full rotation optimizer. No changes are made in game.
+
+Build on Windows with Go and protoc available using
+`powershell -File scripts/build-simulator.ps1`; optional `-GoPath` and `-ProtocPath`
+select those build tools. It compiles the pinned source and refreshes metadata and
+the binary SHA-256. The executable stays out of git and is included by Windows
+release staging; players do not need Go or protoc. Build the simulator before
+packaging a release. MIT attribution is included under `simulator/`.
+
+Offline tests validate level-11 inputs and rejection cases; the native test also
+runs the real engine when the executable is present. To test the real Eve agent
+against a locally captured game snapshot, set `WISP_SMOKE_CHARACTER` to that JSON
+file and run `node scripts/smoke-agent.mjs`. This uses the signed-in subscription
+and an isolated session. Snapshot replay is a diagnostic; normal game requests
+always obtain a fresh reading through the addon. `/simulator/character` on the
+authenticated desktop API provides a read-only snapshot while game communication
+is active.
+
 ## Conversation context
 
 Eve auto-compacts at 75% of its model context window, including summary prompt

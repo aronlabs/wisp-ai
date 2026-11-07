@@ -30,6 +30,10 @@ export const everlootTools = [
   'recent_changes',
 ];
 export const toolDescriptions: Record<string, [string, string]> = {
+  simulate_dps: [
+    'Simulate DPS',
+    'Run the local experimental WoWSims Forever levelsim engine with fresh mage state at levels 1–60. Single-target Frostbolt or Fireball scenarios.',
+  ],
   search_database: [
     'Search Forever database',
     'Search the primary TheWoWDB catalog for Forever items, spells, quests, NPCs and zones.',

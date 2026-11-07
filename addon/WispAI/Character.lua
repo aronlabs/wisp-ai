@@ -9,6 +9,7 @@ function collectors.character()
         level = UnitLevel("player"),
         class = class,
         race = UnitRace("player"),
+        raceToken = select(2, UnitRace("player")),
         faction = UnitFactionGroup("player"),
         moneyCopper = GetMoney(),
         xp = UnitXP("player"),

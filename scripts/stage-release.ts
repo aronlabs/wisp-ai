@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stage = path.resolve(process.env.WISP_RELEASE_STAGE || '');
+await readFile(path.join(root, 'simulator', 'wowsimcli.exe'));
 if (!stage.startsWith(path.join(root, 'dist') + path.sep)) {
   throw Error('Release staging must stay under dist');
 }
@@ -13,6 +14,7 @@ for (const dir of [
   'desktop',
   'scripts',
   'tests',
+  'simulator',
   '.github',
   'node_modules',
 ]) {

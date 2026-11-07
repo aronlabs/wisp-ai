@@ -32,6 +32,7 @@ export interface Chat {
   unread?: boolean;
   historyVersion?: number;
   lastUsedAt?: number;
+  lastActivityAt?: number;
   inline?: boolean;
   proactive?: boolean;
   tipSkipped?: boolean;
