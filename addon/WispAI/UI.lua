@@ -368,6 +368,20 @@ function C.RefreshModelControls()
         end
         local pending = chat and C.modelPending[chat.id]
         controls.model:SetWidth(math.max(90, math.min(165, controls:GetParent():GetWidth() - 150)))
+        if controls.composer then
+            local narrow = controls.composer:GetWidth() < 380
+            if controls.narrow ~= narrow then
+                controls.narrow = narrow
+                controls.composer:SetHeight(narrow and 106 or 78)
+                C.draft:ClearAllPoints()
+                C.draft:SetPoint("TOPLEFT", 10, -7)
+                C.draft:SetPoint("BOTTOMRIGHT", -10, narrow and 56 or 28)
+                controls.send:ClearAllPoints()
+                controls.send:SetPoint("BOTTOMRIGHT", -7, narrow and 31 or 5)
+                transcript:SetPoint("BOTTOMRIGHT", -31, narrow and 132 or 104)
+                scrollBar:SetPoint("BOTTOMRIGHT", -10, narrow and 132 or 104)
+            end
+        end
         local working = chat and chat.status == "working"
         setText(
             controls.model,
@@ -1190,18 +1204,8 @@ function C.BuildUI()
     sessionTitle:SetPoint("TOPLEFT", 12, -9)
     sessionTitle:SetPoint("RIGHT", -12, 0)
     sessionTitle:SetWordWrap(false)
-    local modelPicker = C.CreateModelControls(
-        chatPanel,
-        "WispAIChatModelControls",
-        C.Current,
-        function()
-            C.NewChat()
-            return C.Current()
-        end
-    )
-    modelPicker:SetPoint("TOPLEFT", 12, -30)
     transcript = CreateFrame("ScrollFrame", nil, chatPanel)
-    transcript:SetPoint("TOPLEFT", 13, -62)
+    transcript:SetPoint("TOPLEFT", 13, -34)
     transcript:SetPoint("BOTTOMRIGHT", -31, 104)
     content = CreateFrame("Frame", nil, transcript)
     content:SetSize(360, 1)
@@ -1227,7 +1231,7 @@ function C.BuildUI()
     end
     scrollBar = CreateFrame("Slider", "WispAITranscriptScrollBar", chatPanel, "BackdropTemplate")
     scrollBar:SetOrientation("VERTICAL")
-    scrollBar:SetPoint("TOPRIGHT", -10, -62)
+    scrollBar:SetPoint("TOPRIGHT", -10, -34)
     scrollBar:SetPoint("BOTTOMRIGHT", -10, 104)
     scrollBar:SetWidth(14)
     box(scrollBar, { 0.08, 0.07, 0.05, 1 }, 8)
@@ -1284,8 +1288,6 @@ function C.BuildUI()
         self:ClearFocus()
         C.SetMinimized(true)
     end)
-    local hint = label(inputBox, "Shift-click to link", MUTED)
-    hint:SetPoint("BOTTOMLEFT", 10, 9)
     progress = CreateFrame("Frame", "WispAIProgress", content)
     progress:SetHeight(54)
     progress.author = label(progress, "Wisp AI", GOLD)
@@ -1317,6 +1319,17 @@ function C.BuildUI()
         end
     end)
     send:SetPoint("BOTTOMRIGHT", -7, 5)
+    local modelPicker = C.CreateModelControls(
+        inputBox,
+        "WispAIChatModelControls",
+        C.Current,
+        function()
+            C.NewChat()
+            return C.Current()
+        end
+    )
+    modelPicker:SetPoint("BOTTOMLEFT", 10, 5)
+    modelPicker.composer, modelPicker.send = inputBox, send
     status = label(chatPanel, "Waiting for bridge...", MUTED)
     status:SetPoint("BOTTOMLEFT", 12, 6)
     contextMeter = CreateFrame("Button", "WispAIContextUsage", chatPanel)
