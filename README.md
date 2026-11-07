@@ -291,6 +291,16 @@ The bridge entry point is `src/main.ts`; Eve process management is isolated in
 
 ## Forever knowledge sources
 
+NPC destinations use the optional installed QuestieDB Forever provider through
+`find_npc_locations`. Questie's public class-trainer index resolves trainer IDs,
+and the database supplies spawn positions and field provenance. Another provider
+flavor is rejected. Area IDs are converted through Questie's zone API and checked
+against native map metadata and the reverse mapping. Points with invalid/sentinel
+coordinates or an ambiguous inherited map frame are withheld. These are database
+locations, not live sightings; phase constraints and missing coverage remain
+explicit. No third-party addon files are modified or installed. An unavailable
+provider leaves the existing Forever knowledge fallbacks available.
+
 Live character readings remain authoritative for the player. External catalog facts
 start with TheWoWDB through search_database and get_database_entity. The API path is
 fixed to /api/v1/forever/, response versions/kinds are checked (including search

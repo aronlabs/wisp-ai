@@ -640,6 +640,16 @@ function inspectors.macros(args)
     }
 end
 function C.Inspect(inspection)
+    if inspection and inspection.kind == "npc_locations" then
+        local ok, data = pcall(C.FindNPCLocations, inspection.args or {})
+        return {
+            status = ok and "available" or "unavailable",
+            data = ok and data or nil,
+            error = not ok and tostring(data) or nil,
+            capturedAt = time(),
+            source = "QuestieDB Forever",
+        }
+    end
     if inspection and inspection.kind == "settings" then
         local ok, data = pcall(C.ReadSettings, inspection.args or {})
         return {

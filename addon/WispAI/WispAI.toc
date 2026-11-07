@@ -5,10 +5,12 @@
 ## Version: 0.1.0
 ## SavedVariables: WispAIDB
 ## DefaultState: enabled
+## OptionalDeps: QuestieDB, Questie
 
 Core.lua
 Transport.lua
 Character.lua
+Locations.lua
 Settings.lua
 RichUI.lua
 UI.lua

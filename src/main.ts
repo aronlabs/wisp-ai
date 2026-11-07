@@ -932,6 +932,7 @@ const server = createServer(async (req, res) => {
         ? (
             {
               settings: 'get_settings',
+              npc_locations: 'find_npc_locations',
               reference: 'inspect_reference',
               progression: 'query_progression',
               target: 'inspect_target',

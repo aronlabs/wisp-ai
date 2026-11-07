@@ -1,5 +1,30 @@
 import { z } from 'zod';
 import { settingsRead } from './settings.ts';
+export const npcLocationsInput = z
+  .strictObject({
+    mode: z.enum(['npc', 'class_trainers']).default('npc'),
+    npcId: z.number().int().positive().optional(),
+    name: z.string().trim().min(1).max(80).optional(),
+    class: z
+      .enum([
+        'MAGE',
+        'WARRIOR',
+        'PALADIN',
+        'HUNTER',
+        'ROGUE',
+        'PRIEST',
+        'SHAMAN',
+        'WARLOCK',
+        'DRUID',
+      ])
+      .optional(),
+    mapId: z.number().int().positive().optional(),
+    limit: z.number().int().min(1).max(10).default(5),
+  })
+  .refine(
+    (x) => x.mode === 'class_trainers' || x.npcId !== undefined || x.name !== undefined,
+    'Provide an NPC name/ID or class_trainers mode',
+  );
 export const referenceInput = z.object({
   kind: z.enum(['item', 'spell', 'quest', 'talent']),
   id: z.number().int().positive(),
@@ -17,6 +42,7 @@ export const auctionInput = z.object({
   limit: z.number().int().min(1).max(50).default(20),
 });
 export const inspectionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('npc_locations'), args: npcLocationsInput }),
   z.object({ kind: z.literal('settings'), args: settingsRead }),
   z.object({ kind: z.literal('reference'), args: referenceInput }),
   z.object({ kind: z.literal('progression'), args: progressionInput }),

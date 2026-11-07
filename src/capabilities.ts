@@ -30,6 +30,10 @@ export const everlootTools = [
   'recent_changes',
 ];
 export const toolDescriptions: Record<string, [string, string]> = {
+  find_npc_locations: [
+    'Find NPC locations',
+    'Read NPC spawn coordinates and class-trainer locations from installed QuestieDB Forever, with native map validation and source provenance.',
+  ],
   simulate_dps: [
     'Simulate DPS',
     'Run the local experimental WoWSims Forever levelsim engine with fresh mage state at levels 1–60. Single-target Frostbolt or Fireball scenarios.',
