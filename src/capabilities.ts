@@ -32,7 +32,7 @@ export const everlootTools = [
 export const toolDescriptions: Record<string, [string, string]> = {
   find_npc_locations: [
     'Find NPC locations',
-    'Read NPC spawn coordinates and class-trainer locations from installed QuestieDB Forever, with native map validation and source provenance.',
+    'Read NPC, class-trainer and city-service locations from installed QuestieDB Forever, with native map validation and source provenance.',
   ],
   simulate_dps: [
     'Simulate DPS',

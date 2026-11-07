@@ -293,7 +293,10 @@ The bridge entry point is `src/main.ts`; Eve process management is isolated in
 
 NPC destinations use the optional installed QuestieDB Forever provider through
 `find_npc_locations`. Questie's public class-trainer index resolves trainer IDs,
-and the database supplies spawn positions and field provenance. Another provider
+and its townsfolk service index resolves transmog, barber, banking, auction and
+other supported services without knowing an NPC's name first. Use mode=services
+and the explicit service enum, such as Transmogrifier. The database supplies spawn
+positions and field provenance. Another provider
 flavor is rejected. Area IDs are converted through Questie's zone API and checked
 against native map metadata and the reverse mapping. Points with invalid/sentinel
 coordinates or an ambiguous inherited map frame are withheld. These are database

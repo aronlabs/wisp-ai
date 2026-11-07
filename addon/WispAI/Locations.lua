@@ -38,6 +38,16 @@ function C.FindNPCLocations(args)
         )
         local _, class = UnitClass("player")
         ids = townsfolk.GetClassTrainers()[args.class or class] or {}
+    elseif args.mode == "services" then
+        assert(
+            Questie and Questie.IsForever and townsfolk and townsfolk.townsfolk,
+            "Questie's Forever service index is unavailable"
+        )
+        assert(
+            args.service and type(townsfolk.townsfolk[args.service]) == "table",
+            "The requested service is unavailable in the installed Questie index; this does not prove it is absent from Forever"
+        )
+        ids = townsfolk.townsfolk[args.service]
     elseif args.npcId then
         ids = { args.npcId }
     elseif args.name and npc.IdsByName then

@@ -17,13 +17,13 @@ function runTest(code: string) {
     function UnitClass() return 'Mago','MAGE' end
     function UnitFactionGroup() return 'Horde' end
     C_Map={GetBestMapForUnit=function()return 1454 end,GetMapInfo=function(id)if id==1454 then return{name='Orgrimmar'}end end}
-    local rows={ [5885]={name='Deino',subName='Instructor de magos',friendlyToFaction='H',spawns={[1637]={{38.45,86.13},{-1,-1}}}},[999]={name='Other trainer',friendlyToFaction='A',spawns={[1637]={{40,90}}}} }
+    local rows={ [900001]={name='Test service NPC',friendlyToFaction='H',spawns={[1637]={{45,55}}}}, [5885]={name='Deino',subName='Instructor de magos',friendlyToFaction='H',spawns={[1637]={{38.45,86.13},{-1,-1}}}},[999]={name='Other trainer',friendlyToFaction='A',spawns={[1637]={{40,90}}}} }
     LibQuestieDB={flavor={expansion='Forever'},contractVersion=4,RequireContract=function(v)return v==4 end,
       EraToForever=function(_,x,y)return x,y end,GetProvenance=function()return'QuestieDB'end,
       Npc={Exists=function(id)return rows[id]~=nil end,Get=function(id,key)return rows[id]and rows[id][key]end,IdsByName=function(name)if name=='Deino'then return{5885}end end}}
     Questie={IsForever=true}
     local zones={GetUiMapIdByAreaId=function(_,area)if area==1637 then return 1454 end end,GetAreaIdByUiMapId=function(_,map)if map==1454 then return 1637 end end}
-    QuestieLoader={ImportModule=function(_,name)if name=='ZoneDB'then return zones elseif name=='Townsfolk'then return{GetClassTrainers=function()return{MAGE={5885,999}}end}end end}
+    QuestieLoader={ImportModule=function(_,name)if name=='ZoneDB'then return zones elseif name=='Townsfolk'then return{GetClassTrainers=function()return{MAGE={5885,999}}end,townsfolk={Transmogrifier={900001}}}end end}
   `);
   run(
     `assert(load(${JSON.stringify(readFileSync('addon/WispAI/Locations.lua', 'utf8'))}))('WispAI',C)`,
@@ -56,11 +56,17 @@ test('other versions, unknown maps and ambiguous coordinate frames never become 
 `));
 test('NPC lookup inputs remain bounded and cannot select a different database version', () => {
   assert.ok(
+    npcLocationsInput.safeParse({ mode: 'services', service: 'Transmogrifier', mapId: 1454 })
+      .success,
+  );
+  assert.ok(
     npcLocationsInput.safeParse({ mode: 'class_trainers', class: 'MAGE', mapId: 1454 }).success,
   );
   for (const input of [
     {},
     { npcId: 0 },
+    { mode: 'services' },
+    { mode: 'services', service: 'invented' },
     { name: '' },
     { name: 'Deino', version: 'classic' },
     { mode: 'class_trainers', limit: 10000 },
@@ -68,3 +74,11 @@ test('NPC lookup inputs remain bounded and cannot select a different database ve
     assert.equal(npcLocationsInput.safeParse(input).success, false);
   }
 });
+test('service lookup discovers transmog NPCs without a personal name', () =>
+  runTest(`
+  LibQuestieDB.Npc.IdsByName=function()error('A service query must not search a guessed NPC name')end
+  local result=C.FindNPCLocations({mode='services',service='Transmogrifier',mapId=1454})
+  assert(result.status=='available'and result.total==1)
+  assert(result.locations[1].npcId==900001 and result.locations[1].reference.x==45 and result.locations[1].reference.y==55)
+  assert(not pcall(C.FindNPCLocations,{mode='services',service='Unknown'}))
+`));

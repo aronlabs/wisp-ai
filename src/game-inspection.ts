@@ -2,7 +2,21 @@ import { z } from 'zod';
 import { settingsRead } from './settings.ts';
 export const npcLocationsInput = z
   .strictObject({
-    mode: z.enum(['npc', 'class_trainers']).default('npc'),
+    mode: z.enum(['npc', 'class_trainers', 'services']).default('npc'),
+    service: z
+      .enum([
+        'Transmogrifier',
+        'Barber',
+        'Banker',
+        'Auctioneer',
+        'Innkeeper',
+        'Flight Master',
+        'Repair',
+        'Battlemaster',
+        'Arcane Reforger',
+        'Weapon Master',
+      ])
+      .optional(),
     npcId: z.number().int().positive().optional(),
     name: z.string().trim().min(1).max(80).optional(),
     class: z
@@ -22,8 +36,11 @@ export const npcLocationsInput = z
     limit: z.number().int().min(1).max(10).default(5),
   })
   .refine(
-    (x) => x.mode === 'class_trainers' || x.npcId !== undefined || x.name !== undefined,
-    'Provide an NPC name/ID or class_trainers mode',
+    (x) =>
+      x.mode === 'services'
+        ? x.service !== undefined
+        : x.mode === 'class_trainers' || x.npcId !== undefined || x.name !== undefined,
+    'Provide a service in services mode, an NPC name/ID, or class_trainers mode',
   );
 export const referenceInput = z.object({
   kind: z.enum(['item', 'spell', 'quest', 'talent']),
