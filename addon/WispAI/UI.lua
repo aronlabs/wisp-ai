@@ -148,7 +148,44 @@ local function formatted(text, references, fromUser)
         if not payload then
             return name
         end
-        return keep("|cffe3c77e|H" .. payload .. "|h[" .. name .. "]|h|r")
+        local icon = "Interface\\Icons\\INV_Misc_QuestionMark"
+        local color = "ffe3c77e"
+        if ref.kind == "item" then
+            icon = (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(tonumber(ref.id)))
+                or (GetItemIcon and GetItemIcon(tonumber(ref.id)))
+                or icon
+            if GetItemInfo and GetItemQualityColor then
+                local _, _, quality = GetItemInfo(tonumber(ref.id))
+                if quality then
+                    local _, _, _, hex = GetItemQualityColor(quality)
+                    color = hex or color
+                end
+            end
+        elseif ref.kind == "spell" then
+            icon = (
+                C_Spell
+                and C_Spell.GetSpellTexture
+                and C_Spell.GetSpellTexture(tonumber(ref.id))
+            )
+                or (GetSpellTexture and GetSpellTexture(tonumber(ref.id)))
+                or icon
+            color = "ff71d5ff"
+        elseif ref.kind == "map" then
+            icon, color = "Interface\\Icons\\INV_Misc_Map_01", "ff80cf91"
+        elseif ref.kind == "quest" then
+            icon = "Interface\\GossipFrame\\AvailableQuestIcon"
+        end
+        return keep(
+            "|T"
+                .. tostring(icon)
+                .. ":14:14|t |c"
+                .. color
+                .. "|H"
+                .. payload
+                .. "|h["
+                .. name
+                .. "]|h|r"
+        )
     end)
     text = text:gsub("%*%*([^*]+)%*%*", "|cffe3c77e%1|r")
     text = text:gsub("%*([^*\n]+)%*", "%1"):gsub("_([^_\n]+)_", "%1")
@@ -172,7 +209,7 @@ local function referenceSignature(references)
     return table.concat(parts, "\31")
 end
 local frame, header, body, sidebar, chatPanel, status, transcript, content, scrollBar, sessionTitle, send, mini, settings, contextMeter
-local replyGlow
+local replyGlow, newMessages
 local emptyState
 local progress
 local gear, fold, sessionsLabel, newSession, resize
@@ -413,7 +450,25 @@ function C.CreateModelControls(parent, name, current, ensure)
         local chat = current() or (ensure and ensure())
         C.SetChatModel(chat, model, effort)
     end
-    controls.model = button(controls, "Model...", 165, function(self)
+    local function selector(text, width, click)
+        local control = CreateFrame("Button", nil, controls)
+        control:SetSize(width, 22)
+        local caption = label(control, text, MUTED)
+        caption:SetFontObject("GameFontNormalSmall")
+        caption:SetPoint("LEFT", 2, 0)
+        caption:SetPoint("RIGHT", -12, 0)
+        caption:SetWordWrap(false)
+        control:SetFontString(caption)
+        control:SetNormalFontObject("GameFontNormalSmall")
+        control:SetHighlightFontObject("GameFontHighlightSmall")
+        local arrow = label(control, "v", MUTED)
+        arrow:SetFontObject("GameFontNormalSmall")
+        arrow:SetPoint("RIGHT", -2, 0)
+        control:SetText(text)
+        control:SetScript("OnClick", click)
+        return control
+    end
+    controls.model = selector("Model...", 165, function(self)
         local models = C.modelCatalog and C.modelCatalog.models or {}
         if #models == 0 then
             C.Send({ type = "model_catalog" })
@@ -439,7 +494,7 @@ function C.CreateModelControls(parent, name, current, ensure)
         end
     end)
     controls.model:SetPoint("LEFT")
-    controls.effort = button(controls, "Effort: --", 110, function(self)
+    controls.effort = selector("Effort: --", 110, function(self)
         local chat = current()
         local model = chat and chat.modelSettings and chat.modelSettings.model
             or C.modelCatalog.defaultModel
@@ -756,9 +811,110 @@ local function makeRow(parent)
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetSize(14, 14)
     row.icon:SetPoint("TOPLEFT", 0, -1)
+    row.bubble = row:CreateTexture(nil, "BACKGROUND")
+    row.bubble:SetAllPoints(row)
+    row.bubble:SetColorTexture(0.18, 0.14, 0.09, 0.8)
+    row.bubble:Hide()
+    row.disclosure = CreateFrame("Button", nil, row)
+    row.disclosure:SetAllPoints(row)
+    row.disclosure:SetScript("OnClick", function()
+        C.toolGroupsExpanded = C.toolGroupsExpanded or {}
+        C.toolGroupsExpanded[row.groupKey] = not C.toolGroupsExpanded[row.groupKey]
+        C.Refresh()
+        if C.RefreshInline then
+            C.RefreshInline()
+        end
+    end)
+    row.disclosure:Hide()
     return row
 end
 C.MakeMessageRow = makeRow
+C.toolGroupsExpanded = {}
+function C.DisplayMessages(chat)
+    local messages, group = {}, nil
+    for index, message in ipairs(chat and chat.messages or {}) do
+        if message.role == "tool" then
+            if C.db.showTools then
+                if not group then
+                    group = {
+                        id = "tools-" .. (message.id or index),
+                        role = "tool",
+                        text = "",
+                        calls = {},
+                    }
+                    messages[#messages + 1] = group
+                end
+                group.calls[#group.calls + 1] = message
+            end
+        else
+            group = nil
+            messages[#messages + 1] = message
+        end
+    end
+    for _, message in ipairs(messages) do
+        if message.calls then
+            local labels, details, running, failed = {}, {}, nil, false
+            for _, call in ipairs(message.calls) do
+                local tool = call.tool or {}
+                local name = tool.label or call.text or "Tool"
+                labels[#labels + 1] = name
+                details[#details + 1] = name .. " - " .. (tool.status or "completed")
+                if tool.status == "running" then
+                    running = name
+                end
+                if tool.status and tool.status ~= "running" and tool.status ~= "completed" then
+                    failed = true
+                end
+            end
+            message.groupKey = chat.id .. ":" .. message.id
+            local expanded = C.toolGroupsExpanded[message.groupKey]
+            local summary = running or table.concat(labels, " / ", 1, math.min(2, #labels))
+            if #labels > 2 and not running then
+                summary = summary .. " / +" .. (#labels - 2)
+            end
+            message.text = (expanded and "- " or "+ ")
+                .. summary
+                .. (expanded and ("\n" .. table.concat(details, "\n")) or "")
+            message.tool = {
+                label = message.text,
+                status = running and "running" or (failed and "failed" or "completed"),
+            }
+        end
+    end
+    return messages
+end
+function C.PositionMessageRow(row, parent, y, width)
+    local x = row.speaker == "user" and width - row:GetWidth() or 0
+    if row.y ~= y or row.x ~= x then
+        row.y, row.x = y, x
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
+    end
+end
+function C.MessageGap(previous, speaker)
+    return previous and previous ~= speaker and 12 or 0
+end
+function C.ChatSignature(chat)
+    local parts = { chat and chat.id or "" }
+    for _, message in ipairs(chat and chat.messages or {}) do
+        parts[#parts + 1] = (message.id or "")
+            .. (message.text or "")
+            .. (message.tool and message.tool.status or "")
+            .. (C.RichSignature and C.RichSignature(message.ui) or "")
+    end
+    return table.concat(parts, "\31")
+end
+function C.UpdateNewMessages(button, chat, follow, switched)
+    local signature = C.ChatSignature(chat)
+    if not switched and button.signature and button.signature ~= signature and not follow then
+        button.pending = true
+    end
+    if follow or switched then
+        button.pending = false
+    end
+    button.signature = signature
+    button:SetShown(button.pending == true and not follow)
+end
 function C.MessageSpeaker(message)
     return (message.role == "tool" or message.role == "assistant") and "assistant" or message.role
 end
@@ -783,9 +939,23 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
         .. tostring(showAuthor)
     if row.signature ~= signature then
         row.signature = signature
+        row.speaker = message.role
+        local padding = message.role == "user" and 10 or 0
+        if message.role == "user" then
+            width = math.floor(width * 0.84)
+        end
         row:SetWidth(width)
+        row.bubble:SetShown(message.role == "user")
+        row.groupKey = message.groupKey
+        row.disclosure:SetShown(message.groupKey ~= nil)
         row.text:ClearAllPoints()
-        local top = showAuthor and 20 or 0
+        local top = (showAuthor and 20 or 0) + padding
+        row.author:ClearAllPoints()
+        row.author:SetPoint(
+            message.role == "user" and "TOPRIGHT" or "TOPLEFT",
+            message.role == "user" and -10 or 0,
+            -padding
+        )
         row.author:SetShown(showAuthor)
         setText(
             row.author,
@@ -815,8 +985,8 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
             row.height = top + math.max(18, row.text:GetStringHeight()) + 7
         else
             row.icon:Hide()
-            row.text:SetPoint("TOPLEFT", 0, -top)
-            row.text:SetWidth(width)
+            row.text:SetPoint("TOPLEFT", padding, -top)
+            row.text:SetWidth(width - padding * 2)
             row.text:SetTextColor(unpack(message.role == "system" and MUTED or TEXT))
             setText(row.text, formatted(message.text, message.references, message.role == "user"))
             row.height = top
@@ -830,6 +1000,9 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
                 row.height = row.height + C.RenderRichUI(row.rich, chat, message, width)
             end
             row.height = row.height + 8
+            if message.role == "user" then
+                row.height = row.height + padding
+            end
         end
         row:SetHeight(row.height)
     end
@@ -851,7 +1024,7 @@ local function renderTranscript(chat)
     local width = math.max(100, transcript:GetWidth() - 6)
     local y, used = 0, {}
     local previousSpeaker
-    for index, message in ipairs(chat and chat.messages or {}) do
+    for index, message in ipairs(C.DisplayMessages(chat)) do
         if message.role ~= "tool" or C.db.showTools then
             local key = id .. ":" .. (message.id or tostring(index))
             local row = rows[key]
@@ -861,14 +1034,11 @@ local function renderTranscript(chat)
             end
             used[key] = true
             local speaker = C.MessageSpeaker(message)
+            y = y + C.MessageGap(previousSpeaker, speaker)
             local showAuthor = speaker ~= "assistant" or previousSpeaker ~= speaker
             C.RenderMessageRow(row, chat, message, width, showAuthor)
             previousSpeaker = speaker
-            if row.y ~= y then
-                row.y = y
-                row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
-            end
+            C.PositionMessageRow(row, content, y, width)
             if not row:IsShown() then
                 row:Show()
             end
@@ -909,6 +1079,7 @@ local function renderTranscript(chat)
     local position = follow and scrollRange or math.min(oldOffset, scrollRange)
     scrollBar:SetValue(position)
     transcript:SetVerticalScroll(position)
+    C.UpdateNewMessages(newMessages, chat, follow, switched)
     renderedChat = id
 end
 function C.SetMinimized(value)
@@ -1244,7 +1415,19 @@ function C.BuildUI()
     scrollBar:GetThumbTexture():SetSize(14, 28)
     scrollBar:SetScript("OnValueChanged", function(_, value)
         transcript:SetVerticalScroll(value)
+        if not rendering and newMessages and value >= scrollRange - 30 then
+            newMessages.pending = false
+            newMessages:Hide()
+        end
     end)
+    newMessages = button(chatPanel, "New messages v", 140, function()
+        scrollBar:SetValue(scrollRange)
+        newMessages.pending = false
+        newMessages:Hide()
+    end)
+    newMessages:SetPoint("BOTTOM", transcript, "BOTTOM", 0, 8)
+    newMessages:SetFrameLevel(transcript:GetFrameLevel() + 10)
+    newMessages:Hide()
     transcript:EnableMouseWheel(true)
     transcript:SetScript("OnMouseWheel", function(_, delta)
         scrollBar:SetValue(math.max(0, math.min(scrollRange, scrollBar:GetValue() - delta * 45)))

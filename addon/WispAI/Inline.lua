@@ -3,6 +3,7 @@ BINDING_HEADER_WISPAI = "Wisp"
 BINDING_NAME_WISPAI_INLINE = "Ask about hovered reference"
 local panel, entry, title, scroll, content, busy, send
 local rows = {}
+local newMessages, renderedChat
 local bindingCapture, hotkey, bindingEvents, lastActivation, bindingSignature
 local mouseKeys = { LeftButton = "BUTTON1", RightButton = "BUTTON2", MiddleButton = "BUTTON3" }
 local function combination(key)
@@ -282,7 +283,7 @@ function C.RefreshInline()
     local previousRange = scroll:GetVerticalScrollRange()
     local offset = scroll:GetVerticalScroll()
     local follow = previousRange - offset < 30
-    for index, message in ipairs(chat and chat.messages or {}) do
+    for index, message in ipairs(C.DisplayMessages(chat)) do
         if message.role ~= "tool" or C.db.showTools then
             local key = chat.id .. ":" .. (message.id or index)
             local row = rows[key]
@@ -293,12 +294,12 @@ function C.RefreshInline()
             end
             used[key] = true
             local speaker = C.MessageSpeaker(message)
+            y = y + C.MessageGap(previousSpeaker, speaker)
             local showAuthor = speaker ~= "assistant" or previousSpeaker ~= speaker
             C.RenderMessageRow(row, chat, message, width, showAuthor)
             previousSpeaker = speaker
             local h = row.height
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", 0, -y)
+            C.PositionMessageRow(row, content, y, width)
             if not row:IsShown() then
                 row:Show()
             end
@@ -341,6 +342,8 @@ function C.RefreshInline()
     if follow then
         scroll:SetVerticalScroll(math.max(0, y - scroll:GetHeight()))
     end
+    C.UpdateNewMessages(newMessages, chat, follow, renderedChat ~= (chat and chat.id))
+    renderedChat = chat and chat.id
     set(send, working and "Stop" or "Ask")
 end
 function C.OpenInline()
@@ -494,6 +497,23 @@ function C.InitInline()
     content:SetSize(370, 1)
     content._wispScroll = scroll
     scroll:SetScrollChild(content)
+    newMessages = CreateFrame("Button", "WispAIInlineNewMessages", panel, "UIPanelButtonTemplate")
+    newMessages:SetSize(140, 24)
+    newMessages:SetText("New messages v")
+    newMessages:SetPoint("BOTTOM", scroll, "BOTTOM", 0, 8)
+    newMessages:SetFrameLevel(scroll:GetFrameLevel() + 10)
+    newMessages:SetScript("OnClick", function()
+        scroll:SetVerticalScroll(scroll:GetVerticalScrollRange())
+        newMessages.pending = false
+        newMessages:Hide()
+    end)
+    scroll:SetScript("OnVerticalScroll", function(_, offset)
+        if offset >= scroll:GetVerticalScrollRange() - 30 then
+            newMessages.pending = false
+            newMessages:Hide()
+        end
+    end)
+    newMessages:Hide()
     busy = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     busy:SetTextColor(0.84, 0.72, 0.43)
     busy:SetText("Thinking...")
