@@ -3,6 +3,53 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
+test('chat placeholder distinguishes connecting, fetching history and an empty conversation', () => {
+  const L = lauxlib.luaL_newstate();
+  lualib.luaL_openlibs(L);
+  const run = (code: string) => {
+    if (lauxlib.luaL_dostring(L, to_luastring(code)) !== lua.LUA_OK) {
+      throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
+    }
+  };
+  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(`C={db={sidebar=true,showTools=true,drafts={}},active='chat',connected=false}
+    C.chats={{id='chat',title='Test',status='idle',activity={}}}
+    function C.Current() return C.chats[1] end
+    assert(load(${JSON.stringify(readFileSync('addon/WispAI/UI.lua', 'utf8'))}))('WispAI',C)
+    C.BuildUI()
+    local state=UI_TEST.frames.WispAIChatPlaceholder
+    assert(state:IsShown() and state.loading and state.title:GetText()=='Waiting for bridge')
+    assert(state.mouseEnabled==false)
+    local alpha
+    state.dots[1].SetAlpha=function(_,value)alpha=value end
+    UI_TEST.frames.WispAIWindow.scripts.OnUpdate(nil,0.3)
+    local before=alpha
+    UI_TEST.now=0.5
+    UI_TEST.frames.WispAIWindow.scripts.OnUpdate(nil,0.3)
+    assert(alpha~=before,'the loading indicator must animate')
+    C.connected=true
+    C.Refresh()
+    assert(state:IsShown() and state.loading and state.title:GetText()=='Loading conversation')
+    C.chats[1].messages={}
+    C.Refresh()
+    assert(state:IsShown() and not state.loading and state.title:GetText()=='Ask Wisp')
+    assert(not state.dots[1]:IsShown())
+    C.chats[1].status='working'
+    C.Refresh()
+    assert(not state:IsShown(),'thinking has its own transcript row')
+    C.chats[1]={id='cached',title='Cached',status='done',messages={{id='a',role='assistant',text='Hello'}}}
+    C.connected=false
+    C.Refresh()
+    assert(not state:IsShown(),'disconnection must not obscure cached history')
+    C.chats[1]={id='other',title='Other',status='done'}
+    C.connected=true
+    C.Refresh()
+    assert(state:IsShown() and state.title:GetText()=='Loading conversation')
+    C.chats[1].messages={{id='b',role='assistant',text='Loaded'}}
+    C.Refresh()
+    assert(not state:IsShown(),'the placeholder disappears when history arrives')
+  `);
+});
 test('context meter distinguishes unknown usage, measured context and compaction without adding a transcript row', () => {
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);

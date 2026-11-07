@@ -172,6 +172,7 @@ local function referenceSignature(references)
 end
 local frame, header, body, sidebar, chatPanel, status, transcript, content, scrollBar, sessionTitle, send, mini, settings, contextMeter
 local replyGlow
+local emptyState
 local progress
 local gear, fold, sessionsLabel, newSession, resize
 local memoryPanel, memoryContent, memoryStatus
@@ -327,6 +328,28 @@ C.workStarted = C.workStarted or {}
 local function refreshProgress()
     local chat = C.Current()
     local working = chat and chat.status == "working"
+    local empty = not chat or not chat.messages or #chat.messages == 0
+    local waiting = not C.connected
+    local loading = chat and chat.messages == nil
+    emptyState:SetShown(empty and not working)
+    emptyState.loading = waiting or loading
+    if empty and not working then
+        setText(
+            emptyState.title,
+            waiting and "Waiting for bridge" or (loading and "Loading conversation" or "Ask Wisp")
+        )
+        setText(
+            emptyState.detail,
+            waiting and "Keep the Wisp desktop app open. Your chat will appear when it connects."
+                or (
+                    loading and "Fetching your messages."
+                    or "Ask about your character, quests, equipment or where to go next."
+                )
+        )
+        for _, dot in ipairs(emptyState.dots) do
+            dot:SetShown(emptyState.loading)
+        end
+    end
     progress:SetShown(working)
     local title = "Wisp AI"
     if working then
@@ -1028,6 +1051,25 @@ function C.BuildUI()
     content = CreateFrame("Frame", nil, transcript)
     content:SetSize(360, 1)
     transcript:SetScrollChild(content)
+    emptyState = CreateFrame("Frame", "WispAIChatPlaceholder", chatPanel)
+    emptyState:SetAllPoints(transcript)
+    emptyState:EnableMouse(false)
+    emptyState.title = label(emptyState, "", GOLD)
+    emptyState.title:SetPoint("CENTER", 0, 20)
+    emptyState.title:SetJustifyH("CENTER")
+    emptyState.detail = label(emptyState, "", MUTED)
+    emptyState.detail:SetPoint("TOP", emptyState.title, "BOTTOM", 0, -10)
+    emptyState.detail:SetPoint("LEFT", 20, 0)
+    emptyState.detail:SetPoint("RIGHT", -20, 0)
+    emptyState.detail:SetJustifyH("CENTER")
+    emptyState.detail:SetWordWrap(true)
+    emptyState.dots = {}
+    for index = 1, 3 do
+        local dot = label(emptyState, ".", GOLD)
+        dot:SetFontObject("GameFontNormalLarge")
+        dot:SetPoint("BOTTOM", emptyState.title, "TOP", (index - 2) * 12, 12)
+        emptyState.dots[index] = dot
+    end
     scrollBar = CreateFrame("Slider", "WispAITranscriptScrollBar", chatPanel, "BackdropTemplate")
     scrollBar:SetOrientation("VERTICAL")
     scrollBar:SetPoint("TOPRIGHT", -10, -34)
@@ -1050,6 +1092,11 @@ function C.BuildUI()
     end)
     local progressTick = 0
     frame:SetScript("OnUpdate", function(_, elapsed)
+        if emptyState:IsShown() and emptyState.loading then
+            for index, dot in ipairs(emptyState.dots) do
+                dot:SetAlpha(0.3 + 0.7 * (0.5 + 0.5 * math.sin(GetTime() * 4 - index * 0.8)))
+            end
+        end
         if replyGlow:IsShown() then
             replyGlow:SetAlpha(0.65 + 0.25 * math.sin(GetTime() * math.pi))
         end
