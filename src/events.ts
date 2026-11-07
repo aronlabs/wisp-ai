@@ -1,6 +1,7 @@
 import { ReplyProjection, ReplyStream, type ReferenceCatalog } from './reply-stream.ts';
 import type { UINode } from './ui-schema.ts';
 import { recordContextUsage, type ContextUsage } from './context-usage.ts';
+import type { ChatModel } from './chat-model.ts';
 export interface Activity {
   id: string;
   name: string;
@@ -19,6 +20,9 @@ export interface Message {
   streaming?: boolean;
 }
 export interface Chat {
+  modelSettings?: ChatModel;
+  modelRequestId?: string;
+  modelError?: string;
   usage?: ContextUsage;
   id: string;
   title: string;

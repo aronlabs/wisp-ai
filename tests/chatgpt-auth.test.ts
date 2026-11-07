@@ -249,7 +249,15 @@ test('models are scoped to the active grant and a 401 renews once', async (t) =>
   const f = await fixture(t);
   assert.equal(await f.callback(await f.start()), 200);
   f.setRejected(1);
-  assert.deepEqual(await f.auth.models(), [{ slug: 'gpt-test', displayName: 'Test model' }]);
+  assert.deepEqual(await f.auth.models(), [
+    {
+      slug: 'gpt-test',
+      displayName: 'Test model',
+      efforts: [],
+      defaultEffort: undefined,
+      contextWindow: undefined,
+    },
+  ]);
   assert.equal(f.counts().refreshCount, 1);
   await assert.rejects(
     () => f.auth.authorized('https://chatgpt.com/backend-api/responses', {}),

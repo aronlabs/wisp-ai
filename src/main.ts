@@ -31,6 +31,7 @@ import { sendChatTurn } from './agent-session.ts';
 import { TheWoWDB, databaseRequest } from './thewowdb.ts';
 import { searchWowhead, wowheadQuery } from './wowhead-search.ts';
 import { Simulator, simulationInput } from './simulation.ts';
+import { chooseChatModel, type AccountModel } from './chat-model.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = path.join(ROOT, 'runtime');
@@ -72,6 +73,23 @@ const mcpManager = new McpManager(mcpFile, ROOT, new WindowsVault(path.join(ROOT
 await mcpManager.load();
 const auth = new ChatGPTAuth(runtime, new WindowsVault(path.join(ROOT, 'Wisp.exe')));
 await auth.load();
+let modelCatalog: AccountModel[] = [];
+let modelCatalogError: string | undefined;
+let modelCatalogLoad: Promise<void> | undefined;
+function refreshModelCatalog() {
+  return (modelCatalogLoad ??= (async () => {
+    try {
+      modelCatalog = await auth.models();
+      modelCatalogError = undefined;
+    } catch (error) {
+      modelCatalog = [];
+      modelCatalogError = safeErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      modelCatalogLoad = undefined;
+      changed();
+    }
+  })());
+}
 const database = new TheWoWDB();
 const panelStore = new PanelStore(path.join(runtime, 'panels.json'));
 await panelStore.load();
@@ -259,6 +277,12 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
       throw Error('Finish the ChatGPT account operation first.');
     }
     await auth.accessToken();
+    const available = await auth.models();
+    chat.modelSettings = chooseChatModel(
+      available,
+      chat.modelSettings?.model || config.model || 'gpt-6-luna',
+      chat.modelSettings?.effort,
+    );
     const response = await sendChatTurn(
       client,
       chat,
@@ -347,6 +371,7 @@ function receive(packet: Packet) {
     acknowledgments = [];
     handled.clear();
     transport.resetSession();
+    void refreshModelCatalog();
   }
   if (packet.type !== 'poll' && !packet.heartbeat && !acknowledgments.includes(packet.seq)) {
     acknowledgments.push(packet.seq);
@@ -366,6 +391,58 @@ function receive(packet: Packet) {
     return;
   }
   handled.add(packetKey);
+  if (packet.type === 'model_catalog') {
+    void refreshModelCatalog();
+    return;
+  }
+  if (packet.type === 'chat_model_set' && packet.chat && packet.requestId) {
+    const chat =
+      chatFor(packet.chat) ||
+      ((packet.data as { inline?: boolean })?.inline === true && !deletedChatIds.has(packet.chat)
+        ? createChat(packet.chat)
+        : undefined);
+    if (!chat) {
+      return;
+    }
+    if ((packet.data as { inline?: boolean })?.inline === true && !chat.messages.length) {
+      chat.inline = true;
+      chat.title = 'Quick question';
+      chat.titleGenerated = true;
+      inlineChat = chat.id;
+    }
+    const requestId = packet.requestId;
+    void (async () => {
+      try {
+        if (chat.status === 'working') {
+          throw Error('Wait for this reply before changing model settings.');
+        }
+        const input = packet.data as { model?: unknown; effort?: unknown } | undefined;
+        const models = await auth.models();
+        if (chat.status === 'working') {
+          throw Error('Wait for this reply before changing model settings.');
+        }
+        if (
+          typeof input?.model !== 'string' ||
+          (input.effort !== undefined && typeof input.effort !== 'string')
+        ) {
+          throw Error('Invalid model settings.');
+        }
+        chat.modelSettings = chooseChatModel(
+          models,
+          input.model,
+          input.effort as string | undefined,
+        );
+        chat.modelError = undefined;
+        modelCatalog = models;
+      } catch (error) {
+        chat.modelError = safeErrorMessage(error instanceof Error ? error.message : String(error));
+      } finally {
+        chat.modelRequestId = requestId;
+        changed();
+      }
+    })();
+    return;
+  }
   if (packet.type === 'inline_status') {
     const data = packet.data as Record<string, unknown> | undefined;
     const status = {
@@ -750,6 +827,26 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  if (req.method === 'GET' && req.url?.startsWith('/session-model?')) {
+    try {
+      const id = new URL(req.url, 'http://127.0.0.1').searchParams.get('session');
+      const chat = chats.find((chat) => chat.eveId === id && chat.status === 'working');
+      if (!chat?.modelSettings) {
+        throw Error('No model selected for this turn.');
+      }
+      const models = await auth.models();
+      const selected = chooseChatModel(models, chat.modelSettings.model, chat.modelSettings.effort);
+      res.writeHead(200, { 'content-type': 'application/json' }).end(
+        JSON.stringify({
+          ...selected,
+          contextWindow: models.find((m) => m.slug === selected.model)?.contextWindow,
+        }),
+      );
+    } catch (error) {
+      res.writeHead(503).end(error instanceof Error ? error.message : String(error));
+    }
+    return;
+  }
   if ((req.url || '').startsWith('/mcp/')) {
     try {
       await mcpRelay.handle(req, res, (req.url || '').slice(5));
@@ -846,7 +943,7 @@ const server = createServer(async (req, res) => {
           : await searchWowhead(
               wowheadQuery.parse(args).query,
               auth,
-              config.model || 'gpt-6-luna',
+              chat.modelSettings?.model || config.model || 'gpt-6-luna',
               abort.signal,
             );
       res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(result));
@@ -1060,6 +1157,7 @@ async function accountOperation<T>(operation: () => Promise<T>) {
     return await operation();
   } finally {
     accountBusy = false;
+    void refreshModelCatalog();
   }
 }
 const health = setInterval(
@@ -1226,7 +1324,17 @@ const publish = setInterval(() => {
     v: 1,
     session: activeTransport,
     connected: eveReady,
-    contextPolicy: { windowTokens: contextWindowTokens, compactAt: COMPACTION_THRESHOLD },
+    contextPolicy: {
+      windowTokens:
+        modelCatalog.find((m) => m.slug === chatFor(activeChat)?.modelSettings?.model)
+          ?.contextWindow || contextWindowTokens,
+      compactAt: COMPACTION_THRESHOLD,
+    },
+    modelCatalog: {
+      models: modelCatalog,
+      defaultModel: config.model || 'gpt-6-luna',
+      error: modelCatalogError,
+    },
     acks: acknowledgments,
     activeChat,
     chats: chats
@@ -1249,6 +1357,9 @@ const publish = setInterval(() => {
         status: c.status,
         unread: c.unread,
         usage: c.usage,
+        modelSettings: c.modelSettings,
+        modelRequestId: c.modelRequestId,
+        modelError: c.modelError,
         lastActivityAt: c.lastActivityAt,
         activity: c.activity,
         inline: c.inline,

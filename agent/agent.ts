@@ -1,4 +1,4 @@
-import { defineAgent } from 'eve';
+import { defineAgent, defineDynamic } from 'eve';
 import { createOpenAI } from '@ai-sdk/openai';
 import { capabilityEnabled } from '../src/capabilities.ts';
 import { filterWebSearch, subscriptionCallOptions } from '../src/model-tools.ts';
@@ -20,34 +20,63 @@ const provider = createOpenAI({
     return normalizeModelError(await fetch(input, { ...init, headers }));
   },
 });
-const base = provider.responses((process.env.WOW_MODEL || 'gpt-6-luna').replace(/^openai\//, ''));
-type Options = Parameters<typeof base.doStream>[0];
-const model = {
-  ...base,
-  provider: base.provider,
-  modelId: base.modelId,
-  specificationVersion: base.specificationVersion,
-  get supportedUrls() {
-    return base.supportedUrls;
-  },
-  doStream: async (options: Options) =>
-    base.doStream(
-      filterWebSearch(
-        subscriptionCallOptions(options),
-        await capabilityEnabled('tool:web_search'),
-      ) as Options,
-    ),
-  doGenerate: async (options: Options) =>
-    base.doGenerate(
-      filterWebSearch(
-        subscriptionCallOptions(options),
-        await capabilityEnabled('tool:web_search'),
-      ) as Options,
-    ),
-};
+function subscriptionModel(id: string) {
+  const base = provider.responses(id);
+  type Options = Parameters<typeof base.doStream>[0];
+  return {
+    ...base,
+    provider: base.provider,
+    modelId: base.modelId,
+    specificationVersion: base.specificationVersion,
+    get supportedUrls() {
+      return base.supportedUrls;
+    },
+    doStream: async (options: Options) =>
+      base.doStream(
+        filterWebSearch(
+          subscriptionCallOptions(options),
+          await capabilityEnabled('tool:web_search'),
+        ) as Options,
+      ),
+    doGenerate: async (options: Options) =>
+      base.doGenerate(
+        filterWebSearch(
+          subscriptionCallOptions(options),
+          await capabilityEnabled('tool:web_search'),
+        ) as Options,
+      ),
+  };
+}
 export default defineAgent({
-  model,
-  reasoning: 'medium',
+  model: defineDynamic(async (ctx) => {
+    const response = await fetch(
+      'http://127.0.0.1:43187/session-model?session=' + encodeURIComponent(ctx.session.id),
+      {
+        headers: { authorization: 'Bearer ' + process.env.WOW_BRIDGE_TOKEN },
+        signal: AbortSignal.timeout(15000),
+      },
+    );
+    if (!response.ok) {
+      throw Error('Could not load model settings for this conversation.');
+    }
+    const selected = (await response.json()) as {
+      model: string;
+      effort: string;
+      contextWindow?: number;
+    };
+    const openai: Record<string, string> =
+      selected.effort === 'provider-default' ? {} : { reasoningEffort: selected.effort };
+    return {
+      model: subscriptionModel(selected.model),
+      reasoning: 'provider-default' as const,
+      modelContextWindowTokens: selected.contextWindow,
+      modelOptions: {
+        providerOptions: {
+          openai,
+        },
+      },
+    };
+  }),
   defaultTools: false,
   compaction: { threshold: COMPACTION_THRESHOLD },
 });

@@ -218,16 +218,8 @@ local function inputReference(link)
     end
     return link
 end
-function C.SendInline()
-    local text = (entry:GetText() or ""):match("^%s*(.-)%s*$")
+function C.EnsureInlineChat()
     local chat = C.InlineCurrent()
-    if text == "" then
-        return
-    end
-    if chat and chat.status == "working" then
-        C.Send({ type = "cancel", chat = chat.id })
-        return
-    end
     if not C.inlineId then
         C.inlineCounter = (C.inlineCounter or 0) + 1
         C.inlineId = C.session .. "-inline-" .. C.inlineCounter
@@ -242,6 +234,19 @@ function C.SendInline()
         C.chats[#C.chats + 1] = chat
         C.pendingChats[C.inlineId] = chat
     end
+    return chat
+end
+function C.SendInline()
+    local text = (entry:GetText() or ""):match("^%s*(.-)%s*$")
+    local chat = C.InlineCurrent()
+    if text == "" or (C.modelPending and C.modelPending[C.inlineId]) then
+        return
+    end
+    if chat and chat.status == "working" then
+        C.Send({ type = "cancel", chat = chat.id })
+        return
+    end
+    chat = C.EnsureInlineChat()
     local reference = panel.reference
     if reference then
         text = text .. "\n\n" .. inputReference(reference)
@@ -266,6 +271,9 @@ end
 function C.RefreshInline()
     if not panel or not panel:IsShown() then
         return
+    end
+    if C.RefreshModelControls then
+        C.RefreshModelControls()
     end
     local chat = C.InlineCurrent()
     local y, used = 0, {}
@@ -461,8 +469,17 @@ function C.InitInline()
     panel:SetScript("OnDragStop", function()
         panel:StopMovingOrSizing()
     end)
+    if C.CreateModelControls then
+        local picker = C.CreateModelControls(
+            panel,
+            "WispAIInlineModelControls",
+            C.InlineCurrent,
+            C.EnsureInlineChat
+        )
+        picker:SetPoint("TOPLEFT", 12, -36)
+    end
     scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 12, -42)
+    scroll:SetPoint("TOPLEFT", 12, -70)
     scroll:SetPoint("BOTTOMRIGHT", -30, 53)
     scroll:EnableMouseWheel(true)
     scroll:SetScript("OnMouseWheel", function(_, delta)

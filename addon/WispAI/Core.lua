@@ -91,6 +91,9 @@ function C.DeleteChat(id)
     C.Refresh()
 end
 function C.Submit()
+    if C.modelPending and C.modelPending[C.active] then
+        return
+    end
     local text = (C.draft:GetText() or ""):match("^%s*(.-)%s*$")
     local chat = C.Current()
     if text == "" or (chat and chat.status == "working") then
@@ -165,6 +168,7 @@ function WispAI_Receive(json)
     local previousState = previous and previous.status
     C.rev, C.connected, C.lastSeen = data.rev, data.connected, GetTime()
     C.contextPolicy = data.contextPolicy
+    C.modelCatalog = data.modelCatalog or C.modelCatalog
     if data.capabilities then
         C.capabilities = data.capabilities.entries
         for id, pending in pairs(C.capabilityPending) do

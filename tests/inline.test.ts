@@ -52,6 +52,57 @@ GameTooltip:Show()
   );
   return { run };
 }
+test('chat model controls select account options, wait for confirmation and isolate conversations', () => {
+  vm().run(`
+C.modelCatalog={defaultModel='luna',models={
+    {slug='luna',displayName='Luna',efforts={'low','medium','high'},defaultEffort='low'},
+    {slug='sol',displayName='Sol',efforts={'low','medium','max','ultra'},defaultEffort='low'},
+}}
+local options={}
+MenuUtil={CreateContextMenu=function(_,build)
+    options={}
+    build(nil,{CreateTitle=function()end,CreateRadio=function(_,label,selected,choose)
+        options[label]={selected=selected,choose=choose}
+    end})
+end}
+C.Refresh()
+local controls=UI_TEST.frames.WispAIChatModelControls
+assert(controls.model:GetText()=='Luna' and controls.effort:GetText()=='Effort: medium')
+controls.model.scripts.OnClick(controls.model)
+assert(options.Luna.selected())
+options.Sol.choose()
+local packet=packets[#packets]
+assert(packet.type=='chat_model_set' and packet.chat=='main' and packet.data.model=='sol')
+assert(not controls.model.enabled and controls.model:GetText()=='Saving...')
+C.draft:SetText('Wait')
+local count=#packets
+C.Submit()
+assert(#packets==count,'sending must wait until settings have been confirmed')
+local chat=C.Current()
+chat.modelSettings={model='sol',effort='medium'}
+chat.modelRequestId=packet.requestId
+C.Refresh()
+assert(not C.modelPending.main and controls.model:GetText()=='Sol')
+controls.effort.scripts.OnClick(controls.effort)
+assert(options.ultra and not options.high,'efforts come from the selected model')
+options.ultra.choose()
+assert(packets[#packets].data.effort=='ultra')
+chat.modelRequestId=packets[#packets].requestId
+chat.modelSettings.effort='ultra'
+C.Refresh()
+chat.status='working'
+C.Refresh()
+assert(not controls.model.enabled and not controls.effort.enabled)
+chat.status='done'
+C.OpenInline()
+local inline=UI_TEST.frames.WispAIInlineModelControls
+inline.model.scripts.OnClick(inline.model)
+options.Sol.choose()
+packet=packets[#packets]
+assert(packet.data.inline and packet.chat==C.inlineId and packet.chat~='main')
+assert(chat.modelSettings.effort=='ultra','inline choices must not mutate the main conversation')
+`);
+});
 test('inline item questions preserve named quality colors and full item payloads', () => {
   vm().run(`
 local link = '|cnIQ2:|Hitem:275067::::::::12:1482:::::::::|h[Pergamino de Imbuir gelidaga]|h|r'

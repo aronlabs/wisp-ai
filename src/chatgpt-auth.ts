@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRemoteJWKSet, jwtVerify, customFetch } from 'jose';
 import { z } from 'zod';
 import type { SecretVault } from './secret-vault.ts';
+import { accountModel, type AccountModel, type AccountModelInput } from './chat-model.ts';
 
 const ISSUER = 'https://auth.openai.com',
   RESOURCE = 'https://api.openai.com/v1';
@@ -69,7 +70,11 @@ export class ChatGPTAuth {
   private discovery?: Promise<Discovery>;
   private jwks?: ReturnType<typeof createRemoteJWKSet>;
   private refreshes = new Map<string, Promise<string>>();
-  private modelsCache?: { id: string; models: { slug: string; displayName: string }[]; at: number };
+  private modelsCache?: {
+    id: string;
+    models: AccountModel[];
+    at: number;
+  };
   constructor(
     runtime: string,
     vault: SecretVault,
@@ -586,7 +591,9 @@ export class ChatGPTAuth {
       throw new ChatGPTAuthError('Could not load models for this ChatGPT account.');
     }
     const data = (await response.json()) as {
-      models?: { slug?: string; display_name?: string; visibility?: string }[];
+      models?: (AccountModelInput & {
+        visibility?: string;
+      })[];
     };
     if (!Array.isArray(data.models)) {
       throw new ChatGPTAuthError('ChatGPT returned an unexpected model catalog.');
@@ -598,7 +605,7 @@ export class ChatGPTAuth {
           typeof m.slug === 'string' &&
           /^[A-Za-z0-9_.:-]{1,100}$/.test(m.slug),
       )
-      .map((m) => ({ slug: m.slug!, displayName: m.display_name || m.slug! }));
+      .map((m) => accountModel(m));
     this.modelsCache = { id: id!, models, at: this.now() };
     return models;
   }
