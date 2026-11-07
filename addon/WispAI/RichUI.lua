@@ -25,6 +25,7 @@ local function font(parent)
     local f = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     f:SetJustifyH("LEFT")
     f:SetWordWrap(true)
+    f:SetSpacing(3)
     f:SetTextColor(0.89, 0.85, 0.75)
     return f
 end

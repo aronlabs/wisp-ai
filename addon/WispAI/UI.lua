@@ -808,12 +808,22 @@ local function makeRow(parent)
     row.text = label(row, "")
     row.text:SetFontObject(ChatFontNormal)
     row.text:SetWordWrap(true)
+    row.text:SetSpacing(3)
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetSize(14, 14)
     row.icon:SetPoint("TOPLEFT", 0, -1)
-    row.bubble = row:CreateTexture(nil, "BACKGROUND")
+    row.bubble = CreateFrame("Frame", nil, row, "BackdropTemplate")
+    row.bubble:SetFrameLevel(row:GetFrameLevel())
     row.bubble:SetAllPoints(row)
-    row.bubble:SetColorTexture(0.18, 0.14, 0.09, 0.8)
+    row.bubble:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    row.bubble:SetBackdropColor(0.18, 0.14, 0.09, 0.55)
+    row.bubble:SetBackdropBorderColor(0.32, 0.26, 0.17, 0.25)
+    row.bubble:EnableMouse(false)
     row.bubble:Hide()
     row.disclosure = CreateFrame("Button", nil, row)
     row.disclosure:SetAllPoints(row)
@@ -940,7 +950,7 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
     if row.signature ~= signature then
         row.signature = signature
         row.speaker = message.role
-        local padding = message.role == "user" and 10 or 0
+        local padding = message.role == "user" and 8 or 0
         if message.role == "user" then
             width = math.floor(width * 0.84)
         end
@@ -949,14 +959,14 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
         row.groupKey = message.groupKey
         row.disclosure:SetShown(message.groupKey ~= nil)
         row.text:ClearAllPoints()
-        local top = (showAuthor and 20 or 0) + padding
+        local top = message.role == "user" and padding or (showAuthor and 20 or 0)
         row.author:ClearAllPoints()
         row.author:SetPoint(
             message.role == "user" and "TOPRIGHT" or "TOPLEFT",
             message.role == "user" and -10 or 0,
             -padding
         )
-        row.author:SetShown(showAuthor)
+        row.author:SetShown(showAuthor and message.role ~= "user")
         setText(
             row.author,
             message.role == "user" and "You" or (message.role == "system" and "Notice" or "Wisp AI")
@@ -989,9 +999,18 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
             row.text:SetWidth(width - padding * 2)
             row.text:SetTextColor(unpack(message.role == "system" and MUTED or TEXT))
             setText(row.text, formatted(message.text, message.references, message.role == "user"))
+            if message.role == "user" and not (message.ui and #message.ui > 0) then
+                local natural = row.text.GetUnboundedStringWidth
+                    and row.text:GetUnboundedStringWidth()
+                if type(natural) == "number" and natural > 0 then
+                    width = math.min(width, math.max(64, math.ceil(natural) + padding * 2))
+                    row:SetWidth(width)
+                    row.text:SetWidth(width - padding * 2)
+                end
+            end
             row.height = top
                 + math.max(1, message.text ~= "" and row.text:GetStringHeight() or 0)
-                + 10
+                + (message.role == "user" and padding or 10)
             if C.RenderRichUI then
                 row.rich = row.rich or CreateFrame("Frame", nil, row)
                 row.rich:Show()
@@ -999,9 +1018,8 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
                 row.rich:SetPoint("TOPLEFT", 0, -row.height)
                 row.height = row.height + C.RenderRichUI(row.rich, chat, message, width)
             end
-            row.height = row.height + 8
-            if message.role == "user" then
-                row.height = row.height + padding
+            if message.role ~= "user" then
+                row.height = row.height + 8
             end
         end
         row:SetHeight(row.height)
