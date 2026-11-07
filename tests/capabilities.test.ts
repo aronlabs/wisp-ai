@@ -33,7 +33,8 @@ test('settings persist, filter real tool/MCP definitions, and preserve child set
     const connection = await dynamicEvaluate(everloot)({} as never);
     assert.ok(connection);
     assert.equal(
-      'allow' in connection.tools! && connection.tools.allow.includes('market_value'),
+      'allow' in connection.everloot.tools! &&
+        connection.everloot.tools.allow.includes('market_value'),
       false,
     );
     assert.ok(
@@ -41,6 +42,19 @@ test('settings persist, filter real tool/MCP definitions, and preserve child set
         'auction_history',
       ),
     );
+    assert.equal(connection.everloot_search.toolCall?.providedArguments?.version, 'forever');
+    assert.equal(connection.everloot_changes.toolCall?.providedArguments?.game, 'forever');
+    for (const definition of Object.values(connection)) {
+      assert.ok(
+        !(
+          'allow' in definition.tools! &&
+          definition.tools.allow.some((name) =>
+            ['get_by_name', 'get_entity', 'answer_sources', 'fetch', 'search'].includes(name),
+          )
+        ),
+        'unfiltered cross-version lookup must not be exposed',
+      );
+    }
     await settings.set('mcp:everloot', false);
     assert.equal(await dynamicEvaluate(everloot)({} as never), null);
     assert.equal(

@@ -27,6 +27,8 @@ import { ChatGPTAuth } from './chatgpt-auth.ts';
 import { proxyModel } from './model-proxy.ts';
 import { safeErrorMessage } from './model-errors.ts';
 import { sendChatTurn } from './agent-session.ts';
+import { TheWoWDB, databaseRequest } from './thewowdb.ts';
+import { searchWowhead, wowheadQuery } from './wowhead-search.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = path.join(ROOT, 'runtime');
@@ -67,6 +69,7 @@ const mcpManager = new McpManager(mcpFile, ROOT, new WindowsVault(path.join(ROOT
 await mcpManager.load();
 const auth = new ChatGPTAuth(runtime, new WindowsVault(path.join(ROOT, 'Wisp.exe')));
 await auth.load();
+const database = new TheWoWDB();
 const panelStore = new PanelStore(path.join(runtime, 'panels.json'));
 await panelStore.load();
 const adviceGate = new AdviceGate(path.join(runtime, 'advice-history.json'));
@@ -703,9 +706,17 @@ const server = createServer(async (req, res) => {
   }
   if (
     req.method !== 'POST' ||
-    !['/state', '/title', '/identity', '/memory', '/inspect', '/action', '/panels'].includes(
-      req.url || '',
-    )
+    ![
+      '/state',
+      '/title',
+      '/identity',
+      '/memory',
+      '/inspect',
+      '/action',
+      '/panels',
+      '/database',
+      '/wowhead',
+    ].includes(req.url || '')
   ) {
     res.writeHead(404).end();
     return;
@@ -733,6 +744,35 @@ const server = createServer(async (req, res) => {
       throw Error(
         'Automatic suggestions cannot change settings, memory, panels, macros or map markers',
       );
+    }
+    if (req.url === '/database' || req.url === '/wowhead') {
+      const tool =
+        req.url === '/wowhead'
+          ? 'web_search'
+          : data.operation === 'search'
+            ? 'search_database'
+            : 'get_database_entity';
+      if (!capabilitySettings.enabled('tool:' + tool)) {
+        throw new Error('This knowledge source is disabled in Settings');
+      }
+      const abort = new AbortController();
+      res.once('close', () => {
+        if (!res.writableEnded) {
+          abort.abort();
+        }
+      });
+      const { eveSession: _session, ...args } = data;
+      const result =
+        req.url === '/database'
+          ? await database.query(databaseRequest.parse(args), abort.signal)
+          : await searchWowhead(
+              wowheadQuery.parse(args).query,
+              auth,
+              config.model || 'gpt-6-luna',
+              abort.signal,
+            );
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(result));
+      return;
     }
     if (req.url === '/panels') {
       if (!capabilitySettings.enabled('tool:manage_panel')) {

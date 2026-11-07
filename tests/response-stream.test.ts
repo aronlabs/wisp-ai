@@ -48,3 +48,18 @@ test('failed, incomplete and truncated streams never become completed responses'
   );
   await assert.rejects(() => readCompletedResponse(new Response(null)), /no response/);
 });
+
+test('completed subscription streams retain finalized items when the terminal output is empty', async () => {
+  const item = {
+    type: 'message',
+    id: 'message-test',
+    content: [{ type: 'output_text', text: 'Ready' }],
+  };
+  const result = await readCompletedResponse(
+    eventResponse([
+      { type: 'response.output_item.done', output_index: 0, item },
+      { type: 'response.completed', response: { id: 'test', status: 'completed', output: [] } },
+    ]),
+  );
+  assert.deepEqual(result, { id: 'test', status: 'completed', output: [item] });
+});

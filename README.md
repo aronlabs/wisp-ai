@@ -288,3 +288,26 @@ The bridge entry point is `src/main.ts`; Eve process management is isolated in
 `src/agent-process.ts`, and non-streaming response collection in
 `src/response-stream.ts`. Desktop startup and protected storage live in
 `desktop/Program.cs`; `desktop/Wisp.cs` builds each UI tab in a separate method.
+
+## Forever knowledge sources
+
+Live character readings remain authoritative for the player. External catalog facts
+start with TheWoWDB through search_database and get_database_entity. The API path is
+fixed to /api/v1/forever/, response versions/kinds are checked (including search
+rows), and record links, attribution, build and pagination are preserved. Responses
+are cached for up to an hour with bounded storage and ETag revalidation. Missing
+data, source errors and rate limits are reported explicitly. Beta catalog data is
+not silently treated as the current game build. See https://thewowdb.com/developers/.
+
+Everloot remains a complementary MCP for player observations, relationships,
+professions, talents and realm scan history. The search and changes connections
+supply version=forever and game=forever as application-owned Eve arguments, hidden
+from the model. Unfiltered cross-version entity/lore tools are not exposed.
+
+The web_search tool now uses a backend-controlled Wowhead search with a fixed
+Forever query and a Wowhead domain filter. Only HTTPS Forever page URLs are
+accepted; summaries with other-version citations or retrieved sources are withheld.
+If discovery mixes versions, its summary is discarded and a fresh request reads
+only verified Forever URLs. Both requests share one timeout budget.
+It uses the existing ChatGPT connection/model, without another API key, MCP process
+or browser. Source controls remain in Tools & MCPs.

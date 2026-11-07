@@ -11,9 +11,6 @@ export interface Capability {
 }
 export const everlootTools = [
   'search_knowledge',
-  'get_entity',
-  'get_by_name',
-  'answer_sources',
   'item_page',
   'npc_page',
   'object_page',
@@ -33,6 +30,14 @@ export const everlootTools = [
   'recent_changes',
 ];
 export const toolDescriptions: Record<string, [string, string]> = {
+  search_database: [
+    'Search Forever database',
+    'Search the primary TheWoWDB catalog for Forever items, spells, quests, NPCs and zones.',
+  ],
+  get_database_entity: [
+    'Read Forever database',
+    'Read a verified Forever catalog record with build, attribution and source links.',
+  ],
   manage_panel: [
     'Persistent panels',
     'Create, read, edit and remove character-specific native panels with local live data bindings.',
@@ -80,7 +85,10 @@ export const toolDescriptions: Record<string, [string, string]> = {
     'Create macros',
     'Create new macros outside combat. Existing macros are not changed or executed.',
   ],
-  web_search: ['Web search', 'Search the web for sources and guides.'],
+  web_search: [
+    'Wowhead Forever search',
+    'Fallback search limited to verified Wowhead Forever pages; other-version summaries are rejected.',
+  ],
   set_conversation_title: [
     'Conversation titles',
     'Let the assistant generate conversation titles.',
@@ -112,7 +120,8 @@ export function defaultCapabilities(): Capability[] {
       id: 'mcp:everloot',
       name: 'Everloot',
       group: 'mcps',
-      description: 'WoW Forever database and market history. https://everloot.app/mcp/public',
+      description:
+        'Complementary Forever observations and market history. Search version is enforced. https://everloot.app/mcp/public',
     },
     ...everlootTools.map((name) => ({
       id: 'mcp_tool:everloot:' + name,

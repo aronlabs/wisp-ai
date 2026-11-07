@@ -6,7 +6,7 @@ export default enabledTool(
   'inspect_reference',
   defineTool({
     description:
-      'Reads an item, spell, talent (spell ID) or quest from the live game API, including available tooltip text and requirements. Use verified IDs only. Uncached data can be unavailable; retry after loading or use the Everloot database for sources and relations.',
+      'Reads an item, spell, talent (spell ID) or quest from the live game API, including available tooltip text and requirements. Use verified IDs only. Uncached data can be unavailable; retry after loading or use get_database_entity for catalog details and Everloot for observed sources and relations.',
     inputSchema: referenceInput,
     label: { start: ({ kind }) => 'Inspecting ' + kind },
     execute: async (args, ctx) =>
