@@ -52,6 +52,31 @@ GameTooltip:Show()
   );
   return { run };
 }
+test('inline item questions preserve named quality colors and full item payloads', () => {
+  vm().run(`
+local link = '|cnIQ2:|Hitem:275067::::::::12:1482:::::::::|h[Pergamino de Imbuir gelidaga]|h|r'
+GameTooltip.GetItem = function() return 'Pergamino de Imbuir gelidaga', link end
+C.OpenInline()
+UI_TEST.frames.WispAIInlineInput:SetText('Vale la pena usar esto?')
+C.SendInline()
+local chat = C.InlineCurrent()
+assert(chat.messages[1].text == 'Vale la pena usar esto?\\n\\n' .. link)
+local found
+for _, row in ipairs(UI_TEST.widgets) do
+    if row.scripts.OnHyperlinkEnter and type(row.text) == 'table'
+        and row.text:GetText():find('Vale la pena', 1, true) then found = row end
+end
+assert(found and found.text:GetText() == chat.messages[1].text, 'quality color markup must not become visible text')
+assert(not found.text:GetText():find('||', 1, true))
+local payload = 'item:275067::::::::12:1482:::::::::'
+found.scripts.OnHyperlinkEnter(found, payload, '[Pergamino de Imbuir gelidaga]')
+assert(UI_TEST.tooltipLink == payload, 'hover must retain the exact item variant')
+assert(C.FormatText('|cnIQ1:|Hitem:2901::::::::12:1482::14:::::::|h[Pico de minero]|h|r', nil, true)
+    == '|cnIQ1:|Hitem:2901::::::::12:1482::14:::::::|h[Pico de minero]|h|r')
+assert(C.FormatText('Code: \x60' .. link .. '\x60', nil, true):find('||cnIQ2:', 1, true), 'code stays literal')
+assert(C.FormatText(link, nil, false):find('||cnIQ2:', 1, true), 'assistant output still requires declared references')
+`);
+});
 test('a completed reply lights the minimized window until it is opened', () => {
   vm().run(`
 local glow = UI_TEST.frames.WispAIReplyGlow

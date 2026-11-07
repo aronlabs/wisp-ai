@@ -87,6 +87,7 @@ local function formatted(text, references, fromUser)
         return keep(code:gsub("|", "||"))
     end)
     if fromUser then
+        text = text:gsub("|cn[%w_]+:|H[^|]+|h.-|h|r", keep)
         text = text:gsub("|c%x%x%x%x%x%x%x%x|H[^|]+|h.-|h|r", keep)
         text = text:gsub("|H[^|]+|h.-|h", keep)
     end
