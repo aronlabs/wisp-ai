@@ -190,3 +190,47 @@ test('automatic login/resume never selects an inline conversation', () => {
   assert.equal(resumeChat([main, inline], 'inline')?.id, 'main');
   assert.equal(resumeChat([inline]), undefined);
 });
+
+test('inline binding captures mouse buttons and wheel with modifiers, conflicts and combat guards', () => {
+  vm().run(`
+bindings={['CTRL-J']='WISPAI_INLINE',['ALT-SHIFT-BUTTON4']='OTHER_ACTION'}
+local saves=0
+function GetBindingAction(key)return bindings[key]or''end
+function GetBindingKey()return'CTRL-J'end
+function SetBinding(key,value)bindings[key]=value;return true end
+function SaveBindings()saves=saves+1 end
+function GetCurrentBindingSet()return 1 end
+function IsControlKeyDown()return false end
+function IsAltKeyDown()return true end
+function IsShiftKeyDown()return true end
+local combat=false
+function InCombatLockdown()return combat end
+local function open()
+  C.BindInline()
+  local dialog
+  for _,w in ipairs(UI_TEST.widgets)do if w.scripts.OnKeyDown and w~=UI_TEST.frames.WispAIWindow then dialog=w end end
+  return dialog
+end
+local dialog=open()
+local capture=dialog.parent
+assert(capture.mouseEnabled and dialog.mouseEnabled)
+capture.scripts.OnMouseDown(capture,'Button4')
+assert(saves==0 and bindings['ALT-SHIFT-BUTTON4']=='OTHER_ACTION' and dialog:IsShown())
+capture.scripts.OnMouseDown(capture,'Button5')
+assert(saves==1 and bindings['ALT-SHIFT-BUTTON5']=='WISPAI_INLINE' and not bindings['CTRL-J'])
+assert(C.db.inlineBinding=='ALT-SHIFT-BUTTON5'and not dialog:IsShown())
+dialog.scripts.OnHide()
+assert(not capture:IsShown())
+dialog=open()
+dialog.scripts.OnMouseWheel(dialog,-1)
+assert(saves==2 and bindings['ALT-SHIFT-MOUSEWHEELDOWN']=='WISPAI_INLINE')
+dialog=open()
+combat=true
+dialog.scripts.OnMouseDown(dialog,'MiddleButton')
+assert(saves==2 and not bindings['ALT-SHIFT-BUTTON3'] and not dialog:IsShown())
+combat=false
+dialog=open()
+dialog.scripts.OnKeyDown(dialog,'ESCAPE')
+assert(saves==2 and not dialog:IsShown())
+`);
+});

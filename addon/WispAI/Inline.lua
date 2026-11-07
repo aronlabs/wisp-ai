@@ -405,16 +405,33 @@ function C.InitInline()
     end
     panel:Hide()
 end
+local bindingCapture
 function C.BindInline()
     if InCombatLockdown and InCombatLockdown() then
         C.Log("Leave combat before changing keybindings.")
         return
     end
-    local dialog = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    if bindingCapture then
+        bindingCapture:Hide()
+    end
+    local capture = CreateFrame("Frame", nil, UIParent)
+    bindingCapture = capture
+    capture:SetAllPoints(UIParent)
+    capture:SetFrameStrata("FULLSCREEN_DIALOG")
+    capture:EnableMouse(true)
+    capture:EnableMouseWheel(true)
+    local dialog = CreateFrame("Frame", nil, capture, "BackdropTemplate")
     dialog:SetSize(380, 110)
     dialog:SetPoint("CENTER")
     dialog:SetFrameStrata("FULLSCREEN_DIALOG")
     dialog:EnableKeyboard(true)
+    dialog:EnableMouse(true)
+    dialog:EnableMouseWheel(true)
+    dialog:SetScript("OnHide", function()
+        if capture:IsShown() then
+            capture:Hide()
+        end
+    end)
     dialog:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -426,28 +443,11 @@ function C.BindInline()
     hint:SetWidth(350)
     hint:SetWordWrap(true)
     hint:SetText(
-        "Press a key combination for inline chat.\nEscape cancels. Existing bindings will be preserved."
+        "Press a key, mouse button or mouse wheel for inline chat.\nCtrl, Alt and Shift are supported. Escape cancels. Existing bindings will be preserved."
     )
-    dialog:SetScript("OnKeyDown", function(self, key)
-        if self.SetPropagateKeyboardInput then
-            self:SetPropagateKeyboardInput(false)
-        end
-        if key == "ESCAPE" then
-            self:Hide()
-            return
-        end
-        if
-            key == "LSHIFT"
-            or key == "RSHIFT"
-            or key == "LCTRL"
-            or key == "RCTRL"
-            or key == "LALT"
-            or key == "RALT"
-        then
-            return
-        end
+    local function assign(key)
         if InCombatLockdown and InCombatLockdown() then
-            self:Hide()
+            dialog:Hide()
             C.Log("Binding was not changed in combat.")
             return
         end
@@ -476,9 +476,46 @@ function C.BindInline()
             SaveBindings(GetCurrentBindingSet())
             C.db.inlineBinding = combination
             C.Log("Inline chat: " .. combination)
-            self:Hide()
+            dialog:Hide()
         else
             hint:SetText("This key could not be assigned. Choose another combination.")
         end
+    end
+    dialog:SetScript("OnKeyDown", function(self, key)
+        if self.SetPropagateKeyboardInput then
+            self:SetPropagateKeyboardInput(false)
+        end
+        if key == "ESCAPE" then
+            self:Hide()
+            return
+        end
+        if
+            key == "LSHIFT"
+            or key == "RSHIFT"
+            or key == "LCTRL"
+            or key == "RCTRL"
+            or key == "LALT"
+            or key == "RALT"
+        then
+            return
+        end
+        assign(key)
     end)
+    local mouseKeys = { LeftButton = "BUTTON1", RightButton = "BUTTON2", MiddleButton = "BUTTON3" }
+    local function onMouseDown(_, button)
+        local number = button:match("^Button(%d+)$")
+        local key = mouseKeys[button] or (number and ("BUTTON" .. number))
+        if key then
+            assign(key)
+        end
+    end
+    local function onMouseWheel(_, delta)
+        if delta ~= 0 then
+            assign(delta > 0 and "MOUSEWHEELUP" or "MOUSEWHEELDOWN")
+        end
+    end
+    capture:SetScript("OnMouseDown", onMouseDown)
+    dialog:SetScript("OnMouseDown", onMouseDown)
+    capture:SetScript("OnMouseWheel", onMouseWheel)
+    dialog:SetScript("OnMouseWheel", onMouseWheel)
 end
