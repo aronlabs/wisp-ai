@@ -22,7 +22,7 @@ export default defineDynamic(async () => {
     });
   }
   if (allowed.includes('search_knowledge')) {
-    connections.everloot_search = defineMcpClientConnection({
+    connections['everloot-search'] = defineMcpClientConnection({
       url: 'https://everloot.app/mcp/public',
       description:
         'Complementary Everloot search with version fixed to Forever by the application. Cannot search Retail, Classic or archived wiki lore. Use TheWoWDB first for catalog facts.',
@@ -31,7 +31,7 @@ export default defineDynamic(async () => {
     });
   }
   if (allowed.includes('recent_changes')) {
-    connections.everloot_changes = defineMcpClientConnection({
+    connections['everloot-changes'] = defineMcpClientConnection({
       url: 'https://everloot.app/mcp/public',
       description:
         'Official Forever changes only: blue posts, hotfixes and builds. The game filter is supplied by Wisp; Classic changes cannot be selected.',

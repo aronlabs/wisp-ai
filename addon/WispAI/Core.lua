@@ -144,6 +144,7 @@ function WispAI_Receive(json)
     local previous = C.Current()
     local previousState = previous and previous.status
     C.rev, C.connected, C.lastSeen = data.rev, data.connected, GetTime()
+    C.contextPolicy = data.contextPolicy
     if data.capabilities then
         C.capabilities = data.capabilities.entries
         for id, pending in pairs(C.capabilityPending) do

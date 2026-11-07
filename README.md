@@ -311,3 +311,27 @@ If discovery mixes versions, its summary is discarded and a fresh request reads
 only verified Forever URLs. Both requests share one timeout budget.
 It uses the existing ChatGPT connection/model, without another API key, MCP process
 or browser. Source controls remain in Tools & MCPs.
+
+## Conversation context
+
+Eve auto-compacts at 75% of its model context window, including summary prompt
+overhead. Wisp displays the latest provider-reported input plus output as an
+approximate context percentage; hover for capacity, observed input/output totals,
+cached input and successful compactions. Cache hits are included in input, not
+added again. Summary calls contribute to observed usage but do not masquerade as
+the smaller post-compaction context. Capacity comes from Eve model metadata;
+missing measurements remain unknown. Separate Wowhead search calls are excluded
+from these per-chat totals. These counters are not a subscription quota meter.
+
+Compaction shows as transient progress and preserves the visible transcript. A
+replacement Eve session invalidates the old context measurement. Existing chats
+start accumulating observed usage when this version receives usage events.
+
+For an opt-in live agent check on Windows, run `node scripts/smoke-agent.mjs`
+from the repository root with Wisp signed in. It consumes subscription usage.
+It starts an isolated Eve instance on ports 43196/43197 with the real agent,
+subscription model, catalog client, Everloot MCP and Wowhead search. Only loopback
+ports differ; memory is empty and game actions/writes are blocked. It verifies
+actual tool calls, successful turns, compaction and a subsequent reply, and saves
+a local report under `../../work/agent-smoke-*`. It does not refresh shared
+credentials or edit the user's chats. This live check is separate from offline CI.

@@ -3,6 +3,42 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
+test('context meter distinguishes unknown usage, measured context and compaction without adding a transcript row', () => {
+  const L = lauxlib.luaL_newstate();
+  lualib.luaL_openlibs(L);
+  const run = (code: string) => {
+    if (lauxlib.luaL_dostring(L, to_luastring(code)) !== lua.LUA_OK) {
+      throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
+    }
+  };
+  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(`C={db={sidebar=true,showTools=true,drafts={}},active='chat',connected=true}
+    C.chats={{id='chat',title='Test',status='idle',messages={},activity={}}}
+    function C.Current() return C.chats[1] end
+    assert(load(${JSON.stringify(readFileSync('addon/WispAI/UI.lua', 'utf8'))}))('WispAI',C)
+    C.BuildUI()
+    local meter=UI_TEST.frames.WispAIContextUsage
+    assert(meter.text:GetText()=='Context --')
+    C.contextPolicy={windowTokens=100000,compactAt=0.75}
+    C.chats[1].usage={contextTokens=24000,inputTokens=50000,outputTokens=1000,cacheReadTokens=10000,compactions=1}
+    C.Refresh()
+    assert(meter.text:GetText()=='Context ~24%')
+    local lines={}
+    GameTooltip={SetOwner=function()end,Show=function()end,Hide=function()end,AddLine=function(_,text)table.insert(lines,text)end}
+    meter.scripts.OnEnter(meter)
+    assert(table.concat(lines,'|'):find('not your subscription allowance',1,true))
+    assert(table.concat(lines,'|'):find('Auto compact: 75%',1,true))
+    C.chats[1].usage.compacting=true
+    C.chats[1].status='working'
+    C.Refresh()
+    assert(meter.text:GetText()=='Compacting...')
+    assert(#C.chats[1].messages==0)
+    C.chats[1].usage.compacting=false
+    C.chats[1].usage.contextTokens=nil
+    C.Refresh()
+    assert(meter.text:GetText()=='Context --')
+  `);
+});
 test('native renderer reuses rows, has a visible scrollbar, and preserves a reader position', () => {
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);

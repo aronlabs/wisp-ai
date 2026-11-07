@@ -170,7 +170,7 @@ local function referenceSignature(references)
     table.sort(parts)
     return table.concat(parts, "\31")
 end
-local frame, header, body, sidebar, chatPanel, status, transcript, content, scrollBar, sessionTitle, send, mini, settings
+local frame, header, body, sidebar, chatPanel, status, transcript, content, scrollBar, sessionTitle, send, mini, settings, contextMeter
 local progress
 local gear, fold, sessionsLabel, newSession, resize
 local memoryPanel, memoryContent, memoryStatus
@@ -341,14 +341,18 @@ local function refreshProgress()
                 break
             end
         end
-        local phase = sending and "Sending" or "Thinking"
+        local compacting = chat.usage and chat.usage.compacting
+        local phase = sending and "Sending" or (compacting and "Compacting" or "Thinking")
         local dots = string.rep(".", math.floor(now * 2) % 3 + 1)
         setText(progress.elapsed, elapsed)
         local detail = sending
                 and (seconds >= 15 and "Waiting for bridge confirmation" or "Delivering your message")
             or "Preparing your reply"
+        if compacting then
+            detail = "Summarizing older context to continue this conversation"
+        end
         local activity
-        if not sending then
+        if not sending and not compacting then
             for index = #(chat.activity or {}), 1, -1 do
                 local tool = chat.activity[index]
                 if tool.status == "running" then
@@ -769,6 +773,13 @@ function C.Refresh()
             or (C.connected and "Connected" or "Waiting for bridge...")
     )
     refreshProgress()
+    local usage = chat and chat.usage
+    local window = C.contextPolicy and C.contextPolicy.windowTokens
+    local measured = usage and usage.contextTokens
+    local meterText = usage and usage.compacting and "Compacting..."
+        or (measured and window and string.format("Context ~%.0f%%", measured / window * 100))
+        or "Context --"
+    setText(contextMeter.text, meterText)
     setText(sessionTitle, chat and chat.title or "New conversation")
     layout()
     local sessionCount = 0
@@ -1079,6 +1090,88 @@ function C.BuildUI()
     send:SetPoint("BOTTOMRIGHT", -7, 5)
     status = label(chatPanel, "Waiting for bridge...", MUTED)
     status:SetPoint("BOTTOMLEFT", 12, 6)
+    contextMeter = CreateFrame("Button", "WispAIContextUsage", chatPanel)
+    contextMeter:SetSize(112, 16)
+    contextMeter:SetPoint("BOTTOMRIGHT", -22, 3)
+    contextMeter.text = label(contextMeter, "Context --", MUTED)
+    contextMeter.text:SetAllPoints(contextMeter)
+    contextMeter.text:SetJustifyH("RIGHT")
+    contextMeter:SetScript("OnEnter", function(self)
+        local chat = C.Current()
+        local usage = chat and chat.usage
+        local policy = C.contextPolicy or {}
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Conversation context")
+        if usage and usage.contextTokens then
+            GameTooltip:AddLine(
+                string.format("Last measured context: %d tokens", usage.contextTokens),
+                1,
+                1,
+                1
+            )
+        else
+            GameTooltip:AddLine("Context size not measured yet", 1, 1, 1)
+        end
+        if policy.windowTokens then
+            GameTooltip:AddLine(
+                string.format("Model capacity: %d tokens", policy.windowTokens),
+                1,
+                1,
+                1
+            )
+        end
+        if policy.compactAt then
+            GameTooltip:AddLine(
+                string.format(
+                    "Auto compact: %.0f%% (includes summary overhead)",
+                    policy.compactAt * 100
+                ),
+                1,
+                1,
+                1
+            )
+        end
+        if usage then
+            GameTooltip:AddLine(
+                string.format(
+                    "Observed input / output: %d / %d",
+                    usage.inputTokens or 0,
+                    usage.outputTokens or 0
+                ),
+                1,
+                1,
+                1
+            )
+            GameTooltip:AddLine(
+                string.format(
+                    "Cached input: %d | Compactions: %d",
+                    usage.cacheReadTokens or 0,
+                    usage.compactions or 0
+                ),
+                1,
+                1,
+                1
+            )
+        end
+        GameTooltip:AddLine(
+            "Context is approximate between model calls. Totals count repeated input and exclude separate search requests.",
+            0.7,
+            0.7,
+            0.7,
+            true
+        )
+        GameTooltip:AddLine(
+            "This is conversation space, not your subscription allowance. Older context is summarized; chat messages stay visible.",
+            0.7,
+            0.7,
+            0.7,
+            true
+        )
+        GameTooltip:Show()
+    end)
+    contextMeter:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
     resize = CreateFrame("Button", nil, frame)
     resize:SetSize(18, 18)
     resize:SetPoint("BOTTOMRIGHT")

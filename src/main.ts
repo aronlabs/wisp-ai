@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'eve/client';
+import { COMPACTION_THRESHOLD } from './context-usage.ts';
 import { DiskTransport } from './transport.ts';
 import { applyEvent, type Chat } from './events.ts';
 import { ReplyProjection } from './reply-stream.ts';
@@ -142,6 +143,9 @@ let chats: Chat[] = [];
 try {
   chats = JSON.parse(await readFile(stateFile, 'utf8'));
   for (const c of chats) {
+    if (c.usage) {
+      c.usage.compacting = false;
+    }
     if (c.status === 'working') {
       c.status = 'interrupted';
     }
@@ -161,6 +165,7 @@ let inlineChat = '';
 const snapshots = new SnapshotGate();
 let acknowledgments: number[] = [];
 let eveReady = false;
+let contextWindowTokens: number | undefined;
 let dirty = true;
 const handled = new Set<string>();
 const deletedChatIds = new Set<string>();
@@ -283,6 +288,9 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
     log('Turn failed: ' + chat.id);
   } finally {
     clearInterval(streaming);
+    if (chat.usage) {
+      chat.usage.compacting = false;
+    }
     for (const state of parts.streams.values()) {
       state.reply.finish();
     }
@@ -987,8 +995,18 @@ const health = setInterval(
   () =>
     void client
       .health()
-      .then(() => {
+      .then(async () => {
         if (!eveReady) {
+          contextWindowTokens = undefined;
+          try {
+            const info = await client.info();
+            const window = info.agent.model?.contextWindowTokens;
+            if (typeof window === 'number' && Number.isSafeInteger(window) && window > 0) {
+              contextWindowTokens = window;
+            }
+          } catch {
+            // Unknown capacity is displayed as unknown, never a made-up limit.
+          }
           eveReady = true;
           changed();
           log('Eve ready.');
@@ -1134,6 +1152,7 @@ const publish = setInterval(() => {
     v: 1,
     session: activeTransport,
     connected: eveReady,
+    contextPolicy: { windowTokens: contextWindowTokens, compactAt: COMPACTION_THRESHOLD },
     acks: acknowledgments,
     activeChat,
     chats: chats
@@ -1154,6 +1173,7 @@ const publish = setInterval(() => {
         title: c.title,
         status: c.status,
         unread: c.unread,
+        usage: c.usage,
         activity: c.activity,
         inline: c.inline,
         proactive: c.proactive,

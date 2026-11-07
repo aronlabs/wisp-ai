@@ -1,5 +1,6 @@
 import { ReplyProjection, ReplyStream, type ReferenceCatalog } from './reply-stream.ts';
 import type { UINode } from './ui-schema.ts';
+import { recordContextUsage, type ContextUsage } from './context-usage.ts';
 export interface Activity {
   id: string;
   name: string;
@@ -18,6 +19,7 @@ export interface Message {
   streaming?: boolean;
 }
 export interface Chat {
+  usage?: ContextUsage;
   id: string;
   title: string;
   titleGenerated?: boolean;
@@ -42,6 +44,9 @@ export function applyEvent(
   parts: ReplyProjection,
 ): boolean {
   const data = event.data;
+  if (recordContextUsage(chat, event)) {
+    return true;
+  }
   if (event.type === 'call.requested') {
     const cap = data.capability as { name?: string; label?: string; kind?: string } | undefined;
     if (cap?.kind !== 'control' && cap?.name !== 'set_conversation_title') {

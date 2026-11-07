@@ -9,6 +9,10 @@ import { localMemory } from '../src/agent-memory.ts';
 import { dynamicEvaluate } from '../node_modules/eve/dist/src/dynamic/definition.js';
 import everloot from '../agent/connections/everloot.ts';
 import { filterWebSearch } from '../src/model-tools.ts';
+import { namedEntries } from '../node_modules/eve/dist/src/definitions/named.js';
+import { CONNECTION_SLUG_PATTERN } from '../node_modules/eve/dist/src/discover/grammar.js';
+import { readStampedConnectionProtocol } from '../node_modules/eve/dist/src/public/definitions/connections/protocol.js';
+import { resolveDynamicConnectionValue } from '../node_modules/eve/dist/src/runtime/resolve-connection.js';
 
 test('settings persist, filter real tool/MCP definitions, and preserve child settings when an MCP is off', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'wow-wisp-capabilities-'));
@@ -32,6 +36,30 @@ test('settings persist, filter real tool/MCP definitions, and preserve child set
     assert.equal(await capabilityEnabled('tool:inspect_target'), false);
     const connection = await dynamicEvaluate(everloot)({} as never);
     assert.ok(connection);
+    const source = {
+      logicalPath: 'connections/everloot.ts',
+      slug: 'everloot',
+      sourceId: 'connections/everloot.ts',
+      sourceKind: 'module' as const,
+    };
+    const kind = {
+      noun: 'connection',
+      made: 'defineMcpClientConnection()',
+      is: (value: unknown) => readStampedConnectionProtocol(value) !== undefined,
+      pattern: CONNECTION_SLUG_PATTERN,
+      rule: 'Expected a valid connection slug',
+    };
+    const runtimeConnections = namedEntries(source, connection, kind).map(({ name, entry }) =>
+      resolveDynamicConnectionValue(entry, { ...source, connectionName: name }),
+    );
+    assert.deepEqual(
+      runtimeConnections.map((c) => c.connectionName),
+      ['everloot', 'everloot-search', 'everloot-changes'],
+    );
+    assert.throws(
+      () => namedEntries(source, { everloot_search: connection['everloot-search'] }, kind),
+      /illegal connection name/,
+    );
     assert.equal(
       'allow' in connection.everloot.tools! &&
         connection.everloot.tools.allow.includes('market_value'),
@@ -42,8 +70,8 @@ test('settings persist, filter real tool/MCP definitions, and preserve child set
         'auction_history',
       ),
     );
-    assert.equal(connection.everloot_search.toolCall?.providedArguments?.version, 'forever');
-    assert.equal(connection.everloot_changes.toolCall?.providedArguments?.game, 'forever');
+    assert.equal(connection['everloot-search'].toolCall?.providedArguments?.version, 'forever');
+    assert.equal(connection['everloot-changes'].toolCall?.providedArguments?.game, 'forever');
     for (const definition of Object.values(connection)) {
       assert.ok(
         !(

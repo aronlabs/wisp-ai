@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { capabilityEnabled } from '../src/capabilities.ts';
 import { filterWebSearch, subscriptionCallOptions } from '../src/model-tools.ts';
 import { normalizeModelError } from '../src/model-errors.ts';
+import { COMPACTION_THRESHOLD } from '../src/context-usage.ts';
 // Only the bridge owns account credentials; Eve receives a loopback token.
 const provider = createOpenAI({
   apiKey: 'wisp-loopback',
@@ -44,4 +45,9 @@ const model = {
       ) as Options,
     ),
 };
-export default defineAgent({ model, reasoning: 'medium', defaultTools: false });
+export default defineAgent({
+  model,
+  reasoning: 'medium',
+  defaultTools: false,
+  compaction: { threshold: COMPACTION_THRESHOLD },
+});

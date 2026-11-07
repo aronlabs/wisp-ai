@@ -5,7 +5,7 @@ export function rebuildHistory(
   chat: Chat,
   events: { type: string; data: Record<string, unknown> }[],
 ): Message[] | null {
-  const rebuilt: Chat = { ...chat, messages: [], activity: [] };
+  const rebuilt: Chat = { ...chat, usage: undefined, messages: [], activity: [] };
   const users = chat.messages.filter((m) => m.role === 'user');
   let userIndex = 0;
   const parts = new ReplyProjection();
