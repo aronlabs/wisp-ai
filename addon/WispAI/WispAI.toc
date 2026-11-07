@@ -1,0 +1,17 @@
+## Interface: 16001
+## Title: Wisp AI
+## Notes: Ask about WoW with your character, Eve and your ChatGPT plan.
+## Author: Personal project
+## Version: 0.1.0
+## SavedVariables: WispAIDB
+## DefaultState: enabled
+
+Core.lua
+Transport.lua
+Character.lua
+Settings.lua
+RichUI.lua
+UI.lua
+Inline.lua
+Panels.lua
+Advice.lua

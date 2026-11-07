@@ -1,0 +1,10 @@
+node_modules/
+.eve/
+.env*
+runtime/
+config.local.json
+*.log
+runtime-node.txt
+
+dist/
+Wisp.exe

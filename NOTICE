@@ -1,0 +1,10 @@
+Wisp AI
+
+This project includes outbound framing and addon-file transport concepts adapted
+from thott-bot/chat: https://github.com/thott-bot/chat
+Copyright (C) 2026 Eden Blue Ventures LLC.
+Upstream code is licensed under GNU GPL version 3 only.
+This combined project is distributed under GPL-3.0-only. See LICENSE.
+
+Eve and its dependencies retain their own licenses in node_modules.
+No thott.bot logos, fonts or brand artwork are included.

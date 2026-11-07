@@ -1,0 +1,5 @@
+<Bindings>
+    <Binding name="WISPAI_INLINE" header="WISPAI" category="Wisp">
+        WispAI.OpenInline()
+    </Binding>
+</Bindings>

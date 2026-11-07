@@ -1,0 +1,32 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {readFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import {PanelStore,panelContent} from '../src/panels.ts';
+const require=createRequire(import.meta.url);const {lua,lauxlib,lualib,to_luastring,to_jsstring}=require('fengari');
+const example={id:'materials',title:'Materials',ui:[{id:'root',kind:'card',title:'Materials'},{id:'count',parent:'root',kind:'stat',label:'Cloth',value:'Loading'}],bindings:[{nodeId:'count',source:'item_count',itemId:2589,target:10}],references:{}};
+test('persistent panels isolate characters, survive restart and update by ID without duplication',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'wow-panels-'));try{
+  const file=path.join(root,'panels.json'),store=new PanelStore(file);await store.load();
+  await store.mutate('mage',{operation:'save',panel:panelContent.parse(example)});await store.mutate('warrior',{operation:'save',panel:panelContent.parse({...example,title:'Other character'})});
+  await store.mutate('mage',{operation:'save',panel:panelContent.parse({...example,title:'Updated materials'})});
+  const next=new PanelStore(file);await next.load();assert.equal(next.list('mage').length,1);assert.equal(next.list('mage')[0].title,'Updated materials');assert.equal(next.list('warrior')[0].title,'Other character');
+  await next.mutate('mage',{operation:'remove',id:'materials'});assert.equal(next.list('warrior').length,1);assert.equal(JSON.parse(await readFile(file,'utf8')).length,1);
+ }finally{await rm(root,{recursive:true,force:true})}
+});
+test('panel schema validates parents, bindings, IDs and excludes stale settings actions',()=>{
+ assert.throws(()=>panelContent.parse({...example,bindings:[{nodeId:'missing',source:'item_count',itemId:1}]}));
+ assert.throws(()=>panelContent.parse({...example,bindings:[{nodeId:'count',source:'item_count'}]}));
+ assert.throws(()=>panelContent.parse({...example,ui:[{id:'button',kind:'button',label:'Apply',action:{kind:'apply_settings',transactionId:'old'}}]}));
+ assert.throws(()=>panelContent.parse({...example,ui:[{id:'count',kind:'stat',parent:'missing',label:'x',value:'x'}]}));
+});
+test('native panels update bag counts locally, preserve unknowns and restore hidden windows',()=>{
+ const L=lauxlib.luaL_newstate();lualib.luaL_openlibs(L);const run=(s:string)=>{if(lauxlib.luaL_dostring(L,to_luastring(s))!==lua.LUA_OK)throw Error(to_jsstring(lua.lua_tolstring(L,-1)))};
+ run(readFileSync('tests/wow-ui-stub.lua','utf8'));
+ run(`C={db={}};function UnitName()return 'Mage'end;function GetRealmName()return 'Realm'end;C_EncodingUtil={DeserializeJSON=function(key) return {'Forever',key=='owner' and 'Realm' or 'Other','Mage'}end};bag=3;C_Item.GetItemCount=function(id,bank) assert(id==2589 and bank==false);return bag end;function UnitLevel()return 11 end;function GetMoney()return 12345 end`);
+ for(const file of ['RichUI.lua','Panels.lua'])run(`assert(load(${JSON.stringify(readFileSync('addon/WispAI/'+file,'utf8'))}))('WispAI',C)`);
+ run(`panel={id='materials',characterKey='owner',title='Materials',ui={{id='count',kind='stat',label='Cloth',value='Loading'}},bindings={{nodeId='count',source='item_count',itemId=2589,target=10}}};local view=C.BoundPanel(panel);assert(view.ui[1].value=='3 / 10' and panel.ui[1].value=='Loading');C.ReceivePanels({panel});local window;for _,w in ipairs(UI_TEST.widgets)do if w.title and type(w.title)=='table' and w.title:GetText()=='Materials' then window=w end end;assert(window and window:IsShown());local count=#UI_TEST.widgets;bag=7;C.RefreshPanels();assert(#UI_TEST.widgets==count,'live updates reuse widgets');assert(C.BoundPanel(panel).ui[1].value=='7 / 10');window.close.scripts.OnClick();assert(not window:IsShown());C.ShowPanels();assert(window:IsShown());C.ReceivePanels({panel},{seq=1,id='materials',characterKey='owner',action='show'});window.close.scripts.OnClick();C.lastPanelCommand=nil;C.ReceivePanels({panel},{seq=1,id='materials',characterKey='owner',action='show'});assert(not window:IsShown(),'replayed show commands must not undo a later hide after reload');bag=nil;assert(C.BoundPanel(panel).ui[1].value=='Unavailable');C.ReceivePanels({{id='foreign',characterKey='other',title='Foreign',ui={}}});assert(not window:IsShown())`);
+});

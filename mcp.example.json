@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "game_data": {
+      "enabled": false,
+      "url": "http://127.0.0.1:9000/mcp",
+      "description": "World of Warcraft: Forever game data. Replace this URL with the MCP server you choose."
+    }
+  }
+}
