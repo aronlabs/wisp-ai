@@ -7,7 +7,7 @@ are in English; the assistant replies in the language you use.
 ## First use
 
 1. Open `Wisp.exe`. Release ZIPs include Node and npm; no separate Node installation is needed. Choose the WoW client folder and install/update the addon from Overview.
-2. In the **ChatGPT** tab, click **Continue with ChatGPT** and authorize Wisp in your browser. Click **Load models**, choose a model and **Use model**.
+2. In the **Connections > ChatGPT**, click **Continue with ChatGPT** and authorize Wisp in your browser. Available models load automatically after connection. Choose a model and **Set default** for new conversations; model and effort can also be chosen per chat in WoW.
 3. Fully restart WoW after the first installation so all helper files are discovered.
 4. Enable **Wisp AI** and its helper channels in AddOns.
 5. Type `/wisp`. Use `−` or Escape to minimize it into an always-visible bar.
@@ -74,7 +74,7 @@ source files are never edited. All three tools have their own capability toggle.
 
 ## Desktop application and distribution
 
-The native Windows app has Overview, ChatGPT, MCP connections, Panels and Suggestions tabs.
+The native Windows app has a sidebar with Overview, Connections, Tools & MCPs, Panels, Suggestions and Diagnostics. AI providers live under Connections; ChatGPT is the currently supported provider.
 It runs the bridge without a console window, minimizes to the system tray on close,
 and stops its bridge from the tray Exit command. User data stays in runtime/ beside
 the portable application. Wisp has its own Sign in with ChatGPT connection,
@@ -84,7 +84,7 @@ Credentials are encrypted with Windows DPAPI under LocalAppData for this Windows
 user and installation path. ChatGPT model calls use the public Responses API with
 store:false; Eve only receives a per-process authenticated loopback endpoint.
 
-The ChatGPT tab shows connection state and saved accounts, supports browser sign-in,
+The ChatGPT connection shows connection state and saved accounts, supports browser sign-in,
 cancellation, account switching and independent disconnection, and lists the models
 available to the active grant. Use model persists the choice and restarts the agent
 when no turn is active. Browser cancellation, identity-only consent, expired access,

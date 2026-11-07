@@ -144,9 +144,18 @@ static class Program
         }
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        if (args.Length >= 2 && args[0] == "--preview")
+        {
+            using (var preview = new WispWindow(false))
+                preview.RenderPreview(args[1], args.Length > 2 ? args[2] : "Overview");
+            return 0;
+        }
         if (args.Length == 1 && args[0] == "--self-test")
         {
-            using (var test = new WispWindow(false)) { }
+            using (var test = new WispWindow(false))
+            {
+                test.ValidateUi();
+            }
             return 0;
         }
         bool created;

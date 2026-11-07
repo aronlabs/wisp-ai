@@ -12,6 +12,7 @@ for (const dir of [
   'agent',
   'addon',
   'desktop',
+  'assets',
   'scripts',
   'tests',
   'simulator',
@@ -53,7 +54,7 @@ if (!response.ok) {
 await writeFile(path.join(stage, 'runtime', 'NODE-LICENSE.txt'), await response.text());
 await writeFile(
   path.join(stage, 'START-HERE.txt'),
-  'Open Wisp.exe. Choose your WoW client folder and click Install / update addon. Restart WoW after first installation. Use /wisp and bind inline chat in Wisp settings. The Node runtime is included; no separate Node installation is needed. Open the ChatGPT tab, click Continue with ChatGPT and authorize Wisp in your browser. Load models and choose your preferred model. No Codex installation or API key is required. No account credentials, conversations or personal configuration are included in this archive.\r\n',
+  'Open Wisp.exe. Choose your WoW client folder and click Install / update addon. Restart WoW after first installation. Use /wisp and bind inline chat in Wisp settings. The Node runtime is included; no separate Node installation is needed. Open Connections > ChatGPT, click Continue with ChatGPT and authorize Wisp in your browser. Available models load after connection; choose your preferred default. No Codex installation or API key is required. No account credentials, conversations or personal configuration are included in this archive.\r\n',
 );
 await writeFile(
   path.join(stage, 'BUILD.json'),

@@ -13,12 +13,12 @@ using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
-class WispWindow : Form
+partial class WispWindow : Form
 {
-    static readonly Color Bg = Color.FromArgb(25, 28, 33),
-        Surface = Color.FromArgb(35, 40, 47),
-        Ink = Color.FromArgb(230, 230, 225),
-        Gold = Color.FromArgb(214, 185, 120);
+    static readonly Color Bg = Color.FromArgb(20, 25, 29),
+        Surface = Color.FromArgb(28, 35, 40),
+        Ink = Color.FromArgb(228, 235, 233),
+        Gold = Color.FromArgb(119, 219, 198);
     Label state,
         details;
     TextBox wow,
@@ -69,40 +69,27 @@ class WispWindow : Form
         BackColor = Bg;
         ForeColor = Ink;
         Font = new Font("Segoe UI", 10);
-        var heading = new Label
-        {
-            Text = "Wisp AI",
-            Font = new Font("Segoe UI", 23, FontStyle.Bold),
-            ForeColor = Gold,
-            Location = new Point(25, 16),
-            AutoSize = true,
-        };
-        Controls.Add(heading);
-        state = new Label
-        {
-            Text = "Checking bridge...",
-            Location = new Point(29, 65),
-            AutoSize = true,
-        };
-        Controls.Add(state);
-        var tabs = new TabControl
-        {
-            Location = new Point(22, 100),
-            Size = new Size(835, 480),
-            Anchor =
-                AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-        };
-        Controls.Add(tabs);
-        var home = Page(tabs, "Overview");
-        var mcp = Page(tabs, "MCP connections");
-        var tracking = Page(tabs, "Panels");
-        var automation = Page(tabs, "Suggestions");
-        var account = Page(tabs, "ChatGPT");
+        BuildShell();
+        var home = Page("Overview");
+        var account = Page("Connections");
+        var mcp = Page("Tools & MCPs");
+        var tracking = Page("Panels");
+        var automation = Page("Suggestions");
+        var diagnostics = Page("Diagnostics");
         BuildAccountPage(account);
         BuildOverviewPage(home);
         BuildMcpPage(mcp);
         BuildPanelsPage(tracking);
         BuildSuggestionsPage(automation);
+        BuildDiagnosticsPage(diagnostics);
+        connections.DoubleClick += async delegate
+        {
+            if (connections.SelectedItems.Count > 0)
+                await EditMcp((Dictionary<string, object>)connections.SelectedItems[0].Tag);
+        };
+        BindSelectionActions(mcp, connections, "Add MCP");
+        BindSelectionActions(tracking, panels, "");
+        ShowPage("Overview");
         var menu = new ContextMenuStrip();
         menu.Items.Add(
             "Open Wisp",
@@ -130,7 +117,7 @@ class WispWindow : Form
         );
         tray = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = Icon,
             Text = "Wisp AI",
             Visible = live,
             ContextMenuStrip = menu,
@@ -183,25 +170,35 @@ class WispWindow : Form
             };
     }
 
-    void BuildAccountPage(TabPage account)
+    void BuildAccountPage(Panel page)
     {
-        accountState = Label(account, "Start the bridge to connect your ChatGPT account.", 18, 20);
+        var account = Card(
+            page,
+            "ChatGPT",
+            "Connect with your subscription. No API key needed.",
+            18,
+            8,
+            756,
+            470
+        );
+        accountState = Label(account, "Start Wisp to manage this connection.", 20, 85);
         accountState.AutoSize = false;
-        accountState.Size = new Size(760, 82);
-        Label(account, "Saved connections", 18, 110);
+        accountState.Size = new Size(708, 66);
+        Label(account, "Saved accounts", 20, 165);
         accounts = new ComboBox
         {
-            Location = new Point(18, 138),
-            Width = 520,
+            Location = new Point(20, 192),
+            Width = 500,
             DropDownStyle = ComboBoxStyle.DropDownList,
         };
         account.Controls.Add(accounts);
+        StyleCombo(accounts);
         Button(
             account,
             "Use account",
-            550,
-            135,
-            140,
+            540,
+            190,
+            176,
             async delegate
             {
                 await AuthWork(async () =>
@@ -215,9 +212,9 @@ class WispWindow : Form
         Button(
             account,
             "Continue with ChatGPT",
-            18,
-            190,
-            220,
+            20,
+            243,
+            208,
             async delegate
             {
                 await SignIn(false);
@@ -226,9 +223,9 @@ class WispWindow : Form
         Button(
             account,
             "Add account",
-            250,
-            190,
-            140,
+            244,
+            243,
+            130,
             async delegate
             {
                 await SignIn(true);
@@ -237,8 +234,8 @@ class WispWindow : Form
         Button(
             account,
             "Cancel sign-in",
-            402,
-            190,
+            390,
+            243,
             145,
             async delegate
             {
@@ -251,9 +248,9 @@ class WispWindow : Form
         Button(
             account,
             "Disconnect",
-            559,
-            190,
-            140,
+            551,
+            243,
+            165,
             async delegate
             {
                 await AuthWork(async () =>
@@ -262,20 +259,21 @@ class WispWindow : Form
                 });
             }
         );
-        Label(account, "Model available on your ChatGPT plan", 18, 252);
+        Label(account, "Default model for new chats", 20, 302);
         models = new ComboBox
         {
-            Location = new Point(18, 280),
-            Width = 400,
+            Location = new Point(20, 330),
+            Width = 408,
             DropDownStyle = ComboBoxStyle.DropDownList,
         };
         account.Controls.Add(models);
+        StyleCombo(models);
         Button(
             account,
-            "Load models",
-            430,
-            277,
-            130,
+            "Refresh models",
+            444,
+            328,
+            124,
             async delegate
             {
                 await AuthWork(LoadModels);
@@ -283,133 +281,180 @@ class WispWindow : Form
         );
         Button(
             account,
-            "Use model",
-            572,
-            277,
-            130,
+            "Set default",
+            584,
+            328,
+            132,
             async delegate
             {
                 await AuthWork(async () =>
                 {
                     var item = models.SelectedItem as Choice;
                     if (item == null)
-                        throw new Exception("Load and choose an available model first.");
+                        throw new Exception("Choose an available model first.");
                     await Request("POST", "/auth/model", new { model = item.Id });
                 });
             }
         );
-        Label(
+        var note = Label(
             account,
-            "Sign-in opens your browser. No API key or separate Codex installation is required.\nAccount credentials are protected by Windows for this user and this installation.\nDisconnect only affects Wisp. Your chats and memory stay on this computer.",
-            18,
-            340
-        ).Size = new Size(760, 85);
+            "You can choose a different model and effort inside each chat.\nCredentials are protected by Windows. Disconnecting keeps your chats and memory.",
+            20,
+            396
+        );
+        note.ForeColor = Color.FromArgb(145, 161, 167);
+        note.Font = new Font("Segoe UI", 9);
     }
 
-    void BuildOverviewPage(TabPage home)
+    void BuildOverviewPage(Panel home)
     {
-        Label(home, "World of Warcraft client folder", 18, 18);
-        wow = Input(home, 18, 45, 625);
+        var game = Card(home, "WORLD OF WARCRAFT", "", 18, 10, 244, 104);
+        gameValue = Label(game, "Waiting for WoW", 20, 53);
+        gameValue.Font = new Font("Segoe UI", 15, FontStyle.Bold);
+        var account = Card(home, "AI CONNECTION", "", 274, 10, 244, 104);
+        accountValue = Label(account, "Checking account...", 20, 53);
+        accountValue.Font = new Font("Segoe UI", 15, FontStyle.Bold);
+        var agent = Card(home, "WISP", "", 530, 10, 244, 104);
+        agentValue = Label(agent, "Checking...", 20, 53);
+        agentValue.Font = new Font("Segoe UI", 15, FontStyle.Bold);
+        var installation = Card(home, "Game installation", "", 18, 130, 756, 160);
+        wow = Input(installation, 20, 55, 580);
         wow.Text = ReadWow();
         Button(
-            home,
-            "Browse",
-            655,
-            43,
-            110,
+            installation,
+            "Choose folder",
+            614,
+            52,
+            122,
             delegate
             {
-                using (var d = new FolderBrowserDialog())
+                using (var dialog = new FolderBrowserDialog())
                 {
-                    d.Description = "Select the client folder containing Wow.exe";
-                    if (d.ShowDialog() == DialogResult.OK)
-                        wow.Text = d.SelectedPath;
+                    dialog.Description = "Select the client folder containing Wow.exe";
+                    if (dialog.ShowDialog(this) == DialogResult.OK)
+                        wow.Text = dialog.SelectedPath;
                 }
             }
         );
         Button(
-            home,
+            installation,
             "Install / update addon",
-            18,
-            85,
-            205,
+            20,
+            106,
+            192,
             async delegate
             {
                 await Guard(async () =>
                 {
+                    if (!File.Exists(Path.Combine(wow.Text.Trim(), "Wow.exe")))
+                        throw new Exception("Choose the WoW client folder containing Wow.exe.");
                     await StopBridge();
                     var config = ReadConfig();
                     config["wow"] = wow.Text.Trim();
-                    if (!File.Exists(Path.Combine(wow.Text.Trim(), "Wow.exe")))
-                        throw new Exception("Choose the WoW client folder containing Wow.exe.");
                     File.WriteAllText(
                         Path.Combine(Program.Root, "config.local.json"),
                         Program.Json.Serialize(config)
                     );
                     await RunTool("scripts/install.ts", wow.Text.Trim());
                     StartBridge();
+                    Notice("Addon installed. Restart WoW after the first installation.", false);
                 });
             }
         );
-        Button(
-            home,
-            "Start bridge",
-            235,
-            85,
-            145,
-            delegate
+        startControl = Button(
+            installation,
+            "Start Wisp",
+            228,
+            106,
+            130,
+            async delegate
             {
-                try
+                await Guard(() =>
                 {
                     StartBridge();
-                }
-                catch (Exception e)
-                {
-                    Error(e.Message);
-                }
+                    return Task.FromResult(0);
+                });
             }
         );
-        Button(
-            home,
-            "Stop bridge",
-            390,
-            85,
-            145,
+        stopControl = Button(
+            installation,
+            "Stop Wisp",
+            374,
+            106,
+            130,
             async delegate
             {
                 await Guard(StopBridge);
             }
         );
         Button(
-            home,
-            "Open logs",
-            545,
-            85,
-            145,
+            installation,
+            "Diagnostics",
+            520,
+            106,
+            130,
+            delegate
+            {
+                ShowPage("Diagnostics");
+            }
+        );
+        var next = Card(home, "Back to Azeroth", "", 18, 306, 756, 164);
+        details = Label(next, "Connect an AI provider, then open /wisp in game.", 20, 50);
+        details.AutoSize = false;
+        details.Size = new Size(706, 45);
+        details.ForeColor = Color.FromArgb(159, 176, 180);
+        Button(
+            next,
+            "Manage connections",
+            20,
+            111,
+            190,
+            delegate
+            {
+                ShowPage("Connections");
+            }
+        );
+        Button(
+            next,
+            "Tools & MCPs",
+            226,
+            111,
+            190,
+            delegate
+            {
+                ShowPage("Tools & MCPs");
+            }
+        );
+    }
+
+    void BuildDiagnosticsPage(Panel page)
+    {
+        Label(page, "Local bridge activity", 18, 15);
+        logs = Input(page, 18, 48, 756);
+        logs.Multiline = true;
+        logs.ReadOnly = true;
+        logs.ScrollBars = ScrollBars.Vertical;
+        logs.Height = 340;
+        logs.Font = new Font("Consolas", 9);
+        logs.Anchor =
+            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        Button(
+            page,
+            "Open logs folder",
+            18,
+            408,
+            180,
             delegate
             {
                 Directory.CreateDirectory(Path.Combine(Program.Root, "runtime"));
                 Process.Start("explorer.exe", Program.Quote(Path.Combine(Program.Root, "runtime")));
             }
         );
-        details = Label(
-            home,
-            "Connect your account in the ChatGPT tab.\nIn WoW: /wisp, then Settings > Bind inline chat.",
-            18,
-            135
-        );
-        details.Size = new Size(760, 65);
-        details.AutoSize = false;
-        logs = Input(home, 18, 210, 760);
-        logs.Multiline = true;
-        logs.ReadOnly = true;
-        logs.ScrollBars = ScrollBars.Vertical;
-        logs.Height = 180;
-        logs.Anchor =
-            AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        Label(page, "Logs stay on your computer. Review them before sharing.", 18, 458).ForeColor =
+            Color.FromArgb(145, 161, 167);
     }
 
-    void BuildMcpPage(TabPage mcp)
+    void BuildMcpPage(Panel mcp)
     {
         connections = List(
             mcp,
@@ -452,9 +497,9 @@ class WispWindow : Form
                     {
                         var item = (Dictionary<string, object>)connections.SelectedItems[0].Tag;
                         var result = await Request("POST", "/mcps/test", new { server = item });
-                        MessageBox.Show(
+                        Notice(
                             "Connected. Available tools: " + Program.Text(result, "count"),
-                            "Wisp"
+                            false
                         );
                     });
             }
@@ -488,7 +533,7 @@ class WispWindow : Form
         ).Size = new Size(760, 52);
     }
 
-    void BuildPanelsPage(TabPage tracking)
+    void BuildPanelsPage(Panel tracking)
     {
         panels = List(
             tracking,
@@ -536,26 +581,42 @@ class WispWindow : Form
         ).Size = new Size(760, 52);
     }
 
-    void BuildSuggestionsPage(TabPage automation)
+    void BuildSuggestionsPage(Panel page)
     {
-        Label(automation, "Optional suggestions", 18, 20).Font = new Font(
-            "Segoe UI",
-            14,
-            FontStyle.Bold
-        );
-        levelTips = Check(automation, "When I level up", 18, 70);
-        weaponTips = Check(automation, "When I equip a different weapon", 18, 110);
-        Label(
-            automation,
-            "Suggestions are off by default. The assistant checks relevant live state before advising.\nAt most one suggestion every 10 minutes; nothing is applied automatically.\nEvents during combat or another conversation are skipped.",
+        var level = Card(
+            page,
+            "A little direction when you level up",
+            "Wisp can check what changed and suggest a useful next step.",
             18,
-            155
-        ).Size = new Size(760, 90);
-        Button(
-            automation,
+            10,
+            756,
+            122
+        );
+        levelTips = Check(level, "Offer level-up suggestions", 20, 86);
+        var weapon = Card(
+            page,
+            "Get to know your new weapon",
+            "Receive a contextual tip when you equip a different weapon.",
+            18,
+            148,
+            756,
+            122
+        );
+        weaponTips = Check(weapon, "Offer weapon suggestions", 20, 86);
+        var note = Label(
+            page,
+            "Suggestions are optional and off by default. At most one every ten minutes.\nEvents during combat or another turn are skipped. Wisp never applies changes automatically.",
+            20,
+            300
+        );
+        note.ForeColor = Color.FromArgb(145, 161, 167);
+        note.Font = new Font("Segoe UI", 9);
+        Button save = null;
+        save = Button(
+            page,
             "Save preferences",
             18,
-            265,
+            374,
             185,
             async delegate
             {
@@ -567,26 +628,22 @@ class WispWindow : Form
                         new { levelUp = levelTips.Checked, weapon = weaponTips.Checked }
                     );
                     prefsDirty = false;
+                    save.Enabled = false;
+                    Notice("Suggestion preferences saved.", false);
                 });
             }
         );
-        levelTips.CheckedChanged += delegate
+        save.Enabled = false;
+        EventHandler changed = delegate
         {
             if (!settingPrefs)
+            {
                 prefsDirty = true;
+                save.Enabled = true;
+            }
         };
-        weaponTips.CheckedChanged += delegate
-        {
-            if (!settingPrefs)
-                prefsDirty = true;
-        };
-    }
-
-    static TabPage Page(TabControl tabs, string title)
-    {
-        var p = new TabPage(title) { BackColor = Bg, ForeColor = Ink };
-        tabs.TabPages.Add(p);
-        return p;
+        levelTips.CheckedChanged += changed;
+        weaponTips.CheckedChanged += changed;
     }
 
     static Label Label(Control p, string text, int x, int y)
@@ -629,10 +686,14 @@ class WispWindow : Form
         return c;
     }
 
-    static void Button(Control p, string text, int x, int y, int width, EventHandler action)
+    static Button Button(Control p, string text, int x, int y, int width, EventHandler action)
     {
-        var b = new Button
+        var b = new WispButton
         {
+            Primary =
+                text == "Continue with ChatGPT"
+                || text == "Install / update addon"
+                || text == "Add MCP",
             Text = text,
             Location = new Point(x, y),
             Size = new Size(width, 31),
@@ -642,6 +703,7 @@ class WispWindow : Form
         };
         b.Click += action;
         p.Controls.Add(b);
+        return b;
     }
 
     static ListView List(Control p, string[] columns, int[] widths)
@@ -654,12 +716,57 @@ class WispWindow : Form
             FullRowSelect = true,
             MultiSelect = false,
             HideSelection = false,
+            BorderStyle = BorderStyle.None,
+            OwnerDraw = true,
             BackColor = Surface,
             ForeColor = Ink,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
         };
+        list.DrawColumnHeader += delegate(object sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            using (var brush = new SolidBrush(Color.FromArgb(36, 46, 51)))
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            TextRenderer.DrawText(
+                e.Graphics,
+                e.Header.Text,
+                list.Font,
+                e.Bounds,
+                Color.FromArgb(145, 161, 167),
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left
+            );
+        };
+        list.DrawItem += delegate(object sender, DrawListViewItemEventArgs e) { };
+        list.DrawSubItem += delegate(object sender, DrawListViewSubItemEventArgs e)
+        {
+            using (
+                var brush = new SolidBrush(e.Item.Selected ? Color.FromArgb(41, 67, 66) : Surface)
+            )
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            var bounds = e.Bounds;
+            bounds.Inflate(-7, 0);
+            TextRenderer.DrawText(
+                e.Graphics,
+                e.SubItem.Text,
+                list.Font,
+                bounds,
+                Ink,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis
+            );
+        };
         for (int i = 0; i < columns.Length; i++)
             list.Columns.Add(columns[i], widths[i]);
+        Action stretch = delegate
+        {
+            int used = 0;
+            for (int i = 0; i < list.Columns.Count - 1; i++)
+                used += list.Columns[i].Width;
+            list.Columns[list.Columns.Count - 1].Width = Math.Max(80, list.ClientSize.Width - used);
+        };
+        list.SizeChanged += delegate
+        {
+            stretch();
+        };
+        stretch();
         p.Controls.Add(list);
         return list;
     }
@@ -671,13 +778,25 @@ class WispWindow : Form
 
     async Task Guard(Func<Task> work)
     {
+        if (operationBusy)
+            return;
+        operationBusy = true;
+        UseWaitCursor = true;
+        Notice("Working...", false);
         try
         {
             await work();
+            if (feedback.Text == "Working...")
+                Notice("Done.", false);
         }
         catch (Exception e)
         {
-            Error(e.Message);
+            Notice(e.Message, true);
+        }
+        finally
+        {
+            operationBusy = false;
+            UseWaitCursor = false;
         }
     }
 
@@ -695,7 +814,7 @@ class WispWindow : Form
 
     string ReadWow()
     {
-        return Program.Text(ReadConfig(), "wow", @"E:\Blizzard\World of Warcraft\_forever_");
+        return Program.Text(ReadConfig(), "wow", "");
     }
 
     string Node()
@@ -969,7 +1088,7 @@ class WispWindow : Form
         {
             accountChecked = true;
             if (status != "connected")
-                ((TabControl)accountState.Parent.Parent).SelectedTab = (TabPage)accountState.Parent;
+                ShowPage("Connections");
         }
         if (status != "connected")
             state.Text = "Bridge running - " + label;
@@ -999,6 +1118,9 @@ class WispWindow : Form
         }
     }
 
+    string mcpView = "",
+        panelView = "";
+
     async Task RefreshStatus()
     {
         if (polling)
@@ -1013,63 +1135,94 @@ class WispWindow : Form
                 : "Agent ready - waiting for WoW";
             state.ForeColor = Gold;
             UpdateAccount(data);
+            UpdateDashboard(data);
+            var provider = data["auth"] as Dictionary<string, object>;
+            if (
+                provider != null
+                && Program.Text(provider, "status") == "connected"
+                && activeAccount != automaticModelsAccount
+                && Program.Text(data, "activeTurns") == "0"
+            )
+            {
+                automaticModelsAccount = activeAccount;
+                try
+                {
+                    await LoadModels();
+                }
+                catch (Exception e)
+                {
+                    Notice(e.Message, true);
+                }
+            }
             string selected =
                 connections.SelectedItems.Count > 0 ? connections.SelectedItems[0].Text : "";
-            connections.BeginUpdate();
-            connections.Items.Clear();
-            foreach (var row in Objects(data, "mcps"))
+            var nextMcpView = Program.Json.Serialize(data["mcps"]);
+            if (nextMcpView != mcpView)
             {
-                object tools;
-                int count =
-                    row.TryGetValue("tools", out tools) && tools is object[]
-                        ? ((object[])tools).Length
-                        : 0;
-                var item = new ListViewItem(
-                    new[]
-                    {
-                        Program.Text(row, "name"),
-                        Program.Text(row, "transport"),
-                        count.ToString(),
-                        Program.Text(row, "enabled"),
-                    }
-                )
+                mcpView = nextMcpView;
+                connections.BeginUpdate();
+                connections.Items.Clear();
+                foreach (var row in Objects(data, "mcps"))
                 {
-                    Tag = row,
-                };
-                connections.Items.Add(item);
-                if (item.Text == selected)
-                    item.Selected = true;
+                    object tools;
+                    int count =
+                        row.TryGetValue("tools", out tools) && tools is object[]
+                            ? ((object[])tools).Length
+                            : 0;
+                    var item = new ListViewItem(
+                        new[]
+                        {
+                            Program.Text(row, "name"),
+                            Program.Text(row, "transport"),
+                            count.ToString(),
+                            Program.Text(row, "enabled"),
+                        }
+                    )
+                    {
+                        Tag = row,
+                    };
+                    connections.Items.Add(item);
+                    if (item.Text == selected)
+                        item.Selected = true;
+                }
+                connections.EndUpdate();
             }
-            connections.EndUpdate();
             string panelId =
                 panels.SelectedItems.Count > 0
                     ? Program.Text((Dictionary<string, object>)panels.SelectedItems[0].Tag, "id")
                     : "";
-            panels.BeginUpdate();
-            panels.Items.Clear();
-            foreach (var row in Objects(data, "panels"))
+            var nextPanelView = Program.Json.Serialize(data["panels"]);
+            if (nextPanelView != panelView)
             {
-                object bindings;
-                int count =
-                    row.TryGetValue("bindings", out bindings) && bindings is object[]
-                        ? ((object[])bindings).Length
-                        : 0;
-                var item = new ListViewItem(
-                    new[]
-                    {
-                        Program.Text(row, "title"),
-                        Program.Text(row, "character"),
-                        count.ToString(),
-                    }
-                )
+                panelView = nextPanelView;
+                panels.BeginUpdate();
+                panels.Items.Clear();
+                foreach (var row in Objects(data, "panels"))
                 {
-                    Tag = row,
-                };
-                panels.Items.Add(item);
-                if (Program.Text(row, "id") == panelId)
-                    item.Selected = true;
+                    object bindings;
+                    int count =
+                        row.TryGetValue("bindings", out bindings) && bindings is object[]
+                            ? ((object[])bindings).Length
+                            : 0;
+                    var item = new ListViewItem(
+                        new[]
+                        {
+                            Program.Text(row, "title"),
+                            Program.Text(row, "character"),
+                            count.ToString(),
+                        }
+                    )
+                    {
+                        Tag = row,
+                    };
+                    panels.Items.Add(item);
+                    if (Program.Text(row, "id") == panelId)
+                        item.Selected = true;
+                }
+                panels.EndUpdate();
             }
-            panels.EndUpdate();
+            foreach (var pair in emptyLists)
+                pair.Value.Visible = pair.Key.Items.Count == 0;
             object prefs;
             if (!prefsDirty && data.TryGetValue("suggestions", out prefs))
             {
@@ -1084,6 +1237,17 @@ class WispWindow : Form
         {
             state.Text = "Bridge stopped";
             state.ForeColor = Ink;
+            startControl.Enabled = !operationBusy;
+            stopControl.Enabled = false;
+            gameValue.Text = "Not connected";
+            accountValue.Text = "Unavailable";
+            agentValue.Text = "Stopped";
+            gameValue.ForeColor =
+                accountValue.ForeColor =
+                agentValue.ForeColor =
+                    Color.FromArgb(145, 161, 167);
+            details.Text =
+                "Start Wisp to reconnect. If this is your first time, choose the game folder and install the addon.";
         }
         finally
         {
