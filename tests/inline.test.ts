@@ -176,6 +176,58 @@ assert(
 `,
   );
 });
+test('a mouse binding dispatches over bag UI and preserves the hovered item', () => {
+  vm().run(`
+local base={BUTTON4='WISPAI_INLINE',['ALT-BUTTON5']='WISPAI_INLINE'}
+local overrides={}
+local clears=0
+local combat=false
+function InCombatLockdown()return combat end
+function IsControlKeyDown()return false end
+function IsAltKeyDown()return false end
+function IsShiftKeyDown()return false end
+function GetBindingKey()return'BUTTON4','ALT-BUTTON5'end
+function GetBindingAction(key,check)return(check and overrides[key])or base[key]or''end
+function ClearOverrideBindings(owner)overrides={};clears=clears+1 end
+function SetOverrideBindingClick(owner,priority,key,name,button)
+  assert(owner==UI_TEST.frames.WispAIInlineHotkey and UI_TEST.frames[name] and priority)
+  overrides[key]='CLICK '..name..':'..button
+end
+C.db.inlineBinding='BUTTON4'
+C.RefreshInlineBindings()
+assert(overrides.BUTTON4=='CLICK WispAIInlineHotkey:LeftButton')
+local function event(name,button)
+  for _,w in ipairs(UI_TEST.widgets)do if w.scripts.OnEvent then w.scripts.OnEvent(w,name,button)end end
+end
+local before=clears
+event('UPDATE_BINDINGS')
+assert(clears==before,'unchanged binding events must not rebuild overrides')
+event('GLOBAL_MOUSE_DOWN','Button4')
+assert(UI_TEST.frames.WispAIInline:IsShown())
+assert(UI_TEST.frames.WispAIInline.reference=='|cff00ff00|Hitem:100:0|h[Robe]|h|r')
+local diagnostic=packets[#packets]
+assert(diagnostic.type=='inline_status'and diagnostic.data.panelShown and diagnostic.data.hasReference)
+before=#packets
+UI_TEST.frames.WispAIInlineHotkey.scripts.OnClick()
+assert(#packets==before,'global mouse and native click dispatch must not activate twice')
+C.CloseInline()
+UI_TEST.now=1
+UI_TEST.frames.WispAIInlineHotkey.scripts.OnClick()
+assert(UI_TEST.frames.WispAIInline:IsShown(),'direct click target works without Bindings.xml dispatch')
+C.CloseInline()
+base.BUTTON4='OTHER_ACTION'
+combat=true
+event('UPDATE_BINDINGS')
+assert(overrides.BUTTON4)
+combat=false
+event('PLAYER_REGEN_ENABLED')
+assert(not overrides.BUTTON4 and overrides['ALT-BUTTON5'])
+UI_TEST.now=2
+event('GLOBAL_MOUSE_DOWN','Button4')
+assert(not UI_TEST.frames.WispAIInline:IsShown(),'another action retains its mouse button')
+`);
+});
+
 test('automatic login/resume never selects an inline conversation', () => {
   const main = {
     id: 'main',

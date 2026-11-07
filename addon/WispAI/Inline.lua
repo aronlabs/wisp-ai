@@ -3,6 +3,92 @@ BINDING_HEADER_WISPAI = "Wisp"
 BINDING_NAME_WISPAI_INLINE = "Ask about hovered reference"
 local panel, entry, title, scroll, content, busy, send
 local rows = {}
+local bindingCapture, hotkey, bindingEvents, lastActivation, bindingSignature
+local mouseKeys = { LeftButton = "BUTTON1", RightButton = "BUTTON2", MiddleButton = "BUTTON3" }
+local function combination(key)
+    return (IsControlKeyDown() and "CTRL-" or "")
+        .. (IsAltKeyDown() and "ALT-" or "")
+        .. (IsShiftKeyDown() and "SHIFT-" or "")
+        .. key
+end
+local function mouseKey(button)
+    local number = button:match("^Button(%d+)$")
+    return mouseKeys[button] or (number and ("BUTTON" .. number))
+end
+local function bindingStatus(event, key, error)
+    if C.Send then
+        C.Send({
+            type = "inline_status",
+            data = {
+                event = event,
+                key = key or (C.db and C.db.inlineBinding),
+                action = key and GetBindingAction and GetBindingAction(key, true),
+                panelShown = panel and panel:IsShown() or false,
+                hasReference = panel and panel.reference ~= nil or false,
+                error = error and tostring(error):sub(1, 300),
+            },
+        })
+    end
+end
+function C.ActivateInline(key)
+    if bindingCapture and bindingCapture:IsShown() then
+        return
+    end
+    local now = GetTime()
+    if lastActivation and now - lastActivation < 0.15 then
+        return
+    end
+    lastActivation = now
+    local ok, error = pcall(C.OpenInline)
+    if not ok then
+        C.Log("Inline chat could not open: " .. tostring(error))
+    end
+    bindingStatus("activated", key, not ok and error or nil)
+end
+function C.RefreshInlineBindings()
+    if not hotkey or not SetOverrideBindingClick or not ClearOverrideBindings then
+        return
+    end
+    if InCombatLockdown and InCombatLockdown() then
+        return
+    end
+    if bindingCapture and bindingCapture:IsShown() then
+        if bindingSignature ~= "capturing" then
+            bindingSignature = "capturing"
+            ClearOverrideBindings(hotkey)
+        end
+        return
+    end
+    local first, second = GetBindingKey("WISPAI_INLINE")
+    local keys = { first or false, second or false, C.db and C.db.inlineBinding or false }
+    local signature = {}
+    for _, key in ipairs(keys) do
+        signature[#signature + 1] = tostring(key) .. ":" .. (key and GetBindingAction(key) or "")
+    end
+    signature = table.concat(signature, ";")
+    if signature == bindingSignature then
+        return
+    end
+    bindingSignature = signature
+    ClearOverrideBindings(hotkey)
+    local seen = {}
+    for _, key in ipairs(keys) do
+        if key and not seen[key] then
+            seen[key] = true
+            local action = GetBindingAction(key)
+            if
+                action == "WISPAI_INLINE" or (action == "" and C.db and C.db.inlineBinding == key)
+            then
+                SetOverrideBindingClick(hotkey, true, key, "WispAIInlineHotkey", "LeftButton")
+            end
+        end
+    end
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, function()
+            bindingStatus("ready", first or (C.db and C.db.inlineBinding))
+        end)
+    end
+end
 local function set(font, value)
     if font._inlineText ~= value then
         font._inlineText = value
@@ -250,6 +336,9 @@ function C.RefreshInline()
     set(send, working and "Stop" or "Ask")
 end
 function C.OpenInline()
+    if bindingCapture and bindingCapture:IsShown() then
+        return
+    end
     local reference = C.CaptureHover()
     if not panel then
         C.InitInline()
@@ -293,6 +382,32 @@ function C.InitInline()
     if panel then
         return
     end
+    hotkey = CreateFrame("Button", "WispAIInlineHotkey", UIParent)
+    hotkey:RegisterForClicks("AnyUp")
+    hotkey:SetScript("OnClick", function()
+        C.ActivateInline()
+    end)
+    bindingEvents = CreateFrame("Frame")
+    bindingEvents:RegisterEvent("UPDATE_BINDINGS")
+    bindingEvents:RegisterEvent("PLAYER_REGEN_ENABLED")
+    bindingEvents:RegisterEvent("GLOBAL_MOUSE_DOWN")
+    bindingEvents:SetScript("OnEvent", function(_, event, button)
+        if event == "GLOBAL_MOUSE_DOWN" then
+            if bindingCapture and bindingCapture:IsShown() then
+                return
+            end
+            local key = mouseKey(button)
+            if key then
+                key = combination(key)
+                local action = GetBindingAction(key, true)
+                if action == "WISPAI_INLINE" or action == "CLICK WispAIInlineHotkey:LeftButton" then
+                    C.ActivateInline(key)
+                end
+            end
+        else
+            C.RefreshInlineBindings()
+        end
+    end)
     panel = CreateFrame("Frame", "WispAIInline", UIParent, "BackdropTemplate")
     panel:SetSize(420, 340)
     panel:SetPoint("CENTER")
@@ -404,8 +519,8 @@ function C.InitInline()
         end
     end
     panel:Hide()
+    C.RefreshInlineBindings()
 end
-local bindingCapture
 function C.BindInline()
     if InCombatLockdown and InCombatLockdown() then
         C.Log("Leave combat before changing keybindings.")
@@ -416,6 +531,7 @@ function C.BindInline()
     end
     local capture = CreateFrame("Frame", nil, UIParent)
     bindingCapture = capture
+    C.RefreshInlineBindings()
     capture:SetAllPoints(UIParent)
     capture:SetFrameStrata("FULLSCREEN_DIALOG")
     capture:EnableMouse(true)
@@ -431,6 +547,7 @@ function C.BindInline()
         if capture:IsShown() then
             capture:Hide()
         end
+        C.RefreshInlineBindings()
     end)
     dialog:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -451,14 +568,11 @@ function C.BindInline()
             C.Log("Binding was not changed in combat.")
             return
         end
-        local combination = (IsControlKeyDown() and "CTRL-" or "")
-            .. (IsAltKeyDown() and "ALT-" or "")
-            .. (IsShiftKeyDown() and "SHIFT-" or "")
-            .. key
-        local existing = GetBindingAction(combination)
+        local selectedKey = combination(key)
+        local existing = GetBindingAction(selectedKey)
         if existing and existing ~= "" and existing ~= "WISPAI_INLINE" then
             hint:SetText(
-                combination
+                selectedKey
                     .. " is already assigned to "
                     .. existing
                     .. ".\nChoose another combination or press Escape."
@@ -466,16 +580,16 @@ function C.BindInline()
             return
         end
         local old1, old2 = GetBindingKey("WISPAI_INLINE")
-        if SetBinding(combination, "WISPAI_INLINE") then
-            if old1 and old1 ~= combination then
+        if SetBinding(selectedKey, "WISPAI_INLINE") then
+            if old1 and old1 ~= selectedKey then
                 SetBinding(old1)
             end
-            if old2 and old2 ~= combination then
+            if old2 and old2 ~= selectedKey then
                 SetBinding(old2)
             end
             SaveBindings(GetCurrentBindingSet())
-            C.db.inlineBinding = combination
-            C.Log("Inline chat: " .. combination)
+            C.db.inlineBinding = selectedKey
+            C.Log("Inline chat: " .. selectedKey)
             dialog:Hide()
         else
             hint:SetText("This key could not be assigned. Choose another combination.")
@@ -501,10 +615,8 @@ function C.BindInline()
         end
         assign(key)
     end)
-    local mouseKeys = { LeftButton = "BUTTON1", RightButton = "BUTTON2", MiddleButton = "BUTTON3" }
     local function onMouseDown(_, button)
-        local number = button:match("^Button(%d+)$")
-        local key = mouseKeys[button] or (number and ("BUTTON" .. number))
+        local key = mouseKey(button)
         if key then
             assign(key)
         end

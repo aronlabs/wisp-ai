@@ -366,6 +366,23 @@ function receive(packet: Packet) {
     return;
   }
   handled.add(packetKey);
+  if (packet.type === 'inline_status') {
+    const data = packet.data as Record<string, unknown> | undefined;
+    const status = {
+      at: Date.now(),
+      event: String(data?.event ?? '').slice(0, 40),
+      key: typeof data?.key === 'string' ? data.key.slice(0, 80) : undefined,
+      action: typeof data?.action === 'string' ? data.action.slice(0, 120) : undefined,
+      panelShown: data?.panelShown === true,
+      hasReference: data?.hasReference === true,
+      error: typeof data?.error === 'string' ? data.error.slice(0, 300) : undefined,
+    };
+    void writeFile(path.join(runtime, 'inline-status.json'), JSON.stringify(status, null, 2)).catch(
+      () => {},
+    );
+    changed();
+    return;
+  }
   if (packet.context) {
     currentCharacterKey = characterIdentity(packet.context) || currentCharacterKey;
   }
