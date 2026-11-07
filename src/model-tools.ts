@@ -5,6 +5,9 @@ type CallOptions = Parameters<
 
 export function subscriptionCallOptions(options: CallOptions): CallOptions {
   const openai = { ...options.providerOptions?.openai };
+  // The SDK must know this before it serializes reasoning/tool history. Setting
+  // it only in the HTTP proxy makes the next turn reference unpersisted items.
+  openai.store = false;
   // Eve adds this for API-key providers. ChatGPT subscription grants reject it.
   delete openai.safetyIdentifier;
   return { ...options, providerOptions: { ...options.providerOptions, openai } };

@@ -26,6 +26,7 @@ import { AdviceGate, adviceEvent } from './advice.ts';
 import { ChatGPTAuth } from './chatgpt-auth.ts';
 import { proxyModel } from './model-proxy.ts';
 import { safeErrorMessage } from './model-errors.ts';
+import { sendChatTurn } from './agent-session.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = path.join(ROOT, 'runtime');
@@ -223,12 +224,9 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
       throw Error('Finish the ChatGPT account operation first.');
     }
     await auth.accessToken();
-    const session = chat.eveId
-      ? client.sessions.attach(chat.eveId)
-      : (await client.sessions.create()).session;
-    chat.eveId = session.id;
-    changed();
-    const response = await session.send(
+    const response = await sendChatTurn(
+      client,
+      chat,
       turnInput(text, context, {
         ...chat,
         titleGenerated:
@@ -238,6 +236,7 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
           !capabilitySettings.enabled('tool:set_conversation_title'),
       }),
     );
+    changed();
     for await (const event of response.stream()) {
       if (
         applyEvent(
@@ -251,6 +250,9 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
       }
     }
     const result = await response.result();
+    if (result.sessionEnded) {
+      chat.eveId = undefined;
+    }
     if (chat.proactive) {
       chat.tipSkipped = [...parts.streams.values()].some((s) => s.reply.noTip);
     }
@@ -286,11 +288,13 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
   }
 }
 function receive(packet: Packet) {
-  if (packet.type !== 'hello' && packet.session !== activeTransport) {
+  const establishesSession =
+    packet.type === 'hello' || (!activeTransport && packet.type === 'poll');
+  if (!establishesSession && packet.session !== activeTransport) {
     return;
   }
-  const newTransport = packet.type === 'hello' && activeTransport !== packet.session;
-  if (packet.type === 'hello' && activeTransport !== packet.session) {
+  const newTransport = establishesSession && activeTransport !== packet.session;
+  if (newTransport) {
     for (const req of pending.values()) {
       clearTimeout(req.timer);
       req.reject(new Error('The addon reloaded or the character changed. Query again.'));
@@ -298,6 +302,7 @@ function receive(packet: Packet) {
     pending.clear();
     activeTransport = packet.session;
     firstReadyRevision = 0;
+    activeChat = resumeChat(chats, packet.chat)?.id || '';
     memoryView = undefined;
     acknowledgments = [];
     handled.clear();

@@ -1,4 +1,4 @@
-import type { Chat } from './events.ts';
+import type { Chat, Message } from './events.ts';
 import { linkedReferences } from './references.ts';
 
 function record(value: unknown): Record<string, unknown> {
@@ -81,9 +81,26 @@ export function turnInput(
     tagged('user_message', text),
   ].join('\n\n');
 }
+export function withConversationHistory(input: string, messages: Message[]): string {
+  const history = messages
+    .filter(
+      (message) =>
+        (message.role === 'user' || message.role === 'assistant') &&
+        !message.streaming &&
+        message.text.trim(),
+    )
+    .slice(0, -1)
+    .slice(-12)
+    .map((message) => ({ role: message.role, text: message.text.slice(0, 2000) }));
+  if (!history.length) {
+    return input;
+  }
+  const block = tagged('historical_conversation', history);
+  return input.replace('<user_message>', block + '\n\n<user_message>');
+}
 export function visibleUserText(input: string) {
   const match =
-    /^<game_context>\n[^\n]*\n<\/game_context>\n\n<conversation_context>\n[^\n]*\n<\/conversation_context>\n\n(?:<linked_references>\n[^\n]*\n<\/linked_references>\n\n)?(?:<last_ui_result>\n[^\n]*\n<\/last_ui_result>\n\n)?<user_message>\n([^\n]*)\n<\/user_message>$/.exec(
+    /^<game_context>\n[^\n]*\n<\/game_context>\n\n<conversation_context>\n[^\n]*\n<\/conversation_context>\n\n(?:<linked_references>\n[^\n]*\n<\/linked_references>\n\n)?(?:<last_ui_result>\n[^\n]*\n<\/last_ui_result>\n\n)?(?:<historical_conversation>\n[^\n]*\n<\/historical_conversation>\n\n)?<user_message>\n([^\n]*)\n<\/user_message>$/.exec(
       input,
     );
   if (match) {
