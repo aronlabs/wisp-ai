@@ -52,6 +52,34 @@ GameTooltip:Show()
   );
   return { run };
 }
+test('a completed reply lights the minimized window until it is opened', () => {
+  vm().run(`
+local glow = UI_TEST.frames.WispAIReplyGlow
+assert(not glow:IsShown())
+C.chats[1].status = 'working'
+C.Refresh()
+assert(not glow:IsShown(), 'working is not a completed reply')
+local function completed(rev)
+    WispAI_Receive({
+        v = C.VERSION, session = C.session, rev = rev, connected = true,
+        chats = {{id = 'main', title = 'Main', status = 'done', messages = {}, activity = {}}},
+    })
+end
+completed(1)
+assert(C.unread and glow:IsShown())
+assert(glow.mouseEnabled == false, 'the glow must not block dragging or expanding')
+completed(2)
+assert(glow:IsShown(), 'later snapshots must preserve the unread notification')
+C.SetMinimized(false)
+assert(not C.unread and not glow:IsShown())
+C.SetMinimized(true)
+assert(not glow:IsShown(), 'minimizing again must not relight a read reply')
+C.SetMinimized(false)
+C.chats[1].status = 'working'
+completed(3)
+assert(not C.unread and not glow:IsShown(), 'visible replies do not notify')
+`);
+});
 test('hover shortcut opens an inline query without switching or expanding the main chat, survives stale snapshots, and promotes on demand', () => {
   vm().run(
     `

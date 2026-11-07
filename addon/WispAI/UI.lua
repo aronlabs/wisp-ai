@@ -171,6 +171,7 @@ local function referenceSignature(references)
     return table.concat(parts, "\31")
 end
 local frame, header, body, sidebar, chatPanel, status, transcript, content, scrollBar, sessionTitle, send, mini, settings, contextMeter
+local replyGlow
 local progress
 local gear, fold, sessionsLabel, newSession, resize
 local memoryPanel, memoryContent, memoryStatus
@@ -372,6 +373,7 @@ local function refreshProgress()
         header.title,
         C.db.minimized and (C.unread and "Wisp AI - New reply" or title) or "Wisp AI"
     )
+    replyGlow:SetShown(C.db.minimized and C.unread == true)
 end
 function C.SaveWindowPosition(minimized)
     local point, _, relativePoint, x, y = frame:GetPoint()
@@ -940,6 +942,16 @@ function C.BuildUI()
     end)
     header.title = label(header, "Wisp AI", GOLD)
     header.title:SetPoint("LEFT", 12, 0)
+    replyGlow = CreateFrame("Frame", "WispAIReplyGlow", header, "BackdropTemplate")
+    replyGlow:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 2)
+    replyGlow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 2, -2)
+    replyGlow:SetBackdrop({
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 20,
+    })
+    replyGlow:SetBackdropBorderColor(1, 0.78, 0.28, 1)
+    replyGlow:EnableMouse(false)
+    replyGlow:Hide()
     mini = button(header, "-", 25, function()
         C.SetMinimized(not C.db.minimized)
     end)
@@ -1038,6 +1050,9 @@ function C.BuildUI()
     end)
     local progressTick = 0
     frame:SetScript("OnUpdate", function(_, elapsed)
+        if replyGlow:IsShown() then
+            replyGlow:SetAlpha(0.65 + 0.25 * math.sin(GetTime() * math.pi))
+        end
         progressTick = progressTick + elapsed
         if progressTick >= 0.25 then
             progressTick = 0
