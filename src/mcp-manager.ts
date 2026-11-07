@@ -129,7 +129,9 @@ export class McpManager {
         ].flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : [])),
       );
       allowedEnv.PATH =
-        path.dirname(process.execPath) + ';' + (process.env.PATH || process.env.Path || '');
+        path.dirname(process.execPath) +
+        path.delimiter +
+        (process.env.PATH || process.env.Path || '');
       transport = new StdioClientTransport({
         command,
         args,

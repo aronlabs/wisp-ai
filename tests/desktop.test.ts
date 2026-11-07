@@ -34,7 +34,9 @@ test(
   'compiled Windows secret helper round-trips UTF-8 with per-user encryption',
   { skip: process.platform !== 'win32' },
   async (t) => {
-    const exe = fileURLToPath(new URL('../Wisp.exe', import.meta.url));
+    const exe =
+      process.env.WISP_TEST_DESKTOP_EXE ||
+      fileURLToPath(new URL('../src-tauri/target/release/wisp.exe', import.meta.url));
     try {
       await access(exe);
     } catch {

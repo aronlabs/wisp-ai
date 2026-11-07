@@ -72,7 +72,16 @@ try {
 } catch {
   await writeFile(mcpFile, JSON.stringify({ servers: {} }));
 }
-const vault = new NativeVault(process.env.WISP_DESKTOP_EXE || path.join(ROOT, 'Wisp.exe'));
+const vault = new NativeVault(
+  process.env.WISP_DESKTOP_EXE ||
+    path.join(
+      ROOT,
+      'src-tauri',
+      'target',
+      'release',
+      process.platform === 'win32' ? 'wisp.exe' : 'wisp',
+    ),
+);
 const mcpManager = new McpManager(mcpFile, ROOT, vault);
 await mcpManager.load();
 const auth = new ChatGPTAuth(runtime, vault);

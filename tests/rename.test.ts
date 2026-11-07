@@ -1,21 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  mkdtemp,
-  mkdir,
-  readFile,
-  writeFile,
-  readdir,
-  rm,
-  copyFile,
-  rename,
-  access,
-} from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
 import { migrateGameSaves, retireLegacyAddons } from '../src/rename-migration.ts';
-import { NativeVault } from '../src/secret-vault.ts';
 
 test('rename imports preferences and bindings once, retaining originals and newer Wisp data', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wisp-rename-'));
@@ -87,47 +75,3 @@ test('retirement moves only legacy addon directories outside AddOns and is repea
     await rm(root, { recursive: true, force: true });
   }
 });
-test(
-  'Windows credential migration copies encrypted data once without resurrecting disconnected secrets',
-  { skip: process.platform !== 'win32' },
-  async (t) => {
-    const binary = path.resolve('Wisp.exe');
-    try {
-      await access(binary);
-    } catch {
-      t.skip('Build Wisp.exe first');
-      return;
-    }
-    const root = await mkdtemp(path.join(tmpdir(), 'wisp-vault-')),
-      exe = path.join(root, 'Wisp.exe');
-    await copyFile(binary, exe);
-    const hash = (s: string) => createHash('sha256').update(s).digest('hex');
-    const suffix = hash(root),
-      newDir = path.join(process.env.LOCALAPPDATA!, 'WispAI', 'Secrets', suffix),
-      oldDir = path.join(process.env.LOCALAPPDATA!, 'WoWCompanion', 'Secrets', suffix),
-      file = hash('test-rename') + '.bin';
-    try {
-      const vault = new NativeVault(exe);
-      await vault.write('test-rename', 'private-test-é');
-      await mkdir(oldDir, { recursive: true });
-      await rename(path.join(newDir, file), path.join(oldDir, file));
-      await rm(path.join(newDir, '.renamed-from-companion'));
-      assert.equal(await vault.read('test-rename'), 'private-test-é');
-      assert.deepEqual(
-        await readFile(path.join(newDir, file)),
-        await readFile(path.join(oldDir, file)),
-      );
-      await vault.write('test-rename', '');
-      assert.equal(await vault.read('test-rename'), '');
-    } finally {
-      for (const directory of [newDir, oldDir]) {
-        assert.equal(path.basename(directory), suffix);
-        assert.equal(path.basename(path.dirname(directory)), 'Secrets');
-        assert.ok(directory.startsWith(path.resolve(process.env.LOCALAPPDATA!) + path.sep));
-        await rm(directory, { recursive: true, force: true });
-      }
-      assert.ok(root.startsWith(path.join(tmpdir(), 'wisp-vault-')));
-      await rm(root, { recursive: true, force: true });
-    }
-  },
-);

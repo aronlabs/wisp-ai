@@ -75,6 +75,9 @@ try {
   if (!ready) {
     throw Error('Installed agent did not become ready: ' + log);
   }
+  if (!JSON.stringify(await client.info()).includes('manage_panel')) {
+    throw Error('Installed agent did not discover its tools.');
+  }
   const identity = JSON.parse(await readFile(path.join(data, 'runtime/desktop.json'), 'utf8'));
   if (identity.pid !== child.pid) {
     throw Error('Installer test reached a different bridge.');

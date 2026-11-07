@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -359,6 +359,7 @@ export class Simulator {
       if (hash !== prepared.manifest.sha256) {
         throw Error('Simulator binary does not match the pinned manifest.');
       }
+      await mkdir(this.runtime, { recursive: true });
       temporary = await mkdtemp(path.join(this.runtime, 'simulation-'));
       const infile = path.join(temporary, 'input.json'),
         outfile = path.join(temporary, 'output.json');

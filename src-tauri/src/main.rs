@@ -21,6 +21,9 @@ impl Host {
             .env("WISP_DATA_DIR", &self.data)
             .env("WISP_DESKTOP_EXE", std::env::current_exe().map_err(|e| e.to_string())?)
             .env("DO_NOT_TRACK", "1");
+        let mut paths = vec![self.payload.join("runtime")];
+        if let Some(existing) = std::env::var_os("PATH") { paths.extend(std::env::split_paths(&existing)); }
+        command.env("PATH", std::env::join_paths(paths).map_err(|e|e.to_string())?);
         hidden(&mut command);
         Ok(command)
     }

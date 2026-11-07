@@ -272,20 +272,13 @@ Use /wisp or /wispai after fully restarting WoW to discover the renamed addon.
 ## Code style and checks
 
 Run `npm run format` before committing. Oxfmt formats TypeScript, JSON, YAML and
-Markdown; StyLua formats Lua; CSharpier formats the Windows desktop source.
+Markdown; StyLua formats Lua; Prettier formats Svelte and CSS; rustfmt formats the native host.
 All configurations live in the repo. `npm run lint:fix` applies safe Oxlint fixes.
 `npm run check` checks formatting, lint (including warnings), and TypeScript.
 `npm test` runs the regression suite. Both PRs and pushes to main run these checks.
 
 Development uses Node 24. The desktop installer build also requires Rust and the Windows C++ build tools. Svelte files use Prettier; TypeScript uses Oxfmt/Oxlint.
-The CSharpier helper downloads a pinned, checksum-verified package on first use and
-caches it under node_modules/.cache; subsequent format checks run locally. These
-are development tools and do not add a runtime requirement for the released app.
-
-The bridge entry point is `src/main.ts`; Eve process management is isolated in
-`src/agent-process.ts`, and non-streaming response collection in
-`src/response-stream.ts`. Desktop startup and protected storage live in
-`desktop/Program.cs`; `desktop/Wisp.cs` builds each UI tab in a separate method.
+The bridge entry point is `src/main.ts`; Eve process management lives in `src/agent-process.ts`. The Svelte UI lives in `app/`, and the native supervisor, installer configuration and protected credentials live in `src-tauri/`. `npm run test:ui` exercises desktop workflows; the installer workflow also runs Rust tests and a fresh-install smoke test.
 
 ## Forever knowledge sources
 

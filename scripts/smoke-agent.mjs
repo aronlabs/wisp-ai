@@ -10,7 +10,7 @@ const root = process.cwd(),
 await mkdir(dir, { recursive: true });
 const load = (p) => import(pathToFileURL(path.join(root, p)).href);
 const { ChatGPTAuth } = await load('src/chatgpt-auth.ts'),
-  { WindowsVault } = await load('src/secret-vault.ts'),
+  { NativeVault } = await load('src/secret-vault.ts'),
   { proxyModel } = await load('src/model-proxy.ts'),
   { TheWoWDB } = await load('src/thewowdb.ts'),
   { searchWowhead } = await load('src/wowhead-search.ts'),
@@ -22,11 +22,14 @@ const simulationSnapshot = process.env.WISP_SMOKE_CHARACTER
   ? JSON.parse(await readFile(process.env.WISP_SMOKE_CHARACTER, 'utf8'))
   : undefined;
 const simulator = new Simulator(root);
-const config = JSON.parse(await readFile('config.local.json', 'utf8')),
+const dataRoot = process.env.WISP_DATA_DIR || root;
+const config = JSON.parse(await readFile(path.join(dataRoot, 'config.local.json'), 'utf8')),
   model = config.model || 'gpt-6.1-sol';
 const auth = new ChatGPTAuth(
-  path.join(root, 'runtime'),
-  new WindowsVault(path.join(root, 'Wisp.exe')),
+  path.join(dataRoot, 'runtime'),
+  new NativeVault(
+    process.env.WISP_DESKTOP_EXE || path.join(root, 'src-tauri/target/release/wisp.exe'),
+  ),
 );
 await auth.load();
 const t = auth.saved.profiles.find((p) => p.id === auth.saved.activeId)?.tokens;
@@ -56,6 +59,12 @@ const server = createServer(async (req, res) => {
   try {
     if (req.headers.authorization !== 'Bearer ' + token) {
       res.writeHead(403).end();
+      return;
+    }
+    if (req.url.startsWith('/session-model?')) {
+      res
+        .writeHead(200, { 'content-type': 'application/json' })
+        .end(JSON.stringify({ model, effort: 'medium' }));
       return;
     }
     if (req.url === '/model/responses') {

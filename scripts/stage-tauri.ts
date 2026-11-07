@@ -12,11 +12,37 @@ export async function stageTauri() {
   await readFile(path.join(root, 'simulator', 'wowsimcli.exe'));
   await rm(stage, { recursive: true, force: true });
   await mkdir(stage, { recursive: true });
-  for (const name of ['src', 'agent', 'addon', 'scripts', 'simulator']) {
+  for (const name of ['src', 'agent', 'addon', 'scripts', 'simulator', 'app', 'assets', 'tests']) {
     await cp(path.join(root, name), path.join(stage, name), { recursive: true });
   }
-  for (const name of ['package.json', 'package-lock.json', 'LICENSE', 'NOTICE']) {
+  for (const name of [
+    'package.json',
+    'package-lock.json',
+    'LICENSE',
+    'NOTICE',
+    'README.md',
+    'vite.config.ts',
+    'svelte.config.js',
+    'vitest.config.ts',
+    'tsconfig.json',
+    '.oxfmtrc.json',
+    '.oxlintrc.json',
+    'stylua.toml',
+  ]) {
     await copyFile(path.join(root, name), path.join(stage, name));
+  }
+  for (const name of [
+    'src',
+    'icons',
+    'capabilities',
+    'Cargo.toml',
+    'build.rs',
+    'tauri.conf.json',
+  ]) {
+    await cp(path.join(root, 'src-tauri', name), path.join(stage, 'src-tauri', name), {
+      recursive: true,
+      filter: (file) => !file.includes(path.sep + 'android') && !file.includes(path.sep + 'ios'),
+    });
   }
   const npm = process.env.npm_execpath || path.join(root, 'runtime/npm/bin/npm-cli.js');
   execFileSync(
