@@ -65,6 +65,7 @@ for (const surface of ['main', 'inline']) {
       end
       refresh()
       local first = findRow('Reading spells')
+      assert(not first.disclosure:IsShown(), 'a single tool without extra details must not have an expander')
       assert(first.author:IsShown() and first.author:GetText() == 'Wisp AI')
       local _, _, _, _, textTop = first.text:GetPoint()
       assert(textTop == -20, 'the first tool must be below the assistant name')

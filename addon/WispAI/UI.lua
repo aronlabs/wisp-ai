@@ -178,7 +178,7 @@ local function formatted(text, references, fromUser)
         return keep(
             "|T"
                 .. tostring(icon)
-                .. ":14:14|t |c"
+                .. ":12:12:0:-2|t |c"
                 .. color
                 .. "|H"
                 .. payload
@@ -821,8 +821,8 @@ local function makeRow(parent)
         edgeSize = 12,
         insets = { left = 3, right = 3, top = 3, bottom = 3 },
     })
-    row.bubble:SetBackdropColor(0.18, 0.14, 0.09, 0.55)
-    row.bubble:SetBackdropBorderColor(0.32, 0.26, 0.17, 0.25)
+    row.bubble:SetBackdropColor(0.25, 0.19, 0.115, 0.96)
+    row.bubble:SetBackdropBorderColor(0.45, 0.35, 0.20, 0.5)
     row.bubble:EnableMouse(false)
     row.bubble:Hide()
     row.disclosure = CreateFrame("Button", nil, row)
@@ -864,11 +864,16 @@ function C.DisplayMessages(chat)
     for _, message in ipairs(messages) do
         if message.calls then
             local labels, details, running, failed = {}, {}, nil, false
+            local extraDetails = {}
             for _, call in ipairs(message.calls) do
                 local tool = call.tool or {}
                 local name = tool.label or call.text or "Tool"
                 labels[#labels + 1] = name
                 details[#details + 1] = name .. " - " .. (tool.status or "completed")
+                if type(tool.detail) == "string" and tool.detail ~= "" and tool.detail ~= name then
+                    extraDetails[#extraDetails + 1] = tool.detail
+                    details[#details] = details[#details] .. "\n" .. tool.detail
+                end
                 if tool.status == "running" then
                     running = name
                 end
@@ -876,15 +881,21 @@ function C.DisplayMessages(chat)
                     failed = true
                 end
             end
-            message.groupKey = chat.id .. ":" .. message.id
-            local expanded = C.toolGroupsExpanded[message.groupKey]
+            if #labels > 1 or #extraDetails > 0 then
+                message.groupKey = chat.id .. ":" .. message.id
+            end
+            local expanded = message.groupKey and C.toolGroupsExpanded[message.groupKey]
             local summary = running or table.concat(labels, " / ", 1, math.min(2, #labels))
             if #labels > 2 and not running then
                 summary = summary .. " / +" .. (#labels - 2)
             end
-            message.text = (expanded and "- " or "+ ")
+            message.text = (message.groupKey and (expanded and "- " or "+ ") or "")
                 .. summary
-                .. (expanded and ("\n" .. table.concat(details, "\n")) or "")
+                .. (
+                    expanded
+                        and ("\n" .. table.concat(#labels == 1 and extraDetails or details, "\n"))
+                    or ""
+                )
             message.tool = {
                 label = message.text,
                 status = running and "running" or (failed and "failed" or "completed"),
@@ -947,6 +958,8 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
         .. (chat.status or "")
         .. "\31"
         .. tostring(showAuthor)
+        .. "\31"
+        .. tostring(message.groupKey)
     if row.signature ~= signature then
         row.signature = signature
         row.speaker = message.role

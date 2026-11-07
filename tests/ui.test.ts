@@ -52,7 +52,7 @@ test('chat placeholder distinguishes connecting, fetching history and an empty c
     GetItemInfo=function()return 'Robe',nil,2 end
     GetItemQualityColor=function()return 0,1,0,'ff1eff00' end
     local item=C.FormatText('[[ref:item]]',{item={kind='item',id=100,label='Robe'}},false)
-    assert(item:find('|T12345:14:14|t',1,true) and item:find('|cff1eff00|Hitem:100',1,true),'item references use native icons and known quality')
+    assert(item:find('|T12345:12:12:0:-2|t',1,true) and item:find('|cff1eff00|Hitem:100',1,true),'item references use aligned native icons and known quality')
     local map=C.FormatText('[[ref:map]]',{map={kind='map',mapId=1454,label='Orgrimmar'}},false)
     assert(map:find('INV_Misc_Map_01',1,true) and map:find('|cff80cf91|Hwispzone:1454',1,true),'map references have a distinct icon and color')
   `);
