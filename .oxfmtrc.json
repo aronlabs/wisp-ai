@@ -8,6 +8,13 @@
     ".eve/**",
     "node_modules/**",
     "config.local.json",
-    "runtime-node.txt"
+    "runtime-node.txt",
+    "app/**/*.css",
+    "app/**/*.html",
+    "app/**/*.svelte",
+    "src-tauri/target/**",
+    "src-tauri/resources/**",
+    "src-tauri/gen/**",
+    "dist-ui/**"
   ]
 }

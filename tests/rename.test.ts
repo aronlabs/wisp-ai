@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { migrateGameSaves, retireLegacyAddons } from '../src/rename-migration.ts';
-import { WindowsVault } from '../src/secret-vault.ts';
+import { NativeVault } from '../src/secret-vault.ts';
 
 test('rename imports preferences and bindings once, retaining originals and newer Wisp data', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wisp-rename-'));
@@ -107,7 +107,7 @@ test(
       oldDir = path.join(process.env.LOCALAPPDATA!, 'WoWCompanion', 'Secrets', suffix),
       file = hash('test-rename') + '.bin';
     try {
-      const vault = new WindowsVault(exe);
+      const vault = new NativeVault(exe);
       await vault.write('test-rename', 'private-test-é');
       await mkdir(oldDir, { recursive: true });
       await rename(path.join(newDir, file), path.join(oldDir, file));

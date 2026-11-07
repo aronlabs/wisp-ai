@@ -3,8 +3,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SLOT_COUNT, BIT_COUNT, luaJson } from '../src/protocol.ts';
 import { migrateGameSaves, retireLegacyAddons } from '../src/rename-migration.ts';
+import { appPaths } from '../src/app-paths.ts';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const wow = process.argv[2] || 'E:\\Blizzard\\World of Warcraft\\_forever_';
+const paths = appPaths(root);
+await mkdir(paths.runtime, { recursive: true });
+const wow = process.argv[2];
+if (!wow) {
+  throw Error('Choose the WoW client folder.');
+}
 await access(path.join(wow, 'Wow.exe'));
 const addons = path.join(wow, 'Interface', 'AddOns');
 await mkdir(addons, { recursive: true });
@@ -34,10 +40,9 @@ for (let n = 1; n <= SLOT_COUNT; n++) {
 }
 let config = { wow, model: '' };
 try {
-  config = { ...JSON.parse(await readFile(path.join(root, 'config.local.json'), 'utf8')), wow };
+  config = { ...JSON.parse(await readFile(paths.config, 'utf8')), wow };
 } catch {}
-await writeFile(path.join(root, 'config.local.json'), JSON.stringify(config, null, 2) + '\n');
-await writeFile(path.join(root, 'runtime-node.txt'), process.execPath + '\n');
+await writeFile(paths.config, JSON.stringify(config, null, 2) + '\n');
 const retired = await retireLegacyAddons(wow);
 if (retired.count) {
   console.log('Previous addon installation backed up to ' + retired.backup);

@@ -87,8 +87,10 @@ const raceMap: Record<string, string> = {
 const slots = [1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18];
 export class Simulator {
   readonly root: string;
-  constructor(root: string) {
+  readonly runtime: string;
+  constructor(root: string, runtime = path.join(root, 'runtime')) {
     this.root = path.resolve(root);
+    this.runtime = path.resolve(runtime);
   }
   async prepare(snapshot: unknown, input: z.input<typeof simulationInput>) {
     const options = simulationInput.parse(input);
@@ -357,7 +359,7 @@ export class Simulator {
       if (hash !== prepared.manifest.sha256) {
         throw Error('Simulator binary does not match the pinned manifest.');
       }
-      temporary = await mkdtemp(path.join(this.root, 'runtime', 'simulation-'));
+      temporary = await mkdtemp(path.join(this.runtime, 'simulation-'));
       const infile = path.join(temporary, 'input.json'),
         outfile = path.join(temporary, 'output.json');
       await writeFile(infile, JSON.stringify(prepared.request));
@@ -424,7 +426,7 @@ export class Simulator {
         note: 'No valid DPS result. Do not invent a number or substitute a level-60 preset.',
       };
     } finally {
-      if (temporary && temporary.startsWith(path.join(this.root, 'runtime') + path.sep)) {
+      if (temporary && temporary.startsWith(this.runtime + path.sep)) {
         await rm(temporary, { recursive: true, force: true });
       }
     }

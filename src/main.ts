@@ -21,7 +21,7 @@ import { selectionValues } from './ui-schema.ts';
 import { PanelStore, panelInput } from './panels.ts';
 import { McpManager, mcpSetup } from './mcp-manager.ts';
 import { McpRelay } from './mcp-relay.ts';
-import { WindowsVault } from './secret-vault.ts';
+import { NativeVault } from './secret-vault.ts';
 import { startDesktopServer } from './desktop-server.ts';
 import { AdviceGate, adviceEvent } from './advice.ts';
 import { ChatGPTAuth } from './chatgpt-auth.ts';
@@ -32,10 +32,13 @@ import { TheWoWDB, databaseRequest } from './thewowdb.ts';
 import { searchWowhead, wowheadQuery } from './wowhead-search.ts';
 import { Simulator, simulationInput } from './simulation.ts';
 import { chooseChatModel, type AccountModel } from './chat-model.ts';
+import { appPaths, prepareEngine } from './app-paths.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const runtime = path.join(ROOT, 'runtime');
-const simulator = new Simulator(ROOT);
+const paths = appPaths(ROOT);
+const runtime = paths.runtime;
+const simulator = new Simulator(ROOT, runtime);
+await prepareEngine(ROOT, paths.engine);
 await mkdir(runtime, { recursive: true });
 const memoryStore = new MemoryStore(path.join(runtime, 'memory'));
 let memoryView:
@@ -57,21 +60,22 @@ async function memorySnapshot(identity: string | undefined) {
 }
 let config: { wow: string; model?: string; mcpConfig?: string };
 try {
-  config = JSON.parse(await readFile(path.join(ROOT, 'config.local.json'), 'utf8'));
+  config = JSON.parse(await readFile(paths.config, 'utf8'));
 } catch {
   throw new Error('Missing config.local.json. Run scripts/install.ts with the WoW client folder.');
 }
 const mcpFile = config.mcpConfig
-  ? path.resolve(ROOT, config.mcpConfig)
+  ? path.resolve(paths.dataRoot, config.mcpConfig)
   : path.join(runtime, 'mcp.json');
 try {
   await readFile(mcpFile, 'utf8');
 } catch {
   await writeFile(mcpFile, JSON.stringify({ servers: {} }));
 }
-const mcpManager = new McpManager(mcpFile, ROOT, new WindowsVault(path.join(ROOT, 'Wisp.exe')));
+const vault = new NativeVault(process.env.WISP_DESKTOP_EXE || path.join(ROOT, 'Wisp.exe'));
+const mcpManager = new McpManager(mcpFile, ROOT, vault);
 await mcpManager.load();
-const auth = new ChatGPTAuth(runtime, new WindowsVault(path.join(ROOT, 'Wisp.exe')));
+const auth = new ChatGPTAuth(runtime, vault);
 await auth.load();
 let modelCatalog: AccountModel[] = [];
 let modelCatalogError: string | undefined;
@@ -1124,7 +1128,7 @@ const eveLog = await import('node:fs').then((fs) =>
 );
 function startEve() {
   return startEveProcess({
-    root: ROOT,
+    root: paths.engine,
     logFile: eveLog,
     environment: {
       ...process.env,
@@ -1225,7 +1229,7 @@ const desktopServer = await startDesktopServer(runtime, async (method, url, raw)
         throw Error('Choose an available model.');
       }
       const updated = { ...config, model };
-      const file = path.join(ROOT, 'config.local.json');
+      const file = paths.config;
       await writeFile(file + '.tmp', JSON.stringify(updated, null, 2));
       await rename(file + '.tmp', file);
       config = updated;

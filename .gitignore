@@ -9,3 +9,7 @@ runtime-node.txt
 dist/
 Wisp.exe
 simulator/*.exe
+dist-ui/
+src-tauri/target/
+src-tauri/resources/
+src-tauri/gen/

@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { WindowsVault } from '../src/secret-vault.ts';
+import { NativeVault } from '../src/secret-vault.ts';
 import { startDesktopServer } from '../src/desktop-server.ts';
 test('desktop controls require the session token and reject browser origins', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wow-desktop-'));
@@ -41,7 +41,7 @@ test(
       t.skip('Compile desktop helper first');
       return;
     }
-    const vault = new WindowsVault(exe),
+    const vault = new NativeVault(exe),
       key = 'test-' + Date.now();
     try {
       await vault.write(key, 'private-é-测试-value');

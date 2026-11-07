@@ -3,7 +3,7 @@ export interface SecretVault {
   read(key: string): Promise<string>;
   write(key: string, value: string): Promise<void>;
 }
-export class WindowsVault implements SecretVault {
+export class NativeVault implements SecretVault {
   executable: string;
   constructor(executable: string) {
     this.executable = executable;
