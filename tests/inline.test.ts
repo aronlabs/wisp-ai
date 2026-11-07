@@ -55,6 +55,13 @@ GameTooltip:Show()
 test('a completed reply lights the minimized window until it is opened', () => {
   vm().run(`
 local glow = UI_TEST.frames.WispAIReplyGlow
+local sounds = 0
+C.db.sound = true
+SOUNDKIT = { TELL_MESSAGE = 3081 }
+function PlaySound(id, channel)
+    assert(id == SOUNDKIT.TELL_MESSAGE and channel == 'Master')
+    sounds = sounds + 1
+end
 assert(not glow:IsShown())
 C.chats[1].status = 'working'
 C.Refresh()
@@ -67,9 +74,11 @@ local function completed(rev)
 end
 completed(1)
 assert(C.unread and glow:IsShown())
+assert(sounds == 1)
 assert(glow.mouseEnabled == false, 'the glow must not block dragging or expanding')
 completed(2)
 assert(glow:IsShown(), 'later snapshots must preserve the unread notification')
+assert(sounds == 1, 'snapshots must not replay the sound')
 C.SetMinimized(false)
 assert(not C.unread and not glow:IsShown())
 C.SetMinimized(true)
@@ -78,6 +87,11 @@ C.SetMinimized(false)
 C.chats[1].status = 'working'
 completed(3)
 assert(not C.unread and not glow:IsShown(), 'visible replies do not notify')
+assert(sounds == 2)
+C.db.sound = false
+C.chats[1].status = 'working'
+completed(4)
+assert(sounds == 2, 'the sound setting must be respected')
 `);
 });
 test('hover shortcut opens an inline query without switching or expanding the main chat, survives stale snapshots, and promotes on demand', () => {

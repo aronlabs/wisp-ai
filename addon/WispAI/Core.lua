@@ -12,6 +12,12 @@ C.connected, C.rev = false, 0
 function C.Log(text)
     DEFAULT_CHAT_FRAME:AddMessage("|cffd5bb75Wisp:|r " .. text)
 end
+function C.PlayCompletionSound()
+    if C.db.sound then
+        local sound = SOUNDKIT and SOUNDKIT.TELL_MESSAGE or 3081
+        pcall(PlaySound, sound, "Master")
+    end
+end
 local function activityTime()
     local latest = time() * 1000
     for _, chat in ipairs(C.chats) do
@@ -265,9 +271,7 @@ function WispAI_Receive(json)
     local current = C.Current()
     if current and current.status == "done" and previousState == "working" then
         C.unread = C.db.minimized
-        if C.db.sound then
-            pcall(PlaySound, 3081)
-        end
+        C.PlayCompletionSound()
     end
     for _, request in ipairs(data.requests or {}) do
         if not C.requestsDone[request.id] then

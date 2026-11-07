@@ -1228,6 +1228,9 @@ function C.BuildUI()
     sound:SetChecked(C.db.sound)
     sound:SetScript("OnClick", function(self)
         C.db.sound = self:GetChecked()
+        if C.PlayCompletionSound then
+            C.PlayCompletionSound()
+        end
     end)
     local st = label(settings, "Completion sound")
     st:SetPoint("LEFT", sound, "RIGHT", 4, 0)
