@@ -2,16 +2,24 @@
   "name": "wisp-ai",
   "version": "0.2.2",
   "private": true,
-  "type": "module",
   "license": "GPL-3.0-only",
+  "type": "module",
   "scripts": {
     "agent": "eve dev",
     "start": "node src/main.ts",
     "install-addon": "node scripts/install.ts",
-    "check": "tsc --noEmit",
+    "check": "oxfmt --check && stylua --check addon tests && node scripts/format-csharp.ts --check && oxlint --deny-warnings src agent scripts tests && tsc --noEmit",
     "test": "node --test tests/*.test.ts",
     "build:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-desktop.ps1",
-    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1"
+    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1",
+    "format": "oxfmt --write && stylua --verify addon tests && node scripts/format-csharp.ts",
+    "format:check": "oxfmt --check && stylua --check addon tests && node scripts/format-csharp.ts --check",
+    "lint": "oxlint --deny-warnings src agent scripts tests",
+    "lint:fix": "oxlint --fix src agent scripts tests",
+    "typecheck": "tsc --noEmit",
+    "format:js": "oxfmt --write",
+    "format:lua": "stylua --verify addon tests",
+    "format:csharp": "node scripts/format-csharp.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.110",
@@ -23,8 +31,11 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@johnnymorganz/stylua-bin": "^2.6.0",
     "@types/node": "^24.0.0",
     "fengari": "^0.1.4",
+    "oxfmt": "^0.77.0",
+    "oxlint": "^1.92.0",
     "typescript": "^5.9.0"
   }
 }

@@ -1,22 +1,67 @@
-import {createServer,type IncomingMessage} from 'node:http';
-import {randomBytes,timingSafeEqual} from 'node:crypto';
-import {writeFile,rename} from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-export async function startDesktopServer(runtime:string,handle:(method:string,url:string,data:unknown)=>Promise<unknown>,port=43190){
- const token=randomBytes(32).toString('hex');
- const server=createServer(async(req,res)=>{
-  const expected=Buffer.from('Bearer '+token),supplied=Buffer.from(req.headers.authorization||'');
-  if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected)){res.writeHead(403).end('Forbidden');return}
-  if(req.headers.origin){res.writeHead(403).end('Browser origins are not allowed');return}
-  try{
-   req.setEncoding('utf8');let body='';for await(const chunk of req){body+=chunk;if(body.length>100000)throw Error('Request is too large')}
-   const result=await handle(req.method||'GET',req.url||'/',body?JSON.parse(body):{});
-   res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify(result??{ok:true}));
-  }catch(error){res.writeHead(400,{'content-type':'application/json'}).end(JSON.stringify({error:error instanceof Error?error.message:'Request failed'}))}
- });
- await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve)});
- const boundPort=(server.address() as {port:number}).port;
- const file=path.join(runtime,'desktop.json'),temp=file+'.tmp';await writeFile(temp,JSON.stringify({port:boundPort,token,pid:process.pid}),{mode:0o600});
- for(let attempt=0;;attempt++){try{await rename(temp,file);break}catch(e){if(attempt>=5)throw e;await new Promise(r=>setTimeout(r,50))}}
- return server;
+export async function startDesktopServer(
+  runtime: string,
+  handle: (method: string, url: string, data: unknown) => Promise<unknown>,
+  port = 43190,
+) {
+  const token = randomBytes(32).toString('hex');
+  const server = createServer(async (req, res) => {
+    const expected = Buffer.from('Bearer ' + token),
+      supplied = Buffer.from(req.headers.authorization || '');
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+      res.writeHead(403).end('Forbidden');
+      return;
+    }
+    if (req.headers.origin) {
+      res.writeHead(403).end('Browser origins are not allowed');
+      return;
+    }
+    try {
+      req.setEncoding('utf8');
+      let body = '';
+      for await (const chunk of req) {
+        body += chunk;
+        if (body.length > 100000) {
+          throw Error('Request is too large');
+        }
+      }
+      const result = await handle(
+        req.method || 'GET',
+        req.url || '/',
+        body ? JSON.parse(body) : {},
+      );
+      res
+        .writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        .end(JSON.stringify(result ?? { ok: true }));
+    } catch (error) {
+      res
+        .writeHead(400, { 'content-type': 'application/json' })
+        .end(JSON.stringify({ error: error instanceof Error ? error.message : 'Request failed' }));
+    }
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+  const boundPort = (server.address() as { port: number }).port;
+  const file = path.join(runtime, 'desktop.json'),
+    temp = file + '.tmp';
+  await writeFile(temp, JSON.stringify({ port: boundPort, token, pid: process.pid }), {
+    mode: 0o600,
+  });
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(temp, file);
+      break;
+    } catch (e) {
+      if (attempt >= 5) {
+        throw e;
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+  return server;
 }

@@ -2,7 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resumeChat, isAutomaticEmptyChat } from '../src/sessions.ts';
 import type { Chat } from '../src/events.ts';
-const chat = (id: string, populated = true): Chat => ({ id, title: populated ? 'Existing conversation' : 'New conversation', messages: populated ? [{ role: 'user', text: 'Hello' }] : [], status: 'idle', owner: 'game', activity: [] });
+const chat = (id: string, populated = true): Chat => ({
+  id,
+  title: populated ? 'Existing conversation' : 'New conversation',
+  messages: populated ? [{ role: 'user', text: 'Hello' }] : [],
+  status: 'idle',
+  owner: 'game',
+  activity: [],
+});
 test('login and reload resume a saved chat without creating a conversation', () => {
   const chats = [chat('old'), chat('recent'), chat('explicit-empty', false)];
   assert.equal(resumeChat(chats, 'old')?.id, 'old');

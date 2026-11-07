@@ -1,16 +1,23 @@
 import { watch } from 'node:fs';
 import { readdir, readFile, mkdir, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-import { FrameDecoder, parseFrame, luaJson, SILENT_WAV, type Packet } from './protocol.ts';
+import { FrameDecoder, parseFrame, luaJson, type Packet } from './protocol.ts';
 export class DiskTransport {
-  decoders = new Map<string, FrameDecoder>(); seen = new Map<string, number>();
-  stopped = false; published = ''; timer?: ReturnType<typeof setInterval>;
+  decoders = new Map<string, FrameDecoder>();
+  seen = new Map<string, number>();
+  stopped = false;
+  published = '';
+  timer?: ReturnType<typeof setInterval>;
   nextSlot = 1;
-  latestRevision = 0;
   peerRevision = 0;
-  writing = Promise.resolve(); watchers: ReturnType<typeof watch>[] = [];
-  wow: string; receive: (packet: Packet) => void;
-  constructor(wow: string, receive: (packet: Packet) => void) { this.wow = wow; this.receive = receive; }
+  writing = Promise.resolve();
+  watchers: ReturnType<typeof watch>[] = [];
+  wow: string;
+  receive: (packet: Packet) => void;
+  constructor(wow: string, receive: (packet: Packet) => void) {
+    this.wow = wow;
+    this.receive = receive;
+  }
   async start() {
     await this.scan(true);
     this.timer = setInterval(() => void this.scan(false), 1000);
@@ -18,15 +25,31 @@ export class DiskTransport {
   async scan(baseline: boolean) {
     const account = path.join(this.wow, 'WTF', 'Account');
     const walk = async (dir: string, depth: number): Promise<void> => {
-      if (depth > 4) return;
-      let entries; try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+      if (depth > 4) {
+        return;
+      }
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
       for (const entry of entries) {
         const file = path.join(dir, entry.name);
-        if (entry.isDirectory()) await walk(file, depth + 1);
-        else if (entry.name.toLowerCase() === 'addons.txt') {
+        if (entry.isDirectory()) {
+          await walk(file, depth + 1);
+        } else if (entry.name.toLowerCase() === 'addons.txt') {
           if (!this.decoders.has(file)) {
             this.decoders.set(file, new FrameDecoder());
-            try { this.watchers.push(watch(dir, (_, name) => { if (String(name).toLowerCase() === 'addons.txt') void this.read(file, false); })); } catch {}
+            try {
+              this.watchers.push(
+                watch(dir, (_, name) => {
+                  if (String(name).toLowerCase() === 'addons.txt') {
+                    void this.read(file, false);
+                  }
+                }),
+              );
+            } catch {}
           }
           await this.read(file, baseline);
         }
@@ -35,49 +58,82 @@ export class DiskTransport {
     await walk(account, 0);
   }
   async read(file: string, baseline: boolean) {
-    if (this.stopped) return;
-    let text; try { text = await readFile(file, 'utf8'); } catch { return; }
-    const frame = parseFrame(text); if (!frame) return;
+    if (this.stopped) {
+      return;
+    }
+    let text;
+    try {
+      text = await readFile(file, 'utf8');
+    } catch {
+      return;
+    }
+    const frame = parseFrame(text);
+    if (!frame) {
+      return;
+    }
     const decoder = this.decoders.get(file)!;
-    if (baseline) { decoder.baseline(frame); return; }
-    const packet = decoder.add(frame); if (!packet) return;
+    if (baseline) {
+      decoder.baseline(frame);
+      return;
+    }
+    const packet = decoder.add(frame);
+    if (!packet) {
+      return;
+    }
     const key = packet.session + ':' + packet.seq;
-    if (this.seen.has(key)) { this.receive(packet); return; }
+    if (this.seen.has(key)) {
+      this.receive(packet);
+      return;
+    }
     this.seen.set(key, Date.now());
-    for (const [id, at] of this.seen) if (Date.now() - at > 3600_000) this.seen.delete(id);
+    for (const [id, at] of this.seen) {
+      if (Date.now() - at > 3600_000) {
+        this.seen.delete(id);
+      }
+    }
     this.receive(packet);
   }
   publish(snapshot: unknown) {
-    const json = JSON.stringify(snapshot); if (json === this.published) return this.writing;
+    const json = JSON.stringify(snapshot);
+    if (json === this.published) {
+      return this.writing;
+    }
     this.published = json;
-    this.latestRevision = Number((snapshot as { rev?: number }).rev || 0);
-    this.writing = this.writing.catch(() => {}).then(async () => {
-      const file = path.join(this.wow, 'Interface', 'AddOns', 'WispAI_Payload', 'Payload.lua');
-      await mkdir(path.dirname(file), { recursive: true });
-      const tmp = file + '.tmp'; await writeFile(tmp, luaJson(json), 'utf8');
-      for (let attempt = 0; ; attempt++) {
-        try { await rename(tmp, file); break; } catch (error) { if (attempt >= 5) throw error; await new Promise(r => setTimeout(r, 30)); }
-      }
-      await this.signal();
-    });
+    this.writing = this.writing
+      .catch(() => {})
+      .then(async () => {
+        const file = path.join(this.wow, 'Interface', 'AddOns', 'WispAI_Payload', 'Payload.lua');
+        await mkdir(path.dirname(file), { recursive: true });
+        const tmp = file + '.tmp';
+        await writeFile(tmp, luaJson(json), 'utf8');
+        for (let attempt = 0; ; attempt++) {
+          try {
+            await rename(tmp, file);
+            break;
+          } catch (error) {
+            if (attempt >= 5) {
+              throw error;
+            }
+            await new Promise((r) => setTimeout(r, 30));
+          }
+        }
+      });
     return this.writing;
   }
-  private signal() {
-    return writeFile(path.join(this.wow, 'Interface', 'AddOns', 'WispAI', 'Signals', `Ready${String(this.nextSlot).padStart(4, '0')}.wav`), SILENT_WAV);
-  }
   setCursor(slot: number, receivedRevision: number) {
-    const advanced = slot > this.nextSlot;
     this.nextSlot = Math.max(this.nextSlot, slot);
     this.peerRevision = Math.max(this.peerRevision, receivedRevision);
-    // Reannounce snapshots written while WoW was loading the previous slot.
-    if (advanced && this.peerRevision < this.latestRevision) this.writing = this.writing.catch(() => {}).then(() => this.signal());
   }
   resetSession() {
-    this.nextSlot = 1; this.latestRevision = 0; this.peerRevision = 0; this.published = '';
-    this.writing = this.writing.catch(() => {}).then(async () => {
-      const dir = path.join(this.wow, 'Interface', 'AddOns', 'WispAI', 'Signals');
-      for (let start = 1; start <= 1024; start += 64) await Promise.all(Array.from({ length: Math.min(64, 1025 - start) }, (_, i) => writeFile(path.join(dir, `Ready${String(start + i).padStart(4, '0')}.wav`), '')));
-    });
+    this.nextSlot = 1;
+    this.peerRevision = 0;
+    this.published = '';
   }
-  stop() { this.stopped = true; clearInterval(this.timer); for (const w of this.watchers) w.close(); }
+  stop() {
+    this.stopped = true;
+    clearInterval(this.timer);
+    for (const w of this.watchers) {
+      w.close();
+    }
+  }
 }

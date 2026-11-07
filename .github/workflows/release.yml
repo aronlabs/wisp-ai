@@ -16,6 +16,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npm run build:desktop
       - run: npm test
       - run: ./scripts/package-release.ps1
         shell: pwsh

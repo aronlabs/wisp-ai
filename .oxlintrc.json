@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "curly": ["error", "all"],
+    "eqeqeq": "error",
+    "no-var": "error"
+  },
+  "env": {
+    "builtin": true
+  },
+  "ignorePatterns": ["runtime/**", "dist/**", ".eve/**", "node_modules/**"]
+}

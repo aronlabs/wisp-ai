@@ -226,11 +226,13 @@ no Codex executable or global Node installation is needed in a release.
 Outbound packets use 128 helper addon enable states, saved through
 `C_AddOns.SaveAddOns()` and decoded from `AddOns.txt`. Compressed packets include
 session and sequence identifiers and are retried until acknowledged. Inbound
-snapshots load through 1024 preinstalled load-on-demand addons. Silent WAV readiness
-signals are checked only while a reliable request or a conversation is pending.
-WoW caches successful sound loads across UI reloads, so a positive signal alone
-does not prove that fresh payload data exists. Duplicate payloads back off, idle
-UI never loads a channel, and a new user action wakes the receiver immediately.
+snapshots load through 1024 preinstalled load-on-demand addons. The receiver polls
+only during startup, pending reliable requests or active conversations. It keeps
+reading after the hello is acknowledged until the agent becomes ready. Duplicate
+payloads back off, connected idle UI never loads a channel, and a new user action
+wakes the receiver immediately. Transport does not depend on sound settings or
+PlaySoundFile. The desktop reports WoW connected only after a ready snapshot has
+been acknowledged by the addon.
 Only visible state changes advance revisions; invisible stream events and
 unchanged snapshots do not. Polls and heartbeats need no acknowledgement payload,
 and late outbound packets cannot undo the latest revision acknowledged by WoW.
@@ -239,7 +241,7 @@ inbound slots. Text/events are batched, not transmitted token by token.
 
 Slots are finite within one UI load. `/reload` renews the pool; use `/wisp diag`
 for the cursor, and `/wisp reconnect` to send a fresh handshake. A large message
-or character reading can take several seconds. The signal/file-loading behavior
+or character reading can take several seconds. The addon file-loading behavior
 must be checked after significant game updates.
 
 Conversations are stored locally in `runtime/chats.json`; WoW UI preferences and
@@ -268,3 +270,21 @@ WispAI-RenameBackup folder outside AddOns. Existing Wisp saves are never overwri
 The desktop secret helper imports the encrypted credential store once under WispAI;
 chats, memories, configuration and ChatGPT registration identifiers remain intact.
 Use /wisp or /wispai after fully restarting WoW to discover the renamed addon.
+
+## Code style and checks
+
+Run `npm run format` before committing. Oxfmt formats TypeScript, JSON, YAML and
+Markdown; StyLua formats Lua; CSharpier formats the Windows desktop source.
+All configurations live in the repo. `npm run lint:fix` applies safe Oxlint fixes.
+`npm run check` checks formatting, lint (including warnings), and TypeScript.
+`npm test` runs the regression suite. Both PRs and pushes to main run these checks.
+
+Development uses Node 24 and, for the C# formatter, the .NET 8 runtime (not the SDK).
+The CSharpier helper downloads a pinned, checksum-verified package on first use and
+caches it under node_modules/.cache; subsequent format checks run locally. These
+are development tools and do not add a runtime requirement for the released app.
+
+The bridge entry point is `src/main.ts`; Eve process management is isolated in
+`src/agent-process.ts`, and non-streaming response collection in
+`src/response-stream.ts`. Desktop startup and protected storage live in
+`desktop/Program.cs`; `desktop/Wisp.cs` builds each UI tab in a separate method.
