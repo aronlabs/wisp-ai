@@ -108,14 +108,7 @@ try {
   if (status.auth.status !== 'signed_out') {
     throw Error('Fresh installation unexpectedly has an account.');
   }
-  const stop = await fetch('http://127.0.0.1:' + identity.port + '/stop', {
-    method: 'POST',
-    headers,
-    body: '{}',
-  });
-  if (!stop.ok) {
-    throw Error('Installed bridge could not stop cleanly.');
-  }
+  await exec(executable, ['--prepare-update'], { env, windowsHide: true, timeout: 60000 });
   await new Promise<void>((resolve, reject) => {
     if (child!.exitCode !== null) {
       resolve();
@@ -128,7 +121,18 @@ try {
     });
   });
   await writeFile(path.join(data, 'preserve-on-uninstall.txt'), 'keep user data');
+  await mkdir(path.join(payload, 'tests'), { recursive: true });
+  await writeFile(path.join(payload, 'tests/retired-file.txt'), 'obsolete application resource');
   await exec(installer, ['/S', '/D=' + target], { windowsHide: true, timeout: 180000 });
+  try {
+    await access(path.join(payload, 'tests/retired-file.txt'));
+    throw Error('Upgrade retained a retired application resource.');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
+  await exec(executable, ['--self-test'], { env, windowsHide: true, timeout: 30000 });
   await access(path.join(data, 'config.local.json'));
   await access(path.join(data, 'runtime/chats.json'));
   await exec(path.join(target, 'uninstall.exe'), ['/S', '_?=' + target], {
@@ -145,6 +149,7 @@ try {
     noPersonalData: true,
     userDataPreserved: true,
     upgradePreservesHistory: true,
+    retiredResourcesRemoved: true,
   };
   await writeFile('dist/installer-smoke.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));

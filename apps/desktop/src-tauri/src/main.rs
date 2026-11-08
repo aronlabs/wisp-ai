@@ -328,8 +328,56 @@ async fn import_legacy(host: tauri::State<'_, Host>, source: String) -> Result<S
     Ok("Imported your previous Wisp data. You can start Wisp now.".into())
 }
 
+fn prepare_update() -> Result<(), String> {
+    let data = vault::data_dir()?;
+    let identity = fs::read(data.join("runtime/desktop.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+    let pid = identity.as_ref().and_then(|value| value["pid"].as_u64());
+    let host = Host {
+        data,
+        payload: PathBuf::new(),
+        child: Mutex::new(None),
+    };
+    let running = tauri::async_runtime::block_on(host.request("GET", "/status", json!({}))).is_ok();
+    tauri::async_runtime::block_on(stop_host(&host))?;
+    // The HTTP listener closes before Eve and persistence finish. Wait for the
+    // bridge process itself before the installer replaces its runtime files.
+    #[cfg(windows)]
+    if let Some(pid) = pid.filter(|id| running && *id > 0 && *id <= u32::MAX as u64) {
+        use windows_sys::Win32::Foundation::{
+            CloseHandle, GetLastError, ERROR_INVALID_PARAMETER, WAIT_OBJECT_0,
+        };
+        use windows_sys::Win32::System::Threading::{OpenProcess, WaitForSingleObject};
+        unsafe {
+            let process = OpenProcess(0x00100000, 0, pid as u32); // SYNCHRONIZE access only.
+            if process.is_null() {
+                if GetLastError() != ERROR_INVALID_PARAMETER {
+                    return Err("Cannot wait for the previous Wisp bridge.".into());
+                }
+            } else {
+                let result = WaitForSingleObject(process, 20000);
+                CloseHandle(process);
+                if result != WAIT_OBJECT_0 {
+                    return Err("The previous Wisp bridge is still stopping.".into());
+                }
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (pid, running);
+    Ok(())
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--prepare-update") {
+        if let Err(error) = prepare_update() {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if args.get(1).map(String::as_str) == Some("--secret") {
         if let Err(error) = vault::run(&args) {
             eprintln!("{error}");
