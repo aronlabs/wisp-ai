@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Client } from 'eve/client';
-import { sendChatTurn } from '../src/agent-session.ts';
-import { turnInput, visibleUserText } from '../src/context.ts';
-import type { Chat } from '../src/events.ts';
+import { sendChatTurn } from '@wisp/bridge/agent-session';
+import { turnInput, visibleUserText } from '@wisp/bridge/context';
+import type { Chat } from '@wisp/bridge/events';
 
 function fixture(error?: Error) {
   const chat: Chat = {

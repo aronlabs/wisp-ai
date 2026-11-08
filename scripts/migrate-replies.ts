@@ -1,5 +1,5 @@
 import { readFile, writeFile, copyFile, rename } from 'node:fs/promises';
-import { migrateReplies } from '../src/migrate-replies.ts';
+import { migrateReplies } from '@wisp/bridge/migrate-replies';
 const file = new URL('../runtime/chats.json', import.meta.url);
 const chats = JSON.parse(await readFile(file, 'utf8'));
 if (chats.some((chat: { status: string }) => chat.status === 'working')) {

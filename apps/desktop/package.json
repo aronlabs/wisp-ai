@@ -1,0 +1,30 @@
+{
+  "name": "@wisp/desktop",
+  "version": "0.2.2",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "svelte-check --tsconfig src/tsconfig.json",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.4",
+    "@wisp/protocol": "workspace:*",
+    "svelte": "5.57.3"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@tauri-apps/cli": "2.12.4",
+    "@testing-library/svelte": "5.4.2",
+    "@types/node": "24.19.2",
+    "jsdom": "31.0.0",
+    "svelte-check": "4.7.8",
+    "typescript": "5.9.3",
+    "vite": "8.3.6",
+    "vitest": "5.1.0"
+  }
+}

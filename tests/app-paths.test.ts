@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { appPaths, prepareEngine } from '../src/app-paths.ts';
-import { migrateDesktop } from '../src/desktop-migration.ts';
+import { appPaths, prepareEngine } from '@wisp/bridge/app-paths';
+import { migrateDesktop } from '@wisp/bridge/desktop-migration';
 import { createHash } from 'node:crypto';
 test('installed resources stay separate from writable engine and conversation state', async () => {
   const temporary = await mkdtemp(path.join(tmpdir(), 'wisp-paths-'));
@@ -35,6 +35,33 @@ test('installed resources stay separate from writable engine and conversation st
     await rm(temporary, { recursive: true, force: true });
   }
 });
+test('deployed agent uses its production dependency directory without losing Eve history', async () => {
+  const temporary = await mkdtemp(path.join(tmpdir(), 'wisp-deployed-agent-'));
+  try {
+    const payload = path.join(temporary, 'payload');
+    const agent = path.join(payload, 'node_modules/@wisp/agent');
+    const engine = path.join(temporary, 'user/engine');
+    await mkdir(path.join(agent, 'agent'), { recursive: true });
+    await mkdir(path.join(agent, 'src'));
+    await writeFile(path.join(agent, 'package.json'), '{"name":"@wisp/agent"}');
+    await writeFile(path.join(agent, 'agent/agent.ts'), 'production definition');
+    await mkdir(path.join(engine, '.eve'), { recursive: true });
+    await writeFile(path.join(engine, '.eve/history'), 'existing sessions');
+    await prepareEngine(agent, engine);
+    assert.equal(
+      await readFile(path.join(engine, 'agent/agent.ts'), 'utf8'),
+      'production definition',
+    );
+    assert.equal(
+      await realpath(path.join(engine, 'node_modules')),
+      await realpath(path.join(payload, 'node_modules')),
+    );
+    assert.equal(await readFile(path.join(engine, '.eve/history'), 'utf8'), 'existing sessions');
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+});
+
 test('migration imports explicit user data, leaves the old installation intact and refuses to overwrite', async () => {
   const temporary = await mkdtemp(path.join(tmpdir(), 'wisp-migrate-'));
   try {

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Wisp AI",
+  "version": "0.2.2",
+  "identifier": "com.wisp.ai",
+  "build": {
+    "beforeDevCommand": "node node_modules/vite/bin/vite.js",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "node node_modules/vite/bin/vite.js build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Wisp AI",
+        "width": 1080,
+        "height": 780,
+        "minWidth": 900,
+        "minHeight": 640,
+        "backgroundColor": "#14191d",
+        "theme": "Dark"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'; base-uri 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "resources/payload/": "payload/"
+    },
+    "publisher": "Wisp AI",
+    "shortDescription": "Your AI companion in Azeroth",
+    "category": "Utility",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "languages": ["English"],
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  }
+}

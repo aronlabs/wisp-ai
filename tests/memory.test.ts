@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { MemoryStore } from '../src/memory-store.ts';
-import { characterIdentity } from '../src/context.ts';
-import { localMemory } from '../src/agent-memory.ts';
+import { MemoryStore } from '@wisp/bridge/memory-store';
+import { characterIdentity } from '@wisp/bridge/context';
+import { localMemory } from '@wisp/agent/agent-memory';
 
 test('memory survives new store instances, isolates characters, and serializes concurrent updates', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'wow-wisp-memory-'));

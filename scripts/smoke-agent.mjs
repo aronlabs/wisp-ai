@@ -1,14 +1,20 @@
-import { cp, mkdir, readFile, writeFile, symlink, open } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, open } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { spawn, execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-const root = process.cwd(),
-  dir = path.resolve('../../work', 'agent-smoke-' + Date.now());
+const repository = fileURLToPath(new URL('../', import.meta.url));
+const root = process.env.WISP_RESOURCE_ROOT || repository;
+const bridge = process.env.WISP_RESOURCE_ROOT || path.join(repository, 'apps/bridge');
+const require = createRequire(path.join(bridge, 'package.json'));
+const agent = path.dirname(require.resolve('@wisp/agent/package.json'));
+const eve = fileURLToPath(new URL('../../bin/eve.js', pathToFileURL(require.resolve('eve'))));
+const dir = path.resolve(repository, '../../work', 'agent-smoke-' + Date.now());
 await mkdir(dir, { recursive: true });
-const load = (p) => import(pathToFileURL(path.join(root, p)).href);
+const load = (p) => import(pathToFileURL(path.join(bridge, p)).href);
 const { ChatGPTAuth } = await load('src/chatgpt-auth.ts'),
   { NativeVault } = await load('src/secret-vault.ts'),
   { proxyModel } = await load('src/model-proxy.ts'),
@@ -16,7 +22,7 @@ const { ChatGPTAuth } = await load('src/chatgpt-auth.ts'),
   { searchWowhead } = await load('src/wowhead-search.ts'),
   { applyEvent } = await load('src/events.ts'),
   { ReplyProjection } = await load('src/reply-stream.ts');
-const { Client } = await load('node_modules/eve/dist/src/client/index.js');
+const { Client } = await import(pathToFileURL(require.resolve('eve/client')).href);
 const { Simulator } = await load('src/simulation.ts');
 const simulationSnapshot = process.env.WISP_SMOKE_CHARACTER
   ? JSON.parse(await readFile(process.env.WISP_SMOKE_CHARACTER, 'utf8'))
@@ -28,7 +34,8 @@ const config = JSON.parse(await readFile(path.join(dataRoot, 'config.local.json'
 const auth = new ChatGPTAuth(
   path.join(dataRoot, 'runtime'),
   new NativeVault(
-    process.env.WISP_DESKTOP_EXE || path.join(root, 'src-tauri/target/release/wisp.exe'),
+    process.env.WISP_DESKTOP_EXE ||
+      path.join(repository, 'apps/desktop/src-tauri/target/release/wisp.exe'),
   ),
 );
 await auth.load();
@@ -44,10 +51,8 @@ const scopedAuth = {
     return fetch(url, { ...init, headers, redirect: 'error' });
   },
 };
-await cp(path.join(root, 'agent'), path.join(dir, 'agent'), { recursive: true });
-await cp(path.join(root, 'src'), path.join(dir, 'src'), { recursive: true });
-await cp(path.join(root, 'package.json'), path.join(dir, 'package.json'));
-await symlink(path.join(root, 'node_modules'), path.join(dir, 'node_modules'), 'junction');
+const { prepareEngine } = await load('src/app-paths.ts');
+await prepareEngine(agent, dir);
 for (const file of ['agent/agent.ts', 'src/agent-rpc.ts', 'agent/tools/query_character.ts']) {
   const p = path.join(dir, file);
   await writeFile(p, (await readFile(p, 'utf8')).replaceAll('43187', '43197'));
@@ -113,14 +118,7 @@ await new Promise((r) => server.listen(43197, '127.0.0.1', r));
 const log = await open(path.join(dir, 'eve.log'), 'a');
 const child = spawn(
   process.execPath,
-  [
-    path.join(root, 'node_modules/eve/bin/eve.js'),
-    'dev',
-    '--no-ui',
-    '--no-default-extensions',
-    '--port',
-    '43196',
-  ],
+  [eve, 'dev', '--no-ui', '--no-default-extensions', '--port', '43196'],
   {
     cwd: dir,
     windowsHide: true,

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ReplyProjection, ReplyStream } from '../src/reply-stream.ts';
-import { applyEvent, type Chat } from '../src/events.ts';
-import { migrateReplies } from '../src/migrate-replies.ts';
+import { ReplyProjection, ReplyStream } from '@wisp/bridge/reply-stream';
+import { applyEvent, type Chat } from '@wisp/bridge/events';
+import { migrateReplies } from '@wisp/bridge/migrate-replies';
 const record = (value: unknown) => JSON.stringify(value) + '\n';
 const text = (value: string) => record({ type: 'text_delta', text: value });
 const chat = (): Chat => ({

@@ -1,0 +1,59 @@
+{
+  "name": "@wisp/bridge",
+  "version": "0.2.2",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "files": [
+    "src",
+    "scripts"
+  ],
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    "./advice": "./src/advice.ts",
+    "./agent-process": "./src/agent-process.ts",
+    "./agent-session": "./src/agent-session.ts",
+    "./app-paths": "./src/app-paths.ts",
+    "./capabilities": "./src/capabilities.ts",
+    "./chat-model": "./src/chat-model.ts",
+    "./chatgpt-auth": "./src/chatgpt-auth.ts",
+    "./context": "./src/context.ts",
+    "./desktop-migration": "./src/desktop-migration.ts",
+    "./desktop-server": "./src/desktop-server.ts",
+    "./events": "./src/events.ts",
+    "./history": "./src/history.ts",
+    "./main": "./src/main.ts",
+    "./mcp-manager": "./src/mcp-manager.ts",
+    "./mcp-relay": "./src/mcp-relay.ts",
+    "./memory-store": "./src/memory-store.ts",
+    "./migrate-replies": "./src/migrate-replies.ts",
+    "./model-proxy": "./src/model-proxy.ts",
+    "./panels": "./src/panels.ts",
+    "./rename-migration": "./src/rename-migration.ts",
+    "./reply-stream": "./src/reply-stream.ts",
+    "./response-stream": "./src/response-stream.ts",
+    "./secret-vault": "./src/secret-vault.ts",
+    "./sessions": "./src/sessions.ts",
+    "./simulation": "./src/simulation.ts",
+    "./snapshots": "./src/snapshots.ts",
+    "./thewowdb": "./src/thewowdb.ts",
+    "./transport": "./src/transport.ts",
+    "./wowhead-search": "./src/wowhead-search.ts"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@wisp/agent": "workspace:*",
+    "@wisp/protocol": "workspace:*",
+    "eve": "1.0.0-rc.6",
+    "jose": "6.2.15",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  }
+}

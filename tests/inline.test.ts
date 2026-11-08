@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resumeChat } from '../src/sessions.ts';
+import { resumeChat } from '@wisp/bridge/sessions';
 const require = createRequire(import.meta.url);
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
 function vm() {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TheWoWDB } from '../src/thewowdb.ts';
+import { TheWoWDB } from '@wisp/bridge/thewowdb';
 
 const spell = {
   id: 122,

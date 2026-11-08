@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { AdviceGate } from '../src/advice.ts';
-import { ReplyStream } from '../src/reply-stream.ts';
+import { AdviceGate } from '@wisp/bridge/advice';
+import { ReplyStream } from '@wisp/bridge/reply-stream';
 test('automatic advice is opt-in, deduplicated, rate limited, fresh and quiet while busy', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wow-advice-'));
   try {

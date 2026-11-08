@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
-import { FrameDecoder, parseFrame, luaJson } from '../src/protocol.ts';
+import { FrameDecoder, parseFrame, luaJson } from '@wisp/protocol/protocol';
 function frames(body: unknown, start = 0) {
   const compressed = deflateSync(Buffer.from(JSON.stringify(body)));
   const size = Buffer.alloc(2);

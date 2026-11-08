@@ -1,8 +1,8 @@
-import { ReplyProjection } from '../src/reply-stream.ts';
+import { ReplyProjection } from '@wisp/bridge/reply-stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, type Chat } from '../src/events.ts';
-import { rebuildHistory } from '../src/history.ts';
+import { applyEvent, type Chat } from '@wisp/bridge/events';
+import { rebuildHistory } from '@wisp/bridge/history';
 test('UI gets tool states and final text, never hidden reasoning', () => {
   const chat: Chat = {
     id: 'test',

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { linkedReferences } from '../src/references.ts';
-import { turnInput, visibleUserText } from '../src/context.ts';
+import { linkedReferences } from '@wisp/protocol/references';
+import { turnInput, visibleUserText } from '@wisp/bridge/context';
 
 test('user-linked skills retain their verified identity and exact localized label in model context', () => {
   const text =

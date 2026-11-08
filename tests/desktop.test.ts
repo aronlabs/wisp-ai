@@ -4,8 +4,8 @@ import { mkdtemp, readFile, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NativeVault } from '../src/secret-vault.ts';
-import { startDesktopServer } from '../src/desktop-server.ts';
+import { NativeVault } from '@wisp/bridge/secret-vault';
+import { startDesktopServer } from '@wisp/bridge/desktop-server';
 test('desktop controls require the session token and reject browser origins', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wow-desktop-'));
   const server = await startDesktopServer(root, async () => ({ ok: true }), 0);
@@ -36,7 +36,7 @@ test(
   async (t) => {
     const exe =
       process.env.WISP_TEST_DESKTOP_EXE ||
-      fileURLToPath(new URL('../src-tauri/target/release/wisp.exe', import.meta.url));
+      fileURLToPath(new URL('../apps/desktop/src-tauri/target/release/wisp.exe', import.meta.url));
     try {
       await access(exe);
     } catch {

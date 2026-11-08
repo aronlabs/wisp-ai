@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { ReplyStream } from '../src/reply-stream.ts';
-import { selectionValues } from '../src/ui-schema.ts';
+import { ReplyStream } from '@wisp/bridge/reply-stream';
+import { selectionValues } from '@wisp/protocol/ui-schema';
 const require = createRequire(import.meta.url);
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
 test('UI stream upserts stable components and rejects cycles, invalid inputs and executable actions', () => {

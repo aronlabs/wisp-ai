@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { PanelStore, panelContent } from '../src/panels.ts';
+import { PanelStore } from '@wisp/bridge/panels';
+import { panelContent } from '@wisp/protocol/panels';
 const require = createRequire(import.meta.url);
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
 const example = {

@@ -10,19 +10,20 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.1'
-          cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm run test:ui
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm check
+      - run: pnpm test:ui
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: apps/desktop/src-tauri
           cache-on-failure: true
       - uses: actions/setup-go@v6
         with:
@@ -37,10 +38,10 @@ jobs:
           key: wowsims-windows-go125-7f9c0e7
       - run: ./scripts/build-simulator.ps1
         shell: pwsh
-      - run: npm test
-      - run: npm run build:desktop
-      - run: cargo test --release --features tauri/custom-protocol --manifest-path src-tauri/Cargo.toml
-      - run: cargo fmt --manifest-path src-tauri/Cargo.toml
+      - run: pnpm test
+      - run: pnpm build:desktop
+      - run: cargo test --release --features tauri/custom-protocol --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml
       - run: node scripts/verify-installer.ts
       - uses: actions/upload-artifact@v4
         if: always()
@@ -50,9 +51,9 @@ jobs:
           path: |
             dist/*-setup.exe
             dist/*.sha256
-            src-tauri/Cargo.lock
-            src-tauri/src/*.rs
-            src-tauri/build.rs
+            apps/desktop/src-tauri/Cargo.lock
+            apps/desktop/src-tauri/src/*.rs
+            apps/desktop/src-tauri/build.rs
             dist/installer-smoke.json
       - if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2

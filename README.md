@@ -121,7 +121,7 @@ as dismissible Read notifications; opening one promotes it into a conversation.
 
 The desktop shell uses Tauri 2 and Svelte, with the existing Node/Eve bridge packaged as application resources. The frontend talks to a small allowlisted native command layer; bridge tokens and credentials are never sent to the webview. Closing the window keeps Wisp in the system tray. Exit from the tray stops the bridge first and refuses to interrupt an active turn.
 
-Build a Windows NSIS installer with `npm run build:desktop` (requires Rust, Windows C++ build tools, Node 24+, and a built simulator). The build stages production dependencies and bundled Node/npm without user data, then writes the installer and SHA-256 checksum under `dist/`. Installation is per user; updates replace app resources while preserving application data. The release workflow compiles the pinned simulator, builds the installer, tests protected credential storage and launches the installed bridge without a global Node installation. Tag builds create a draft GitHub release. Installers are currently unsigned.
+Build a Windows NSIS installer with `pnpm build:desktop` (requires Rust, Windows C++ build tools, Node 24.22.1+, pnpm, and a built simulator). The build stages production dependencies and bundled Node/npm without user data, then writes the installer and SHA-256 checksum under `dist/`. Installation is per user; updates replace app resources while preserving application data. The release workflow compiles the pinned simulator, builds the installer, tests protected credential storage and launches the installed bridge without a global Node installation. Tag builds create a draft GitHub release. Installers are currently unsigned.
 
 Windows is the currently tested distribution target. The shell and credential interface have macOS implementations, but a macOS release still requires simulator packaging, game-client validation and signing/notarization on a Mac.
 
@@ -180,7 +180,7 @@ in source. Restart the bridge after changing configuration. A stdio-only server
 needs a local HTTP adapter.
 
 The read-only [Everloot MCP](https://everloot.app/docs/mcp/clients) is enabled
-separately in `agent/connections/everloot.ts`. Its allowlist covers reference
+separately in `apps/agent/agent/connections/everloot.ts`. Its allowlist covers reference
 pages, sources/relations, talent plans, profession recipes, nearby locations,
 market values, price history, coverage and changes. It requires no API key or
 addon/uploader installation. Player-specific upload/guild/ledger tools are not
@@ -205,13 +205,27 @@ filtered from the model's offered tools in the subscription adapter instead.
 
 ## Development
 
+Use Node 24.22.1+ and the pnpm version pinned in `packageManager`.
+
 ```sh
-npm install
-npm run check
-npm test
-npm run install-addon -- "E:\Blizzard\World of Warcraft\_forever_"
-npm start
+pnpm install --frozen-lockfile
+pnpm build
+pnpm check
+pnpm test
+pnpm install-addon "E:\Blizzard\World of Warcraft\_forever_"
+pnpm start
 ```
+
+The pnpm workspace separates four projects:
+
+- `@wisp/desktop`: Svelte frontend, Tauri native host and installer.
+- `@wisp/bridge`: game transport, accounts, persistence and tool execution.
+- `@wisp/agent`: Eve definitions, tools, connections and memory adapters.
+- `@wisp/protocol`: shared input schemas, references and desktop contracts.
+
+Each project declares its dependencies. Agent and desktop imports of the bridge are blocked by lint rules; shared contracts have no app dependencies. The protocol package compiles to JavaScript so Node can load it from installed dependencies.
+
+`pnpm --filter @wisp/desktop dev` starts the frontend; `pnpm desktop:dev` stages production resources and starts the native app. Production packaging uses `pnpm --filter @wisp/bridge --prod deploy`, includes the agent and compiled protocol, and ships no desktop development source, tests or Rust build tree. The installable dependency tree is hoisted only during deployment so Windows resources contain no links to the development store.
 
 The bridge starts Eve automatically on loopback port 43186. A separate loopback
 RPC endpoint on 43187 authenticates character and title tool requests with an ephemeral
@@ -271,14 +285,14 @@ Use /wisp or /wispai after fully restarting WoW to discover the renamed addon.
 
 ## Code style and checks
 
-Run `npm run format` before committing. Oxfmt formats TypeScript, JSON, YAML and
+Run `pnpm format` before committing. Oxfmt formats TypeScript, JSON, YAML and
 Markdown; StyLua formats Lua; Prettier formats Svelte and CSS; rustfmt formats the native host.
-All configurations live in the repo. `npm run lint:fix` applies safe Oxlint fixes.
-`npm run check` checks formatting, lint (including warnings), and TypeScript.
-`npm test` runs the regression suite. Both PRs and pushes to main run these checks.
+All configurations live in the repo. `pnpm exec oxlint --fix apps packages scripts tests` applies safe Oxlint fixes.
+`pnpm check` checks formatting, lint (including warnings), and TypeScript.
+`pnpm test` runs the regression suite. Both PRs and pushes to main run these checks.
 
 Development uses Node 24. The desktop installer build also requires Rust and the Windows C++ build tools. Svelte files use Prettier; TypeScript uses Oxfmt/Oxlint.
-The bridge entry point is `src/main.ts`; Eve process management lives in `src/agent-process.ts`. The Svelte UI lives in `app/`, and the native supervisor, installer configuration and protected credentials live in `src-tauri/`. `npm run test:ui` exercises desktop workflows; the installer workflow also runs Rust tests and a fresh-install smoke test.
+The bridge entry point is `apps/bridge/src/main.ts`; Eve process management lives in `apps/bridge/src/agent-process.ts`. The Svelte UI lives in `apps/desktop/src/`, and the native supervisor, installer configuration and protected credentials live in `apps/desktop/src-tauri/`. `pnpm test:ui` exercises desktop workflows; the installer workflow also runs Rust tests and a fresh-install smoke test.
 
 ## Forever knowledge sources
 

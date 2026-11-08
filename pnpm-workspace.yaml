@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Package boundaries stay explicit; undeclared transitive imports are not hoisted.
+hoist: false

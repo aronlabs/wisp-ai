@@ -1,10 +1,10 @@
-import { ReplyProjection } from '../src/reply-stream.ts';
+import { ReplyProjection } from '@wisp/bridge/reply-stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { applyEvent, type Chat } from '../src/events.ts';
-import { SnapshotGate } from '../src/snapshots.ts';
+import { applyEvent, type Chat } from '@wisp/bridge/events';
+import { SnapshotGate } from '@wisp/bridge/snapshots';
 const require = createRequire(import.meta.url);
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
 

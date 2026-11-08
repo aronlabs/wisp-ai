@@ -28,6 +28,10 @@ try {
     'runtime/chats.json',
     'runtime/chatgpt-host.json',
     'secrets',
+    'tests',
+    'apps/desktop',
+    'src-tauri',
+    'node_modules/@wisp/desktop',
   ]) {
     try {
       await access(path.join(payload, name));
@@ -47,7 +51,12 @@ try {
       throw error;
     }
   }
-  const env = { ...process.env, WISP_DATA_DIR: data, WISP_DESKTOP_EXE: executable };
+  const env = {
+    ...process.env,
+    WISP_DATA_DIR: data,
+    WISP_RESOURCE_ROOT: payload,
+    WISP_DESKTOP_EXE: executable,
+  };
   await exec(executable, ['--self-test'], { env, windowsHide: true, timeout: 30000 });
   await writeFile(
     path.join(data, 'config.local.json'),

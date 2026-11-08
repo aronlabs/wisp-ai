@@ -6,15 +6,15 @@
     "runtime/**",
     "dist/**",
     ".eve/**",
-    "node_modules/**",
+    "**/node_modules/**",
     "config.local.json",
     "runtime-node.txt",
-    "app/**/*.css",
-    "app/**/*.html",
-    "app/**/*.svelte",
-    "src-tauri/target/**",
-    "src-tauri/resources/**",
-    "src-tauri/gen/**",
-    "dist-ui/**"
+    "apps/desktop/src/**/*.css",
+    "apps/desktop/src/**/*.html",
+    "apps/desktop/src/**/*.svelte",
+    "**/src-tauri/target/**",
+    "**/src-tauri/resources/**",
+    "**/src-tauri/gen/**",
+    "**/dist/**"
   ]
 }

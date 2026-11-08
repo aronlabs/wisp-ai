@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { Simulator, simulationInput } from '../src/simulation.ts';
+import { Simulator } from '@wisp/bridge/simulation';
+import { simulationInput } from '@wisp/protocol/simulation';
 const simulator = new Simulator(process.cwd());
 const input = { plans: [{ label: 'Frostbolt', priority: [{ spellId: 205 }] }] };
 export function mageSnapshot(level = 11) {

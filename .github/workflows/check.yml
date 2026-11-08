@@ -10,12 +10,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.1'
-          cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm run ui:build
-      - run: npm run test:ui
-      - run: npm test
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm check
+      - run: pnpm ui:build
+      - run: pnpm test:ui
+      - run: pnpm test

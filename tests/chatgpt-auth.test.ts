@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import { createHash } from 'node:crypto';
-import { ChatGPTAuth } from '../src/chatgpt-auth.ts';
+import { ChatGPTAuth } from '@wisp/bridge/chatgpt-auth';
 
 async function fixture(t: { after(fn: () => Promise<void>): void }) {
   const root = await mkdtemp(path.join(tmpdir(), 'wisp-auth-')),

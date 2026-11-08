@@ -12,5 +12,43 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": ["runtime/**", "dist/**", ".eve/**", "node_modules/**"]
+  "ignorePatterns": [
+    "runtime/**",
+    "dist/**",
+    "**/.eve/**",
+    "**/node_modules/**",
+    "**/src-tauri/**",
+    "**/dist/**"
+  ],
+  "overrides": [
+    {
+      "files": ["apps/agent/**", "apps/desktop/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": ["@wisp/bridge", "@wisp/bridge/*"]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/protocol/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              "@wisp/bridge",
+              "@wisp/bridge/*",
+              "@wisp/agent",
+              "@wisp/agent/*",
+              "@wisp/desktop",
+              "@wisp/desktop/*"
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

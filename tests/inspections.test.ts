@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
-import { inspectionSchema } from '../src/game-inspection.ts';
+import { inspectionSchema } from '@wisp/protocol/game-inspection';
 const require = createRequire(import.meta.url);
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
 function vm() {

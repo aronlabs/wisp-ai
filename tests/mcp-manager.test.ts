@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { McpManager, mcpSetup } from '../src/mcp-manager.ts';
+import { McpManager, mcpSetup } from '@wisp/bridge/mcp-manager';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createServer } from 'node:http';
-import { McpRelay } from '../src/mcp-relay.ts';
+import { McpRelay } from '@wisp/bridge/mcp-relay';
 test('stdio MCP setup tests real tools, encrypts through the vault interface and gates relay calls', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wow-mcp-'));
   const secrets = new Map<string, string>();

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { DiskTransport } from '../src/transport.ts';
+import { DiskTransport } from '@wisp/bridge/transport';
 test('payload writes stay ordered and acknowledgements never rewind the receive cursor', async () => {
   const base = path.resolve('runtime');
   await mkdir(base, { recursive: true });

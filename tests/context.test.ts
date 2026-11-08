@@ -1,9 +1,14 @@
-import { ReplyProjection } from '../src/reply-stream.ts';
+import { ReplyProjection } from '@wisp/bridge/reply-stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { basicGameContext, turnInput, visibleUserText, conversationTitle } from '../src/context.ts';
-import { rebuildHistory } from '../src/history.ts';
-import { applyEvent, type Chat } from '../src/events.ts';
+import {
+  basicGameContext,
+  turnInput,
+  visibleUserText,
+  conversationTitle,
+} from '@wisp/bridge/context';
+import { rebuildHistory } from '@wisp/bridge/history';
+import { applyEvent, type Chat } from '@wisp/bridge/events';
 
 test('automatic context contains only fundamental character and location data from this message', () => {
   const input = {
