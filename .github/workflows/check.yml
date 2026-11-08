@@ -20,28 +20,28 @@ concurrency:
   cancel-in-progress: true
 jobs:
   format:
-    if: github.event_name != 'workflow_run' && github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_run' && !inputs.release_run_id
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
       - run: pnpm format:check
   lint:
-    if: github.event_name != 'workflow_run' && github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_run' && !inputs.release_run_id
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
       - run: pnpm lint
   types:
-    if: github.event_name != 'workflow_run' && github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_run' && !inputs.release_run_id
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
       - run: pnpm typecheck
   unit-tests:
-    if: github.event_name != 'workflow_run' && github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_run' && !inputs.release_run_id
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -62,14 +62,14 @@ jobs:
         shell: pwsh
       - run: pnpm test:core
   addon-tests:
-    if: github.event_name != 'workflow_run' && github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_run' && !inputs.release_run_id
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
       - run: pnpm test:addon
   ui-tests:
-    if: github.event_name != 'workflow_run' && github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_run' && !inputs.release_run_id
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -77,7 +77,7 @@ jobs:
       - run: pnpm ui:build
       - run: pnpm test:ui
   native-tests:
-    if: github.event_name != 'workflow_run' && github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_run' && !inputs.release_run_id
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -99,7 +99,7 @@ jobs:
     # Release artifacts are executable code. Only consume successful builds
     # originating in this repository, never an artifact supplied by a fork PR.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && inputs.release_run_id != '') ||
       (github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_repository.full_name == github.repository)
