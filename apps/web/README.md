@@ -18,9 +18,13 @@ Open http://127.0.0.1:3000. Production check: `pnpm web:build`.
 
 1. Import this GitHub repository into Vercel.
 2. Set **Root Directory** to `apps/web` and framework to **Next.js**.
-3. Keep the framework build/output defaults. Use `pnpm install --frozen-lockfile`
-   as the install command if an override is needed. Allow workspace files outside
-   the root directory so Vercel can use the repository's pnpm lockfile.
+3. Keep the output defaults. The checked-in `vercel.json` installs the web as
+   an independent project with `pnpm install --ignore-workspace --frozen-lockfile`
+   and builds Next directly. The deployment uses `apps/web/pnpm-lock.yaml`,
+   without installing the root, agent, bridge or desktop packages. No access to
+   workspace files outside `apps/web` is needed for this deployment.
+   Do not override installation with plain `pnpm install`: that includes unrelated
+   workspace dependencies and their native build scripts.
 4. Add `wisp.fedeya.sh` in the project's Domains settings and apply the DNS record
    Vercel provides.
 
