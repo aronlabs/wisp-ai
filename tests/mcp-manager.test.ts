@@ -49,6 +49,15 @@ test('stdio MCP setup tests real tools, encrypts through the vault interface and
     assert.match(JSON.stringify(result), /true/);
     allowed = false;
     await assert.rejects(() => client.callTool({ name: 'echo', arguments: {} }));
+    await manager.setEnabled('test_server', false);
+    assert.equal(manager.list()[0].enabled, false);
+    await assert.rejects(manager.connect('test_server'), /unavailable/);
+    const savedTools = manager.list()[0].tools;
+    await manager.setEnabled('test_server', true);
+    assert.deepEqual(manager.list()[0].tools, savedTools, 'switching preserves discovery');
+    assert.equal(secrets.get('mcp:test_server:env'), JSON.stringify(input.env));
+    const reopened = await manager.connect('test_server');
+    assert.equal(reopened.tools[0].name, 'echo');
     await manager.remove('test_server');
     assert.equal(manager.list().length, 0);
     assert.equal(secrets.get('mcp:test_server:env'), '');
@@ -67,6 +76,9 @@ test('MCP setup rejects embedded URL credentials and keeps command arguments str
   assert.throws(() =>
     mcpSetup.parse({ server: { name: 'everloot', url: 'https://example.com/mcp' } }),
   );
+  for (const name of ['wow', 'questie', 'wisp', 'everloot_search']) {
+    assert.throws(() => mcpSetup.parse({ server: { name, url: 'https://example.com/mcp' } }));
+  }
   assert.equal(
     mcpSetup.parse({
       server: { name: 'test', transport: 'stdio', command: 'node', args: ['literal; not a shell'] },

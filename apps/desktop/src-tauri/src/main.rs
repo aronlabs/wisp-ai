@@ -120,6 +120,7 @@ fn permitted(method: &str, route: &str) -> bool {
                 "/auth/select",
                 "/auth/disconnect",
                 "/auth/model",
+                "/integrations/set",
                 "/mcps/test",
                 "/mcps/save",
                 "/mcps/remove",

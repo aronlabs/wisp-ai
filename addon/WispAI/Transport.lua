@@ -38,6 +38,9 @@ local function enqueue(packet)
 end
 function C.Send(packet)
     seq = seq + 1
+    if packet.type == "hello" and C.IntegrationReport then
+        packet.integrations = C.IntegrationReport()
+    end
     packet.session = C.session
     packet.seq = seq
     packet.at = time()

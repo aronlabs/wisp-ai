@@ -11,7 +11,24 @@ import type { SecretVault } from './secret-vault.ts';
 const name = z
   .string()
   .regex(/^[a-z][a-z0-9_]{0,47}$/)
-  .refine((s) => !['everloot', 'external', 'constructor', 'prototype', '__proto__'].includes(s));
+  .refine(
+    (s) =>
+      ![
+        'everloot',
+        'everloot_search',
+        'everloot_changes',
+        'external',
+        'wow',
+        'questie',
+        'thewowdb',
+        'wowhead',
+        'wowsims',
+        'wisp',
+        'constructor',
+        'prototype',
+        '__proto__',
+      ].includes(s),
+  );
 export const mcpDefinition = z
   .object({
     name,
@@ -226,6 +243,29 @@ export class McpManager {
     await writeFile(temp, JSON.stringify({ servers: next }, null, 2));
     await rename(temp, this.file);
     this.servers = next;
+  }
+  async setEnabled(key: string, enabled: boolean) {
+    name.parse(key);
+    if (typeof enabled !== 'boolean') {
+      throw Error('Invalid MCP switch');
+    }
+    const work = this.queue
+      .catch(() => {})
+      .then(async () => {
+        const server = this.servers[key];
+        if (!server) {
+          throw Error('Unknown MCP connection');
+        }
+        if (server.enabled === enabled) {
+          return;
+        }
+        await this.persist({ ...this.servers, [key]: { ...server, enabled } });
+        if (!enabled) {
+          await this.disconnect(key);
+        }
+      });
+    this.queue = work;
+    await work;
   }
   async remove(key: string) {
     name.parse(key);

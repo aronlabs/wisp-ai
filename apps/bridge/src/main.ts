@@ -15,6 +15,8 @@ import { turnInput, conversationTitle, characterIdentity } from './context.ts';
 import { MemoryStore } from './memory-store.ts';
 import { inspectionSchema } from '@wisp/protocol/game-inspection';
 import { actionSchema, actionTools } from '@wisp/protocol/game-actions';
+import { IntegrationState } from './integration-state.ts';
+import { existsSync } from 'node:fs';
 import { CapabilitySettings } from './capabilities.ts';
 import { defaultCapabilities } from '@wisp/protocol/capabilities';
 import { SnapshotGate } from './snapshots.ts';
@@ -126,6 +128,13 @@ try {
 } catch {}
 const capabilitySettings = new CapabilitySettings(path.join(runtime, 'capabilities.json'));
 await capabilitySettings.load();
+capabilitySettings.agentFile = path.join(runtime, 'agent-capabilities.json');
+const integrationState = new IntegrationState(capabilitySettings);
+capabilitySettings.availability.set('integration:wowsims', {
+  available: existsSync(path.join(ROOT, 'simulator', 'wowsimcli.exe')),
+  status: existsSync(path.join(ROOT, 'simulator', 'wowsimcli.exe')) ? 'ready' : 'missing',
+  reason: 'Experimental local mage engine, levels 1–60.',
+});
 function refreshMcpCatalog() {
   const catalog = defaultCapabilities();
   for (const server of mcpManager.list()) {
@@ -138,8 +147,9 @@ function refreshMcpCatalog() {
     }
     catalog.push({
       id: 'mcp:' + server.name,
+      kind: 'mcp',
       name: server.name,
-      group: 'mcps',
+      group: 'integrations',
       defaultEnabled: server.enabled,
       description:
         (server.description || server.name) + ' - ' + (url?.toString() || 'Local stdio server'),
@@ -148,7 +158,7 @@ function refreshMcpCatalog() {
       catalog.push({
         id: 'mcp_tool:' + server.name + ':' + tool.name,
         name: tool.name,
-        group: 'mcps',
+        group: 'integrations',
         parent: 'mcp:' + server.name,
         description: (tool.description || tool.name).slice(0, 500),
       });
@@ -157,6 +167,26 @@ function refreshMcpCatalog() {
   capabilitySettings.catalog = catalog;
 }
 refreshMcpCatalog();
+for (const server of mcpManager.list()) {
+  await mcpManager.setEnabled(server.name, capabilitySettings.configured('mcp:' + server.name));
+}
+async function setCapability(id: string, enabled: boolean) {
+  const server = id.startsWith('mcp:')
+    ? mcpManager.list().find((server) => id === 'mcp:' + server.name)
+    : undefined;
+  if (server) {
+    await mcpManager.setEnabled(server.name, enabled);
+  }
+  try {
+    await capabilitySettings.set(id, enabled);
+  } catch (error) {
+    if (server) {
+      await mcpManager.setEnabled(server.name, server.enabled);
+    }
+    throw error;
+  }
+}
+await capabilitySettings.publish();
 const mcpRelay = new McpRelay(
   mcpManager,
   (name, tool) =>
@@ -290,6 +320,7 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
     }
   }, 400);
   try {
+    await capabilitySettings.publish();
     if (!eveReady) {
       throw new Error('Eve is still starting. Please try again in a few seconds.');
     }
@@ -306,14 +337,19 @@ async function run(chat: Chat, text: string, messageId?: string, context?: unkno
     const response = await sendChatTurn(
       client,
       chat,
-      turnInput(text, context, {
-        ...chat,
-        titleGenerated:
-          chat.proactive ||
-          chat.inline ||
-          chat.titleGenerated ||
-          !capabilitySettings.enabled('tool:set_conversation_title'),
-      }),
+      turnInput(
+        text,
+        context,
+        {
+          ...chat,
+          titleGenerated:
+            chat.proactive ||
+            chat.inline ||
+            chat.titleGenerated ||
+            !capabilitySettings.enabled('tool:set_conversation_title'),
+        },
+        capabilitySettings.snapshot(),
+      ),
     );
     changed();
     for await (const event of response.stream()) {
@@ -377,6 +413,7 @@ function receive(packet: Packet) {
   if (!establishesSession && packet.session !== activeTransport) {
     return;
   }
+  const beforeIntegrations = JSON.stringify(capabilitySettings.snapshot());
   const newTransport = establishesSession && activeTransport !== packet.session;
   if (newTransport) {
     for (const req of pending.values()) {
@@ -385,6 +422,7 @@ function receive(packet: Packet) {
     }
     pending.clear();
     activeTransport = packet.session;
+    integrationState.reset();
     firstReadyRevision = 0;
     activeChat = resumeChat(chats, packet.chat)?.id || '';
     memoryView = undefined;
@@ -399,6 +437,13 @@ function receive(packet: Packet) {
   }
   if (Number.isSafeInteger(packet.nextSlot) && packet.nextSlot! >= 1 && packet.nextSlot! <= 1024) {
     transport.setCursor(packet.nextSlot!, Number(packet.receivedRev || 0));
+  }
+  integrationState.receive(packet.integrations);
+  if (JSON.stringify(capabilitySettings.snapshot()) !== beforeIntegrations) {
+    void capabilitySettings
+      .publish()
+      .catch((error) => log('Integration update failed: ' + error.message));
+    changed();
   }
   if (packet.heartbeat && !newTransport) {
     return;
@@ -697,7 +742,7 @@ function receive(packet: Packet) {
       if (typeof packet.key !== 'string' || typeof packet.enabled !== 'boolean') {
         throw new Error('Invalid capability setting');
       }
-      await capabilitySettings.set(packet.key, packet.enabled);
+      await setCapability(packet.key, packet.enabled);
       if (activeTransport === transportSession) {
         capabilityAcks[packet.key] = packet.requestId || '';
         capabilityError = undefined;
@@ -1149,7 +1194,7 @@ function startEve() {
     environment: {
       ...process.env,
       WOW_BRIDGE_TOKEN: token,
-      WOW_CAPABILITIES_FILE: capabilitySettings.file,
+      WOW_CAPABILITIES_FILE: capabilitySettings.agentFile,
       WOW_MCP_CONFIG: mcpFile,
       ...(config.model ? { WOW_MODEL: config.model } : {}),
       DO_NOT_TRACK: '1',
@@ -1264,6 +1309,7 @@ const desktopServer = await startDesktopServer(runtime, async (method, url, raw)
       auth: auth.state(),
       model: config.model || 'gpt-6-luna',
       activeTurns: chats.filter((c) => c.status === 'working').length,
+      integrations: capabilitySettings.snapshot(),
       mcps: mcpManager
         .list()
         .map((s) => ({ ...s, enabled: s.enabled && capabilitySettings.enabled('mcp:' + s.name) })),
@@ -1281,6 +1327,11 @@ const desktopServer = await startDesktopServer(runtime, async (method, url, raw)
       suggestions,
     };
   }
+  if (method === 'POST' && url === '/integrations/set') {
+    await setCapability(String(data.id), data.enabled);
+    changed();
+    return { ok: true };
+  }
   if (method === 'POST' && url === '/mcps/test') {
     return await mcpManager.test(mcpSetup.parse(data));
   }
@@ -1295,6 +1346,7 @@ const desktopServer = await startDesktopServer(runtime, async (method, url, raw)
   if (method === 'POST' && url === '/mcps/remove') {
     await mcpManager.remove(String(data.name));
     refreshMcpCatalog();
+    await capabilitySettings.publish();
     changed();
     return { ok: true };
   }
@@ -1335,6 +1387,16 @@ const desktopServer = await startDesktopServer(runtime, async (method, url, raw)
   }
   throw Error('Unknown desktop request');
 });
+const integrationHealth = setInterval(() => {
+  const before = JSON.stringify(capabilitySettings.snapshot());
+  integrationState.refresh();
+  if (JSON.stringify(capabilitySettings.snapshot()) !== before) {
+    void capabilitySettings
+      .publish()
+      .catch((error) => log('Integration update failed: ' + error.message));
+    changed();
+  }
+}, 30_000);
 const publish = setInterval(() => {
   if (!dirty || !activeTransport) {
     return;
@@ -1446,6 +1508,7 @@ async function stop() {
   }
   stopping = true;
   clearInterval(health);
+  clearInterval(integrationHealth);
   clearInterval(publish);
   await auth.cancel();
   transport.stop();

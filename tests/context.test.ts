@@ -81,7 +81,7 @@ test('conversation naming updates stay out of game activity and titles are bound
     chat,
     {
       type: 'call.requested',
-      data: { callId: 'title', capability: { name: 'set_conversation_title', kind: 'tool' } },
+      data: { callId: 'title', capability: { name: 'wisp__set_conversation_title', kind: 'tool' } },
     },
     parts,
   );

@@ -217,7 +217,7 @@ local memoryPanel, memoryContent, memoryStatus
 local memoryRows = {}
 local capabilityPanel, capabilityContent, capabilityStatus, capabilityScroll
 local capabilityRows, capabilityTabs = {}, {}
-local capabilityGroup = "tools"
+local capabilityGroup = "integrations"
 function C.RefreshCapabilities()
     if not capabilityPanel then
         return
@@ -269,6 +269,12 @@ function C.RefreshCapabilities()
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                     GameTooltip:SetText(row.entry.name)
                     GameTooltip:AddLine(row.entry.description, 0.85, 0.82, 0.75, true)
+                    if row.entry.reason then
+                        GameTooltip:AddLine(row.entry.reason, 0.7, 0.75, 0.65, true)
+                    end
+                    if row.entry.toolName then
+                        GameTooltip:AddLine(row.entry.toolName, 0.6, 0.6, 0.6, true)
+                    end
                     GameTooltip:Show()
                 end
                 row:SetScript("OnEnter", showHelp)
@@ -293,7 +299,13 @@ function C.RefreshCapabilities()
             setText(
                 row.state,
                 pending[entry.id] and "Saving..."
-                    or (blocked and "MCP off" or (values[entry.id] and "On" or "Off"))
+                    or (
+                        blocked and "Off"
+                        or (
+                            not entry.available and entry.status
+                            or (values[entry.id] and "On" or "Off")
+                        )
+                    )
             )
             row:SetAlpha(blocked and 0.45 or 1)
             row:Show()
@@ -1672,7 +1684,7 @@ function C.BuildUI()
     end)
     local tt = label(settings, "Show tool activity in conversations")
     tt:SetPoint("LEFT", tools, "RIGHT", 4, 0)
-    local capabilitiesButton = button(settings, "Tools & MCPs", 125, function()
+    local capabilitiesButton = button(settings, "Integrations", 125, function()
         capabilityPanel:Show()
         C.Send({ type = "capabilities_list" })
         C.RefreshCapabilities()
@@ -1709,13 +1721,13 @@ function C.BuildUI()
     capabilityPanel:SetFrameLevel(settings:GetFrameLevel() + 5)
     box(capabilityPanel, { 0.10, 0.085, 0.065, 1 }, 12)
     capabilityPanel:Hide()
-    local capabilityTitle = label(capabilityPanel, "Tools & MCPs", GOLD)
+    local capabilityTitle = label(capabilityPanel, "Integrations", GOLD)
     capabilityTitle:SetPoint("TOPLEFT", 20, -15)
-    for index, group in ipairs({ "tools", "mcps", "memory" }) do
+    for index, group in ipairs({ "integrations", "memory" }) do
         local tabGroup = group
         local tab = button(
             capabilityPanel,
-            group == "mcps" and "MCPs" or (group == "memory" and "Memory" or "Tools"),
+            group == "memory" and "Memory" or "Integrations",
             85,
             function()
                 capabilityGroup = tabGroup

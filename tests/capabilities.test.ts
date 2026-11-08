@@ -8,6 +8,7 @@ import { capabilityEnabled, connectionTools } from '@wisp/agent/capabilities';
 import { enabledTool } from '@wisp/agent/enabled-tool';
 import { localMemory } from '@wisp/agent/agent-memory';
 import { dynamicEvaluate } from '../node_modules/eve/dist/src/dynamic/definition.js';
+import external from '../apps/agent/agent/connections/external.ts';
 import everloot from '../apps/agent/agent/connections/everloot.ts';
 import { filterWebSearch } from '@wisp/agent/model-tools';
 import { namedEntries } from '../node_modules/eve/dist/src/definitions/named.js';
@@ -138,4 +139,35 @@ test('disabled native search is removed from model calls without affecting other
     ['query_character'],
   );
   assert.deepEqual(filtered.toolChoice, { type: 'auto' });
+});
+
+test('custom MCP names with underscores produce legal Eve connection names', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'wisp-external-'));
+  const previous = process.env.WOW_MCP_CONFIG;
+  const flags = process.env.WOW_CAPABILITIES_FILE;
+  try {
+    process.env.WOW_MCP_CONFIG = path.join(directory, 'mcp.json');
+    process.env.WOW_CAPABILITIES_FILE = '';
+    await writeFile(
+      process.env.WOW_MCP_CONFIG,
+      JSON.stringify({ servers: { my_tools: { enabled: true, description: 'Test' } } }),
+    );
+    const connections = await dynamicEvaluate(external)({} as never);
+    assert.ok(connections);
+    assert.deepEqual(Object.keys(connections), ['my-tools']);
+    assert.match(Object.keys(connections)[0], CONNECTION_SLUG_PATTERN);
+    assert.ok(connections['my-tools'].url?.endsWith('/mcp/my_tools'));
+  } finally {
+    if (previous === undefined) {
+      delete process.env.WOW_MCP_CONFIG;
+    } else {
+      process.env.WOW_MCP_CONFIG = previous;
+    }
+    if (flags === undefined) {
+      delete process.env.WOW_CAPABILITIES_FILE;
+    } else {
+      process.env.WOW_CAPABILITIES_FILE = flags;
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
 });

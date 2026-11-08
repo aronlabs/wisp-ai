@@ -20,6 +20,7 @@ export function filterWebSearch(options: CallOptions, enabled: boolean): CallOpt
   const blocked = (options.tools || []).filter(
     (tool) =>
       tool.name === 'web_search' ||
+      tool.name === 'wowhead__web_search' ||
       (tool.type !== 'function' && tool.id.startsWith('openai.web_search')),
   );
   const names = new Set(blocked.map((tool) => tool.name));

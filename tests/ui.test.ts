@@ -136,15 +136,15 @@ C.capabilities = {
         id = "tool:query_character",
         name = "Character readings",
         description = "On-demand readings",
-        group = "tools",
+        group = "integrations",
         enabled = true,
     },
-    { id = "mcp:everloot", name = "Everloot", description = "Database", group = "mcps", enabled = true },
+    { id = "mcp:everloot", name = "Everloot", description = "Database", group = "integrations", enabled = true },
     {
         id = "mcp_tool:everloot:market_value",
         name = "market value",
         description = "Prices",
-        group = "mcps",
+        group = "integrations",
         parent = "mcp:everloot",
         enabled = true,
     },
@@ -184,7 +184,7 @@ assert(
     child
         and child.check:GetChecked()
         and not child.check.enabled
-        and child.state:GetText() == "MCP off",
+        and child.state:GetText() == "Off",
     "turning off an MCP must disable its children without erasing their preferences"
 )
 C.capabilityPending = {}

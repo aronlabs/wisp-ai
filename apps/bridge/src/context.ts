@@ -1,3 +1,4 @@
+import { integrationContext, type CapabilityView } from '@wisp/protocol/capabilities';
 import type { Chat, Message } from './events.ts';
 import { linkedReferences } from '@wisp/protocol/references';
 
@@ -66,10 +67,12 @@ export function turnInput(
   text: string,
   context: unknown,
   chat: Pick<Chat, 'id' | 'title' | 'titleGenerated' | 'lastUIResult' | 'proactive'>,
+  capabilities?: CapabilityView[],
 ) {
   const references = linkedReferences(text);
   return [
     tagged('game_context', basicGameContext(context)),
+    ...(capabilities ? [tagged('integrations_context', integrationContext(capabilities))] : []),
     tagged('conversation_context', {
       id: chat.id,
       title: chat.title,

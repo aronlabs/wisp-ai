@@ -9,6 +9,7 @@
 
 Core.lua
 Transport.lua
+Integrations.lua
 Character.lua
 Locations.lua
 Settings.lua

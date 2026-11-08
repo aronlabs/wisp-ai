@@ -1,3 +1,4 @@
+import type { CapabilityView } from './capabilities.js';
 export interface DesktopInfo {
   wow?: string;
   configured: boolean;
@@ -44,6 +45,7 @@ export interface Status {
     profiles: { id: string; label: string; connected: boolean }[];
   };
   mcps: Mcp[];
+  integrations: CapabilityView[];
   panels: Panel[];
   suggestions: { levelUp: boolean; weapon: boolean };
 }

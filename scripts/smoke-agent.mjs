@@ -21,9 +21,11 @@ const { ChatGPTAuth } = await load('src/chatgpt-auth.ts'),
   { TheWoWDB } = await load('src/thewowdb.ts'),
   { searchWowhead } = await load('src/wowhead-search.ts'),
   { applyEvent } = await load('src/events.ts'),
-  { ReplyProjection } = await load('src/reply-stream.ts');
+  { ReplyProjection } = await load('src/reply-stream.ts'),
+  { turnInput } = await load('src/context.ts');
 const { Client } = await import(pathToFileURL(require.resolve('eve/client')).href);
 const { Simulator } = await load('src/simulation.ts');
+const { CapabilitySettings } = await load('src/capabilities.ts');
 const simulationSnapshot = process.env.WISP_SMOKE_CHARACTER
   ? JSON.parse(await readFile(process.env.WISP_SMOKE_CHARACTER, 'utf8'))
   : undefined;
@@ -53,10 +55,18 @@ const scopedAuth = {
 };
 const { prepareEngine } = await load('src/app-paths.ts');
 await prepareEngine(agent, dir);
-for (const file of ['agent/agent.ts', 'src/agent-rpc.ts', 'agent/tools/query_character.ts']) {
+for (const file of ['agent/agent.ts', 'src/agent-rpc.ts', 'agent/tools/wow__query_character.ts']) {
   const p = path.join(dir, file);
   await writeFile(p, (await readFile(p, 'utf8')).replaceAll('43187', '43197'));
 }
+const capabilities = new CapabilitySettings(path.join(dir, 'capabilities.json'));
+capabilities.agentFile = path.join(dir, 'agent-capabilities.json');
+await capabilities.load();
+await capabilities.set('integration:questie', false);
+if (!simulationSnapshot) {
+  await capabilities.set('integration:wow', false);
+}
+await capabilities.publish();
 const token = randomBytes(32).toString('hex'),
   database = new TheWoWDB(),
   rpc = [];
@@ -128,7 +138,7 @@ const child = spawn(
       WOW_BRIDGE_TOKEN: token,
       WOW_MODEL: model,
       WOW_MCP_CONFIG: '',
-      WOW_CAPABILITIES_FILE: '',
+      WOW_CAPABILITIES_FILE: capabilities.agentFile,
     },
   },
 );
@@ -159,9 +169,12 @@ try {
   const run = async (name, question) => {
     console.log('START ' + name);
     const d = await session.send(
-      '<conversation_context>{"needsTitle":false}</conversation_context>\n<user_message>' +
-        JSON.stringify(question) +
-        '</user_message>',
+      turnInput(
+        question,
+        simulationSnapshot,
+        { id: 'smoke', title: 'Diagnostic', titleGenerated: true },
+        capabilities.snapshot(),
+      ),
     );
     let calls = [];
     const failures = [];
@@ -196,7 +209,7 @@ try {
       'current-level DPS simulation',
       'Compará con simulate_dps, al nivel real del personaje, estas dos rotaciones de 30 segundos a 5 yardas: A) repetir Descarga de Escarcha; B) apertura una vez de Descarga de Escarcha, Nova de Escarcha, Explosión de Fuego y Misiles Arcanos, después usar la varita. Primero consultá mis hechizos para elegir sus rangos aprendidos. Usá 500 iteraciones para ambas y explicá el resultado sin fingir kiteo ni ataques del enemigo.',
     );
-    assert.ok(result.calls.includes('simulate_dps'));
+    assert.ok(result.calls.includes('wowsims__simulate_dps'));
     const call = rpc.findLast((r) => r.endpoint === '/simulate');
     assert.equal(call?.status, 'available');
     assert.equal(call.plans.length, 2);
@@ -212,7 +225,22 @@ try {
       'primary catalog',
       '¿Qué hace Nova de Escarcha (spell 122) en Forever? Usá get_database_entity para verificar el dato en TheWoWDB y citá su fuente. No consultes mi personaje: es una pregunta general.',
     );
-    assert.ok(result.calls.includes('get_database_entity'));
+    assert.ok(result.calls.includes('thewowdb__get_database_entity'));
+    await capabilities.set('integration:thewowdb', false);
+    result = await run(
+      'disabled integration',
+      'Consultá otra vez spell 122 usando TheWoWDB. Si esa integración ya no está habilitada, decímelo y no uses otra fuente ni inventes una consulta.',
+    );
+    assert.ok(
+      !result.calls.some((name) => name?.startsWith('thewowdb__')),
+      'disabled integration removed on an existing Eve session',
+    );
+    await capabilities.set('integration:thewowdb', true);
+    result = await run(
+      're-enabled integration',
+      'Volví a habilitar TheWoWDB. Consultá spell 122 con thewowdb__get_database_entity para verificarlo de nuevo.',
+    );
+    assert.ok(result.calls.includes('thewowdb__get_database_entity'));
     result = await run(
       'Everloot complement',
       'Para verificar la cobertura: buscá Frost Nova con search_knowledge de la conexión everloot-search de Everloot. Descubrí la herramienta con eve__search y ejecutala con eve__tool aunque TheWoWDB ya tenga el hechizo. Informá si hay coincidencias confirmadas para Forever; no guardes nada en memoria.',
@@ -225,7 +253,7 @@ try {
       'Wowhead fallback',
       'Buscá con web_search una guía de leveleo de mago escarcha en Wowhead Forever. Usá esa herramienta de búsqueda aunque haya otras fuentes. Dame 2 consejos con enlaces de esa guía, no de Retail ni Classic.',
     );
-    assert.ok(result.calls.includes('web_search'));
+    assert.ok(result.calls.includes('wowhead__web_search'));
     console.log('START manual compaction');
     const compact = await session.compact();
     for await (const event of compact.stream()) {

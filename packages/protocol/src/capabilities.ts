@@ -1,7 +1,9 @@
 export interface Capability {
   id: string;
   name: string;
-  group: 'tools' | 'mcps' | 'memory';
+  group: 'integrations' | 'memory';
+  kind?: 'game' | 'addon' | 'source' | 'service' | 'mcp';
+  toolName?: string;
   description: string;
   parent?: string;
   defaultEnabled?: boolean;
@@ -33,7 +35,7 @@ export const toolDescriptions: Record<string, [string, string]> = {
   ],
   simulate_dps: [
     'Simulate DPS',
-    'Run the local experimental WoWSims Forever levelsim engine with fresh mage state at levels 1–60. Single-target Frostbolt or Fireball scenarios.',
+    'Run the local experimental WoWSims Forever levelsim engine with fresh mage state at levels 1–60. Supports explicit mage rotations and comparisons.',
   ],
   search_database: [
     'Search Forever database',
@@ -99,18 +101,100 @@ export const toolDescriptions: Record<string, [string, string]> = {
     'Let the assistant generate conversation titles.',
   ],
 };
+
+export const integrations: Capability[] = [
+  {
+    id: 'integration:wow',
+    name: 'World of Warcraft',
+    group: 'integrations',
+    kind: 'game',
+    description: 'Live character readings, references, maps, macros and game settings.',
+  },
+  {
+    id: 'integration:questie',
+    name: 'Questie',
+    group: 'integrations',
+    kind: 'addon',
+    description:
+      'NPC spawn positions, class trainers and city services from QuestieDB Forever. Database positions, not live sightings.',
+  },
+  {
+    id: 'integration:thewowdb',
+    name: 'TheWoWDB',
+    group: 'integrations',
+    kind: 'source',
+    description: 'Primary catalog for Forever items, spells, quests, NPCs and zones.',
+  },
+  {
+    id: 'integration:wowhead',
+    name: 'Wowhead',
+    group: 'integrations',
+    kind: 'source',
+    description: 'Fallback web searches restricted to Forever.',
+  },
+  {
+    id: 'integration:wowsims',
+    name: 'WoWSims Forever',
+    group: 'integrations',
+    kind: 'service',
+    description: 'Local experimental mage DPS simulation for levels 1–60.',
+  },
+  {
+    id: 'integration:wisp',
+    name: 'Wisp',
+    group: 'integrations',
+    kind: 'service',
+    description: 'Conversation titles, persistent panels and optional memory.',
+  },
+];
+export function toolIntegration(name: string): string {
+  if (name === 'find_npc_locations') {
+    return 'questie';
+  }
+  if (['search_database', 'get_database_entity'].includes(name)) {
+    return 'thewowdb';
+  }
+  if (name === 'web_search') {
+    return 'wowhead';
+  }
+  if (name === 'simulate_dps') {
+    return 'wowsims';
+  }
+  if (['manage_panel', 'set_conversation_title'].includes(name)) {
+    return 'wisp';
+  }
+  return 'wow';
+}
+export function publicToolName(name: string): string {
+  return toolIntegration(name) + '__' + name;
+}
+export interface CapabilityView extends Capability {
+  enabled: boolean;
+  effective: boolean;
+  available: boolean;
+  status: string;
+  reason?: string;
+  version?: string;
+}
 export function defaultCapabilities(): Capability[] {
+  const tools = Object.entries(toolDescriptions).map(([name, [label, description]]) => ({
+    id: 'tool:' + name,
+    name: label,
+    group: 'integrations' as const,
+    parent: 'integration:' + toolIntegration(name),
+    toolName: publicToolName(name),
+    description,
+  }));
   return [
-    ...Object.entries(toolDescriptions).map(([name, [label, description]]) => ({
-      id: 'tool:' + name,
-      name: label,
-      group: 'tools' as const,
-      description,
-    })),
+    ...integrations.flatMap((entry) => [
+      entry,
+      ...tools.filter((tool) => tool.parent === entry.id),
+    ]),
     {
       id: 'memory:preferences',
       name: 'Player preferences',
       group: 'memory',
+      parent: 'integration:wisp',
       description:
         'Recall and update saved preferences across characters. Disabling this preserves existing notes.',
     },
@@ -118,22 +202,40 @@ export function defaultCapabilities(): Capability[] {
       id: 'memory:character',
       name: 'Character plans',
       group: 'memory',
+      parent: 'integration:wisp',
       description:
         'Recall and update this character’s guide and goals. Disabling this preserves existing notes.',
     },
     {
       id: 'mcp:everloot',
       name: 'Everloot',
-      group: 'mcps',
+      group: 'integrations',
+      kind: 'mcp',
       description:
-        'Complementary Forever observations and market history. Search version is enforced. https://everloot.app/mcp/public',
+        'Complementary Forever observations and market history. Version filters are enforced.',
     },
     ...everlootTools.map((name) => ({
       id: 'mcp_tool:everloot:' + name,
       name: name.replace(/_/g, ' '),
-      group: 'mcps' as const,
+      toolName: name,
+      group: 'integrations' as const,
       parent: 'mcp:everloot',
       description: 'Everloot tool: ' + name,
     })),
   ];
+}
+
+// Compact, authoritative availability for this turn; never addon descriptions or instructions.
+export function integrationContext(entries: CapabilityView[]) {
+  return entries
+    .filter((entry) => !entry.parent)
+    .map((entry) => ({
+      id: entry.id,
+      enabled: entry.enabled,
+      available: entry.available,
+      status: entry.status,
+      disabledTools: entries
+        .filter((tool) => tool.parent === entry.id && !tool.enabled)
+        .map((tool) => tool.toolName || tool.id),
+    }));
 }

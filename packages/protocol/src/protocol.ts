@@ -21,6 +21,7 @@ export interface Packet {
   key?: string;
   enabled?: boolean;
   heartbeat?: boolean;
+  integrations?: unknown;
   nodeId?: string;
   values?: unknown;
 }

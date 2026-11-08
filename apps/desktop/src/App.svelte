@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
+  import IntegrationCard from "./IntegrationCard.svelte";
   import Icon from "./Icon.svelte";
   import McpDialog from "./McpDialog.svelte";
   import logo from "../../../assets/wisp.png";
@@ -29,7 +30,7 @@
       caption: "Manage the AI connections Wisp can use.",
     },
     {
-      name: "Tools & MCPs",
+      name: "Integrations",
       icon: "tools",
       title: "Give Wisp more to work with.",
       caption:
@@ -225,6 +226,13 @@
         logs = await desktop<string>("read_logs");
       },
       "Local logs loaded.",
+    );
+  }
+  async function setIntegration(id: string, enabled: boolean) {
+    await work(
+      "Updating integration",
+      () => request("/integrations/set", { id, enabled }),
+      "Integration updated.",
     );
   }
   function edit(server: Mcp | null) {
@@ -618,7 +626,7 @@
       <p class="footnote">
         AI providers live here. ChatGPT is the currently supported connection.
       </p>
-    {:else if page === "Tools & MCPs"}
+    {:else if page === "Integrations"}
       <div class="toolbar">
         <p class="muted">{status?.mcps.length || 0} custom connections</p>
         <button
@@ -628,62 +636,51 @@
           ><Icon name="plus" size={17} />Add MCP</button
         >
       </div>
-      {#if !status?.mcps.length}<section class="card empty-state">
-          <Icon name="tools" size={34} />
-          <h2>A little more capability.</h2>
-          <p>
-            Add an MCP endpoint or local process to connect extra tools and
-            data.
-          </p>
-          <button onclick={() => edit(null)} disabled={locked || !status}
-            >Add your first MCP</button
-          >
-        </section>{:else}<div class="connection-list">
-          {#each status.mcps as server (server.name)}<section
-              class="card integration"
-            >
-              <div class="integration-top">
-                <div>
-                  <h2>{server.name}</h2>
-                  <p>{server.description || server.url || server.command}</p>
-                </div>
-                <span class="badge" class:good={server.enabled}
-                  >{server.enabled ? "Enabled" : "Disabled"}</span
-                >
-              </div>
-              <div class="integration-meta">
-                <span>{server.transport.toUpperCase()}</span><span
-                  >{server.tools?.length || 0} tools</span
-                >{#if server.hasToken}<span>Token stored</span>{/if}
-              </div>
+      <div class="connection-list">
+        {#each (status?.integrations || []).filter((entry) => !entry.parent) as entry (entry.id)}
+          <div>
+            <IntegrationCard
+              {entry}
+              tools={(status?.integrations || []).filter(
+                (tool) => tool.parent === entry.id,
+              )}
+              {locked}
+              set={setIntegration}
+            />
+            {#each (status?.mcps || []).filter((server) => entry.id === "mcp:" + server.name) as server (server.name)}
               <div class="actions">
                 <button onclick={() => edit(server)} disabled={locked}
                   >Edit</button
-                ><button
+                >
+                <button
                   onclick={() =>
                     work(
-                      `Testing ${server.name}`,
+                      "Testing " + server.name,
                       async () => {
                         const result = await request<{ count: number }>(
                           "/mcps/test",
                           { server },
                         );
-                        feedback = `Connected. ${result.count} tools available.`;
+                        feedback =
+                          "Connected. " + result.count + " tools available.";
                       },
                       "Connection test completed.",
                     )}
                   disabled={locked}>Test connection</button
-                ><button
+                >
+                <button
                   class="quiet danger"
                   onclick={() => removeMcp(server)}
                   disabled={locked}>Remove</button
                 >
               </div>
-            </section>{/each}
-        </div>{/if}
+            {/each}
+          </div>
+        {/each}
+      </div>
       <p class="footnote">
-        Built-in tools and individual MCP tools can be enabled in WoW → Wisp →
-        Tools & MCPs.
+        Changes apply to new tool calls. Disabling an integration preserves
+        individual tool choices. Addon availability updates when WoW connects.
       </p>
     {:else if page === "Panels"}
       {#if !status?.panels.length}<section class="card empty-state">

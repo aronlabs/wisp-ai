@@ -20,7 +20,7 @@ Suggestions are off by default. Enable level-up or weapon events on the desktop 
 
 ## Controls, privacy and limits
 
-In-game **Settings > Tools & MCPs** controls built-in tools, MCP connections, individual MCP tools and memory slots. Changes affect new calls immediately; running calls may finish. Disabling character queries does not remove the basic identity/location context described below.
+In-game **Settings > Integrations** controls built-in tools, MCP connections, individual MCP tools and memory slots. Changes affect new calls immediately; running calls may finish. Disabling character queries does not remove the basic identity/location context described below.
 
 ### Actions you control
 
@@ -73,3 +73,25 @@ Missing readings and database coverage remain unknown, not zero or proof of abse
 | App remains after closing | Closing hides it in the tray. **Exit Wisp** stops it, but waits for any active turn to finish. |
 
 For an old portable install, choose **Import your previous installation** on first launch. Existing Wisp saves are preserved; renamed addon folders are backed up under `Interface/WispAI-RenameBackup`. Older Codex-adapter installs need Wisp’s own ChatGPT sign-in. Fully restart WoW after migration.
+
+## Integrations
+
+Desktop **Integrations** and WoW **Settings > Integrations** share the same controls.
+Each integration has a master switch and individual capabilities. Disabling a parent
+preserves child preferences. Enabled and available capabilities are projected into
+Eve's dynamic definitions; the bridge enforces the same checks on game/RPC calls.
+
+- **World of Warcraft:** live character, inventory, progression, references, settings, maps and macros.
+- **Questie:** installed QuestieDB Forever NPC locations, with optional Questie trainer/service indexes. Missing, incompatible and partial providers are distinguished. No addon source is modified.
+- **TheWoWDB / Wowhead / Everloot:** primary Forever catalog, scoped fallback search, and complementary MCP observations respectively. Configured network sources are not claimed to be online until a request succeeds.
+- **WoWSims Forever:** the bundled experimental mage simulator.
+- **Wisp:** titles, persistent panels and optional memory.
+- **Custom MCPs:** Add/Edit/Test/Remove plus per-tool switches after discovery.
+
+Local agent tools have public names such as `questie__find_npc_locations` and
+`wow__query_character`. Preference IDs remain internal stable keys. Addon reports
+piggyback on the existing hello/heartbeat; unchanged reports do not publish new
+snapshots. Reports expire after three minutes and reset on reload. Availability is
+kept separate from saved choices. A compact `integrations_context` block tells the
+agent what is unavailable or disabled for the current turn.
+

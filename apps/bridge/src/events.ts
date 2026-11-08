@@ -55,7 +55,7 @@ export function applyEvent(
   }
   if (event.type === 'call.requested') {
     const cap = data.capability as { name?: string; label?: string; kind?: string } | undefined;
-    if (cap?.kind !== 'control' && cap?.name !== 'set_conversation_title') {
+    if (cap?.kind !== 'control' && cap?.name !== 'wisp__set_conversation_title') {
       const activity = {
         id: String(data.callId),
         name: cap?.name || 'tool',

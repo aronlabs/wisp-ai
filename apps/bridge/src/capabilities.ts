@@ -1,7 +1,11 @@
 import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { defaultCapabilities, type Capability } from '@wisp/protocol/capabilities';
+import {
+  defaultCapabilities,
+  type Capability,
+  type CapabilityView,
+} from '@wisp/protocol/capabilities';
 export async function readCapabilityFlags(file?: string): Promise<Record<string, boolean>> {
   if (!file) {
     return {};
@@ -34,18 +38,69 @@ export class CapabilitySettings {
     this.file = file;
     this.catalog = catalog;
   }
-  async load() {
-    this.flags = await readCapabilityFlags(this.file);
-  }
-  enabled(id: string) {
+  agentFile = '';
+  availability = new Map<
+    string,
+    { available: boolean; status: string; reason?: string; version?: string }
+  >();
+  private agentContent = '';
+  configured(id: string) {
     const entry = this.catalog.find((entry) => entry.id === id);
     return this.flags[id] ?? entry?.defaultEnabled ?? true;
   }
-  snapshot() {
+  state(id: string): { available: boolean; status: string; reason?: string; version?: string } {
+    const entry = this.catalog.find((entry) => entry.id === id);
+    return (
+      this.availability.get(id) ||
+      (entry?.parent
+        ? this.state(entry.parent)
+        : {
+            available: true,
+            status: entry?.kind === 'source' || entry?.kind === 'mcp' ? 'configured' : 'ready',
+          })
+    );
+  }
+  async publish() {
+    if (!this.agentFile) {
+      return;
+    }
+    const enabled = Object.fromEntries(
+      this.catalog.map((entry) => [entry.id, this.enabled(entry.id)]),
+    );
+    const content = JSON.stringify({ enabled });
+    const operation = this.queue
+      .catch(() => {})
+      .then(async () => {
+        if (content === this.agentContent) {
+          return;
+        }
+        await mkdir(path.dirname(this.agentFile), { recursive: true });
+        const temp = this.agentFile + '.' + randomUUID() + '.tmp';
+        await writeFile(temp, content);
+        await rename(temp, this.agentFile);
+        this.agentContent = content;
+      });
+    this.queue = operation;
+    await operation;
+  }
+  async load() {
+    this.flags = await readCapabilityFlags(this.file);
+  }
+  enabled(id: string): boolean {
+    const entry = this.catalog.find((entry) => entry.id === id);
+    return (
+      !!entry &&
+      this.configured(id) &&
+      this.state(id).available &&
+      (!entry.parent || this.enabled(entry.parent))
+    );
+  }
+  snapshot(): CapabilityView[] {
     return this.catalog.map((entry) => ({
       ...entry,
-      enabled: this.enabled(entry.id),
-      effective: this.enabled(entry.id) && (!entry.parent || this.enabled(entry.parent)),
+      ...this.state(entry.id),
+      enabled: this.configured(entry.id),
+      effective: this.enabled(entry.id),
     }));
   }
   async set(id: string, enabled: boolean) {
@@ -64,5 +119,6 @@ export class CapabilitySettings {
       });
     this.queue = operation;
     await operation;
+    await this.publish();
   }
 }

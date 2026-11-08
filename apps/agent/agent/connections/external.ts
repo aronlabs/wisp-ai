@@ -27,7 +27,7 @@ export default defineDynamic(async () => {
     const blocked = Object.keys(flags)
       .filter((key) => key.startsWith(prefix) && flags[key] === false)
       .map((key) => key.slice(prefix.length));
-    connections[name] = defineMcpClientConnection({
+    connections[name.replace(/_/g, '-')] = defineMcpClientConnection({
       url: 'http://127.0.0.1:43187/mcp/' + name,
       description: server.description || name,
       tools: { block: blocked },
