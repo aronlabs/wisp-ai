@@ -7,7 +7,7 @@ import { CapabilitySettings } from '@wisp/bridge/capabilities';
 import { IntegrationState } from '../apps/bridge/src/integration-state.ts';
 import { integrationContext, defaultCapabilities } from '@wisp/protocol/capabilities';
 import { enabledTool } from '@wisp/agent/enabled-tool';
-import { dynamicEvaluate } from '../node_modules/eve/dist/src/dynamic/definition.js';
+import { dynamicEvaluate } from './node_modules/eve/dist/src/dynamic/definition.js';
 
 test('integration availability and master switches govern real Eve definitions and backend admission, preserving preferences', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'wisp-integrations-'));

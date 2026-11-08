@@ -1,0 +1,24 @@
+{
+  "name": "@wisp/tests",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "cd .. && vitest run --config tests/vitest.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@ai-sdk/openai": "4.0.110",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@types/node": "24.19.2",
+    "@wisp/agent": "workspace:*",
+    "@wisp/bridge": "workspace:*",
+    "@wisp/protocol": "workspace:*",
+    "ai": "7.0.164",
+    "eve": "1.0.0-rc.6",
+    "jose": "6.2.15",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0",
+    "zod": "4.6.7"
+  }
+}

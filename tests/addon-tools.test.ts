@@ -5,7 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { CapabilitySettings } from '@wisp/bridge/capabilities';
 import { IntegrationState } from '../apps/bridge/src/integration-state.ts';
-import { dynamicEvaluate } from '../node_modules/eve/dist/src/dynamic/definition.js';
+import { dynamicEvaluate } from './node_modules/eve/dist/src/dynamic/definition.js';
 import quest from '../apps/agent/agent/tools/questie__get_quest.ts';
 import chain from '../apps/agent/agent/tools/questie__get_quest_chain.ts';
 import object from '../apps/agent/agent/tools/questie__find_object_locations.ts';

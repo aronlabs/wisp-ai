@@ -1,0 +1,56 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "globalDependencies": ["tsconfig.base.json"],
+  "futureFlags": { "pruneIncludesGlobalFiles": true },
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "!.next/dev/**"],
+      "env": ["NEXT_PUBLIC_*", "VERCEL_ENV", "VERCEL", "VERCEL_URL", "VITE_*", "CI"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@wisp/web#typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/types/**", "next-env.d.ts"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": ["*"]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["*"]
+    },
+    "start": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["*"]
+    },
+    "stage": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": ["*"]
+    },
+    "dev:native": {
+      "dependsOn": ["stage"],
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["*"]
+    },
+    "package:windows": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["*"]
+    },
+    "//#typecheck:root": { "outputs": [] },
+    "//#lint": { "cache": false },
+    "//#format:check": { "cache": false }
+  }
+}

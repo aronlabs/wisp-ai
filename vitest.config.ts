@@ -16,11 +16,7 @@ export default defineConfig({
     },
   },
   test: {
-    projects: [
-      { test: { name: 'core', environment: 'node', include: ['tests/**/*.test.ts'] } },
-      { test: { name: 'addon', environment: 'node', include: ['addon/tests/**/*.test.ts'] } },
-      'apps/desktop/vitest.config.ts',
-    ],
+    projects: ['tests/vitest.config.ts', 'addon/vitest.config.ts', 'apps/desktop/vitest.config.ts'],
     watchTriggerPatterns: [
       {
         pattern: /(?:^|\/)addon\/(?:WispAI\/.*|tests\/.*)\.lua$/,

@@ -13,13 +13,25 @@ pnpm check
 pnpm test
 ```
 
-`build` compiles the protocol and desktop frontend, not the native host, simulator or installer. `check` runs formatting, lint and type checks; `pnpm test` runs all TypeScript tests with Vitest (core, addon and desktop UI). Simulator engine tests require its binary—offline input tests alone do not validate the engine.
+`build` runs workspace builds through Turborepo, including the protocol, agent,
+desktop frontend and website. It does not build the native host, simulator or
+installer. `check` runs formatting, lint and type checks; `pnpm test` runs all
+TypeScript tests with Vitest (core, addon and desktop UI). Simulator engine tests
+require its binary—offline input tests alone do not validate the engine.
 
-Use the root entry points on a fresh checkout: `pnpm ui:build` builds the desktop
-and its protocol dependency in order; `pnpm typecheck` first builds the agent
-and protocol exports. Those packages expose generated files in `dist`, so checks
-must not rely on a previous local build. The web deployment installs independently
-with its own lockfile and configuration in `apps/web`; see its README.
+Turborepo resolves prerequisites from the declared workspace dependencies and
+`turbo.json`. Builds and type checks depend on dependency builds (`^build`), so a
+fresh checkout works without manually compiling protocol or agent first. Generated
+`dist` and Next outputs are cached; tests, development servers, resource staging
+and native packaging are not. Runtime tasks preserve their environment; cached
+builds hash the declared build variables. GitHub Actions persists `.turbo` by OS.
+
+The repository uses one pnpm lockfile. Root dependencies are shared development
+tools. Core tests, addon tests and build scripts declare their own dependencies in
+`tests`, `addon` and `scripts`. Optional native archive codecs from just-bash are
+excluded explicitly, following Eve's own optional-engine setup; installs do not
+need `--ignore-scripts`. The web deploy uses a filtered install and Turbo build;
+`turbo prune @wisp/web` can export an isolated web workspace from the same lockfile.
 
 ## Tests
 
@@ -33,8 +45,10 @@ Vitest projects keep each environment separate:
 | `pnpm test:ui`    | Svelte components in `apps/desktop/src/` (jsdom + Testing Library)   |
 | `pnpm test:watch` | Watch all projects; Lua source and fixture changes rerun addon tests |
 
-Filter tests with `pnpm test --project addon` or `pnpm test:watch --project core`.
-The test commands build the shared protocol first. Existing schema assertions in addon tests
+Use `pnpm test:addon`, `pnpm test:core` or `pnpm test:ui` for a suite. For a file,
+run `pnpm exec turbo run test --filter=@wisp/tests -- tests/routines.test.ts`.
+`pnpm test:watch` watches the task graph and rebuilds dependencies before rerunning tests.
+Existing schema assertions in addon tests
 also verify the TypeScript contracts consumed by Lua. Native Rust tests remain on Cargo;
 see the CI workflow for their build prerequisites and command. Simulator and native-helper
 tests keep their existing skips when the required binaries are absent.

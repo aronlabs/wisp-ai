@@ -7,14 +7,14 @@ import { CapabilitySettings } from '@wisp/bridge/capabilities';
 import { capabilityEnabled, connectionTools } from '@wisp/agent/capabilities';
 import { enabledTool } from '@wisp/agent/enabled-tool';
 import { localMemory } from '@wisp/agent/agent-memory';
-import { dynamicEvaluate } from '../node_modules/eve/dist/src/dynamic/definition.js';
+import { dynamicEvaluate } from './node_modules/eve/dist/src/dynamic/definition.js';
 import external from '../apps/agent/agent/connections/external.ts';
 import everloot from '../apps/agent/agent/connections/everloot.ts';
 import { filterWebSearch } from '@wisp/agent/model-tools';
-import { namedEntries } from '../node_modules/eve/dist/src/definitions/named.js';
-import { CONNECTION_SLUG_PATTERN } from '../node_modules/eve/dist/src/discover/grammar.js';
-import { readStampedConnectionProtocol } from '../node_modules/eve/dist/src/public/definitions/connections/protocol.js';
-import { resolveDynamicConnectionValue } from '../node_modules/eve/dist/src/runtime/resolve-connection.js';
+import { namedEntries } from './node_modules/eve/dist/src/definitions/named.js';
+import { CONNECTION_SLUG_PATTERN } from './node_modules/eve/dist/src/discover/grammar.js';
+import { readStampedConnectionProtocol } from './node_modules/eve/dist/src/public/definitions/connections/protocol.js';
+import { resolveDynamicConnectionValue } from './node_modules/eve/dist/src/runtime/resolve-connection.js';
 
 test('settings persist, filter real tool/MCP definitions, and preserve child settings when an MCP is off', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'wow-wisp-capabilities-'));

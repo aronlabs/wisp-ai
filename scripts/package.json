@@ -1,0 +1,18 @@
+{
+  "name": "@wisp/scripts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.19.2",
+    "@wisp/agent": "workspace:*",
+    "@wisp/bridge": "workspace:*",
+    "@wisp/protocol": "workspace:*",
+    "eve": "1.0.0-rc.6",
+    "typescript": "5.9.3"
+  }
+}

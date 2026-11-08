@@ -18,18 +18,22 @@ Open http://127.0.0.1:3000. Production check: `pnpm web:build`.
 
 1. Import this GitHub repository into Vercel.
 2. Set **Root Directory** to `apps/web` and framework to **Next.js**.
-3. Keep the output defaults. The checked-in `vercel.json` installs the web as
-   an independent project with `pnpm install --ignore-workspace --frozen-lockfile`
-   and builds Next directly. The deployment uses `apps/web/pnpm-lock.yaml`,
-   without installing the root, agent, bridge or desktop packages. No access to
-   workspace files outside `apps/web` is needed for this deployment.
-   Do not override installation with plain `pnpm install`: that includes unrelated
-   workspace dependencies and their native build scripts.
+3. Keep the output defaults and enable access to files outside the root directory.
+   The checked-in `vercel.json` installs with `pnpm --filter @wisp/web... install
+   --frozen-lockfile` and builds with `pnpm exec turbo run build --filter=@wisp/web`.
+   There is one shared lockfile at the repository root. Root dependencies are
+   repository tools only; agent, bridge, addon and test dependencies belong to their
+   own workspaces and are not installed by the web deployment. Do not override
+   installation with an unfiltered `pnpm install`.
 4. Add `wisp.fedeya.sh` in the project's Domains settings and apply the DNS record
    Vercel provides.
 
 No environment variables are required. Optionally set `NEXT_PUBLIC_INSTALL_URL`
 to a public installer asset URL and redeploy for direct downloads.
+
+For an isolated workspace export, run `pnpm exec turbo prune @wisp/web
+--out-dir=.vercel-workspace` from the repository root. Turbo generates the reduced
+workspace and lockfile from the shared graph; do not maintain a second lockfile.
 
 ## Launch configuration
 

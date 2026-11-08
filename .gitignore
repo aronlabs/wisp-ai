@@ -36,3 +36,7 @@ apps/desktop/src-tauri/icons/*
 
 # Generated agent server output
 **/.output/
+
+# Turborepo task cache and generated deployment workspace
+.turbo/
+.vercel-workspace/
