@@ -48,13 +48,13 @@ Replace the example with the folder containing `Wow.exe`. Installation updates `
 
 ## Source map
 
-| Area | Entry points |
-| --- | --- |
-| Desktop UI and native host | [Svelte](../apps/desktop/src), [Tauri, vault and installer](../apps/desktop/src-tauri) |
-| Bridge and agent process | [main.ts](../apps/bridge/src/main.ts), [agent-process.ts](../apps/bridge/src/agent-process.ts) |
-| Agent tools and behavior | [definitions](../apps/agent/agent), [instructions](../apps/agent/agent/instructions.md) |
-| Shared contracts | [protocol](../packages/protocol/src) |
-| Game UI, readings and actions | [addon](../addon/WispAI) |
+| Area                          | Entry points                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| Desktop UI and native host    | [Svelte](../apps/desktop/src), [Tauri, vault and installer](../apps/desktop/src-tauri)         |
+| Bridge and agent process      | [main.ts](../apps/bridge/src/main.ts), [agent-process.ts](../apps/bridge/src/agent-process.ts) |
+| Agent tools and behavior      | [definitions](../apps/agent/agent), [instructions](../apps/agent/agent/instructions.md)        |
+| Shared contracts              | [protocol](../packages/protocol/src)                                                           |
+| Game UI, readings and actions | [addon](../addon/WispAI)                                                                       |
 
 The bridge owns accounts, persistence and tool execution. Eve runs on loopback **43186**; the separate RPC/model endpoint on **43187** uses an ephemeral agent token. Credential and data boundaries are documented under [privacy](usage.md#what-leaves-your-computer).
 
@@ -73,4 +73,3 @@ implement its adapter and readiness checks, register live detection in
 `addon/WispAI/Integrations.lua` / `apps/bridge/src/integration-state.ts`, and test
 missing/incompatible providers and disabled-tool admission. Integrations supply
 tools; reply panels and automatic suggestions remain separate features.
-

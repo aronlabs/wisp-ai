@@ -33,8 +33,14 @@ function C.IntegrationReport()
             end
         end
     end
+    local clientVersion, clientBuild
+    if GetBuildInfo then
+        clientVersion, clientBuild = GetBuildInfo()
+    end
     return {
-        version = version("WispAI"),
+        version = (tostring(clientVersion or "unknown") .. " (" .. tostring(
+            clientBuild or "unknown"
+        ) .. ")"):sub(1, 80),
         questie = {
             status = status,
             version = db and version("QuestieDB") or nil,

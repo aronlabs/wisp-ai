@@ -24,11 +24,11 @@ In-game **Settings > Integrations** controls built-in tools, MCP connections, in
 
 ### Actions you control
 
-| Action | What to expect |
-| --- | --- |
-| Map pins | Requested pins use validated maps/coordinates and verified placement. Undo preserves pins you changed yourself. |
-| Macros | New macros only, outside combat. Inspect the code and place it yourself; Wisp cannot overwrite, run or assign it to a bar. Script, console, click and chat commands are excluded. |
-| Settings | Supported CVars and registered AceConfig options offer a preview. Use **Apply** or explicitly ask to apply it; **Undo** preserves later player edits. |
+| Action   | What to expect                                                                                                                                                                    |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Map pins | Requested pins use validated maps/coordinates and verified placement. Undo preserves pins you changed yourself.                                                                   |
+| Macros   | New macros only, outside combat. Inspect the code and place it yourself; Wisp cannot overwrite, run or assign it to a bar. Script, console, click and chat commands are excluded. |
+| Settings | Supported CVars and registered AceConfig options offer a preview. Use **Apply** or explicitly ask to apply it; **Undo** preserves later player edits.                             |
 
 Settings application checks combat, character identity and stale values, then reads back the result. Failures attempt rollback and report incomplete restoration; the last 30 proposals retain previous values locally. Action bars and keybindings are read-only. Unsupported addon options require an integration, not edits to another addon’s source.
 
@@ -44,13 +44,13 @@ The bridge holds the ChatGPT grant and proxies model requests with `store: false
 
 Installed Windows data lives in `%APPDATA%/com.wisp.ai`, separate from application resources. Source runs default to the repository root; `WISP_DATA_DIR` overrides it.
 
-| Data | Path relative to the data root |
-| --- | --- |
-| Configuration | `config.local.json` |
-| Conversations | `runtime/chats.json` |
-| Shared preferences and character plans | `runtime/memory/` |
-| Tool choices / custom MCP metadata | `runtime/capabilities.json` / `runtime/mcp.json` |
-| Agent log | `runtime/eve.log` |
+| Data                                   | Path relative to the data root                   |
+| -------------------------------------- | ------------------------------------------------ |
+| Configuration                          | `config.local.json`                              |
+| Conversations                          | `runtime/chats.json`                             |
+| Shared preferences and character plans | `runtime/memory/`                                |
+| Tool choices / custom MCP metadata     | `runtime/capabilities.json` / `runtime/mcp.json` |
+| Agent log                              | `runtime/eve.log`                                |
 
 WoW stores UI preferences and drafts in the `WispAIDB` SavedVariables. Logs may contain conversations and tool data: redact them before sharing, and never share credential stores, tokens or private configuration.
 
@@ -64,13 +64,13 @@ Missing readings and database coverage remain unknown, not zero or proof of abse
 
 ## Troubleshooting
 
-| Symptom | Try this |
-| --- | --- |
-| Addon missing | Select the folder containing `Wow.exe`, install/update from **Overview**, fully restart WoW, and enable Wisp AI and its helpers. |
-| Disconnected or replies stop | Keep the desktop app running. Check **Diagnostics** and `/wisp diag`; use `/wisp reconnect` for a fresh handshake or `/reload` to renew receive channels. Large payloads take several seconds. Significant game updates may change file-loading behavior. |
-| Sign-in or models unavailable | Finish browser authorization in **Connections** and refresh the model list. Expired access, identity-only consent or an ambiguous token refresh may require signing in again. |
-| Tool unavailable | Check in-game tool toggles and required windows; missing APIs or source coverage can also prevent a result. |
-| App remains after closing | Closing hides it in the tray. **Exit Wisp** stops it, but waits for any active turn to finish. |
+| Symptom                       | Try this                                                                                                                                                                                                                                                  |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Addon missing                 | Select the folder containing `Wow.exe`, install/update from **Overview**, fully restart WoW, and enable Wisp AI and its helpers.                                                                                                                          |
+| Disconnected or replies stop  | Keep the desktop app running. Check **Diagnostics** and `/wisp diag`; use `/wisp reconnect` for a fresh handshake or `/reload` to renew receive channels. Large payloads take several seconds. Significant game updates may change file-loading behavior. |
+| Sign-in or models unavailable | Finish browser authorization in **Connections** and refresh the model list. Expired access, identity-only consent or an ambiguous token refresh may require signing in again.                                                                             |
+| Tool unavailable              | Check in-game tool toggles and required windows; missing APIs or source coverage can also prevent a result.                                                                                                                                               |
+| App remains after closing     | Closing hides it in the tray. **Exit Wisp** stops it, but waits for any active turn to finish.                                                                                                                                                            |
 
 For an old portable install, choose **Import your previous installation** on first launch. Existing Wisp saves are preserved; renamed addon folders are backed up under `Interface/WispAI-RenameBackup`. Older Codex-adapter installs need Wisp’s own ChatGPT sign-in. Fully restart WoW after migration.
 
@@ -94,4 +94,3 @@ piggyback on the existing hello/heartbeat; unchanged reports do not publish new
 snapshots. Reports expire after three minutes and reset on reload. Availability is
 kept separate from saved choices. A compact `integrations_context` block tells the
 agent what is unavailable or disabled for the current turn.
-
