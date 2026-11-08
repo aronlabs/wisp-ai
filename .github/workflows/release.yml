@@ -9,6 +9,7 @@ jobs:
   validate:
     permissions:
       contents: read
+      actions: read
     uses: ./.github/workflows/check.yml
   windows:
     needs: validate
