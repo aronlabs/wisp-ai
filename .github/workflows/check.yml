@@ -1,22 +1,125 @@
-name: Code quality
+name: CI
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_run:
+    workflows: ['Windows release']
+    types: [completed]
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.event.workflow_run.id || github.ref }}
+  cancel-in-progress: true
 jobs:
-  check:
+  format:
+    if: github.event_name != 'workflow_run'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm format:check
+  lint:
+    if: github.event_name != 'workflow_run'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm lint
+  types:
+    if: github.event_name != 'workflow_run'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm --filter @wisp/protocol build
+      - run: pnpm typecheck
+  unit-tests:
+    if: github.event_name != 'workflow_run'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache: false
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/AppData/Local/go-build
+            node_modules/.cache/wowsims-levelsim
+          key: wowsims-windows-go125-7f9c0e7
+      - run: choco install protoc --yes --no-progress
+      - run: ./scripts/build-simulator.ps1
+        shell: pwsh
+      - run: pnpm test
+  ui-tests:
+    if: github.event_name != 'workflow_run'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm ui:build
+      - run: pnpm test:ui
+  native-tests:
+    if: github.event_name != 'workflow_run'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm ui:build
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+          cache-on-failure: true
+      - name: Prepare native unit-test resource directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Path apps/desktop/src-tauri/resources/payload -Force | Out-Null
+      - run: cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - run: cargo test --locked --features tauri/custom-protocol --manifest-path apps/desktop/src-tauri/Cargo.toml
+  installer-tests:
+    # Release artifacts are executable code. Only consume successful builds
+    # originating in this repository, never an artifact supplied by a fork PR.
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      # The verified release can predate the local composite action itself.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.1'
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm check
-      - run: pnpm ui:build
-      - run: pnpm test:ui
-      - run: pnpm test
+      - uses: actions/download-artifact@v4
+        with:
+          name: Wisp-windows-x64
+          path: work/release-artifact
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Verify installed application and upgrades
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          $installers = @(Get-ChildItem work/release-artifact -Recurse -Filter '*-setup.exe')
+          if ($installers.Count -ne 1) { throw 'Expected one release installer.' }
+          node scripts/verify-installer.ts $installers[0].FullName
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Windows-installer-test-report
+          path: dist/installer-smoke.json
+          if-no-files-found: ignore

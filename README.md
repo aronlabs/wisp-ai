@@ -121,7 +121,7 @@ as dismissible Read notifications; opening one promotes it into a conversation.
 
 The desktop shell uses Tauri 2 and Svelte, with the existing Node/Eve bridge packaged as application resources. The frontend talks to a small allowlisted native command layer; bridge tokens and credentials are never sent to the webview. Closing the window keeps Wisp in the system tray. Exit from the tray stops the bridge first and refuses to interrupt an active turn.
 
-Build a Windows NSIS installer with `pnpm build:desktop` (requires Rust, Windows C++ build tools, Node 24.22.1+, pnpm, and a built simulator). The build stages production dependencies and bundled Node/npm without user data, then writes the installer and SHA-256 checksum under `dist/`. Installation is per user; updates replace app resources while preserving application data. The release workflow compiles the pinned simulator, builds the installer, tests protected credential storage and launches the installed bridge without a global Node installation. Tag builds create a draft GitHub release. Installers are currently unsigned.
+Build a Windows NSIS installer with `pnpm build:desktop` (requires Rust, Windows C++ build tools, Node 24.22.1+, pnpm, and a built simulator). The build stages production dependencies and bundled Node/npm without user data, then writes the installer and SHA-256 checksum under `dist/`. Installation is per user; updates replace app resources while preserving application data. The release workflow only compiles the pinned simulator, builds the application and packages the installer. CI runs formatting, lint, type checks, backend/UI tests and native Rust tests as separate jobs. After a successful release build, a CI installer job downloads that exact artifact and tests protected credential storage, bridge startup without a global Node installation, resource replacement and user-data retention. Tag builds create a draft GitHub release. Installers are currently unsigned.
 
 Windows is the currently tested distribution target. The shell and credential interface have macOS implementations, but a macOS release still requires simulator packaging, game-client validation and signing/notarization on a Mac.
 
@@ -292,7 +292,7 @@ All configurations live in the repo. `pnpm exec oxlint --fix apps packages scrip
 `pnpm test` runs the regression suite. Both PRs and pushes to main run these checks.
 
 Development uses Node 24. The desktop installer build also requires Rust and the Windows C++ build tools. Svelte files use Prettier; TypeScript uses Oxfmt/Oxlint.
-The bridge entry point is `apps/bridge/src/main.ts`; Eve process management lives in `apps/bridge/src/agent-process.ts`. The Svelte UI lives in `apps/desktop/src/`, and the native supervisor, installer configuration and protected credentials live in `apps/desktop/src-tauri/`. `pnpm test:ui` exercises desktop workflows; the installer workflow also runs Rust tests and a fresh-install smoke test.
+The bridge entry point is `apps/bridge/src/main.ts`; Eve process management lives in `apps/bridge/src/agent-process.ts`. The Svelte UI lives in `apps/desktop/src/`, and the native supervisor, installer configuration and protected credentials live in `apps/desktop/src-tauri/`. `pnpm test:ui` exercises desktop workflows; CI also runs Rust tests and a fresh-install/upgrade smoke test against the release artifact.
 
 ## Forever knowledge sources
 
