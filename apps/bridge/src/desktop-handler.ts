@@ -1,6 +1,8 @@
 import { desktopInputs } from '@wisp/protocol/desktop-inputs';
 import type { Status } from '@wisp/protocol/desktop';
 import { mcpSetup, type McpManager } from './mcp-manager.ts';
+import type { ModelConnections } from './model-connections.ts';
+import type { WebSearch } from './web-search.ts';
 import type { ChatGPTAuth } from './chatgpt-auth.ts';
 import type { CapabilitySettings } from './capabilities.ts';
 import type { PanelStore } from './panels.ts';
@@ -15,6 +17,8 @@ export interface PanelCommand {
 }
 interface DesktopDependencies {
   auth: ChatGPTAuth;
+  connections: ModelConnections;
+  webSearch: WebSearch;
   capabilitySettings: CapabilitySettings;
   mcpManager: McpManager;
   panelStore: PanelStore;
@@ -35,6 +39,8 @@ interface DesktopDependencies {
 export function createDesktopHandler(deps: DesktopDependencies) {
   const {
     auth,
+    connections,
+    webSearch,
     capabilitySettings,
     mcpManager,
     panelStore,
@@ -54,6 +60,37 @@ export function createDesktopHandler(deps: DesktopDependencies) {
   } = deps;
   const chatFor = (id: string) => getChats().find((chat) => chat.id === id);
   return async (method: string, url: string, raw: unknown) => {
+    if (method === 'POST' && ['/search/save', '/search/test', '/search/remove-exa'].includes(url)) {
+      return accountOperation(async () => {
+        if (url === '/search/save') {
+          return webSearch.save(raw);
+        }
+        if (url === '/search/test') {
+          return webSearch.test(raw);
+        }
+        desktopInputs['/search/remove-exa'].parse(raw);
+        return webSearch.removeExa();
+      });
+    }
+    if (method === 'POST' && url.startsWith('/connections/')) {
+      return accountOperation(async () => {
+        if (url === '/connections/save') {
+          return connections.save(raw);
+        }
+        if (url === '/connections/test') {
+          return connections.test(raw);
+        }
+        if (url === '/connections/discover') {
+          return connections.discover(raw);
+        }
+        if (url === '/connections/remove') {
+          const { id } = desktopInputs['/connections/remove'].parse(raw);
+          await connections.remove(id);
+          return { ok: true };
+        }
+        throw Error('Unknown connection operation.');
+      });
+    }
     if (method === 'POST' && url === '/simulator/character') {
       return readSimulationCharacter();
     }
@@ -78,16 +115,13 @@ export function createDesktopHandler(deps: DesktopDependencies) {
       return accountOperation(() => auth.select(data.profileId));
     }
     if (method === 'GET' && url === '/auth/models') {
-      return accountOperation(async () => ({ models: await auth.models() }));
+      return accountOperation(async () => ({ models: await connections.models() }));
     }
     if (method === 'POST' && url === '/auth/model') {
       const data = desktopInputs['/auth/model'].parse(raw);
       return accountOperation(async () => {
-        if (auth.pending) {
-          throw Error('Finish sign-in first.');
-        }
         const model = data.model;
-        if (!(await auth.models()).some((m) => m.slug === model)) {
+        if (!(await connections.models()).some((m) => m.slug === model)) {
           throw Error('Choose an available model.');
         }
         await updateModel(model);

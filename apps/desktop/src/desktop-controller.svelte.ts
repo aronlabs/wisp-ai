@@ -24,7 +24,7 @@ export function createDesktopController() {
       name: 'Connections',
       icon: 'link',
       title: 'AI connections',
-      caption: 'Connect an AI provider and choose the default model.',
+      caption: 'Connect AI providers and choose your default model.',
     },
     {
       name: 'Integrations',
@@ -70,6 +70,7 @@ export function createDesktopController() {
   let loading = $state(true);
   let starting = $state(false);
   let busy = $state('');
+  let busyTarget = $state('');
   let feedback = $state('');
   let failed = $state(false);
   let wow = $state('');
@@ -84,7 +85,7 @@ export function createDesktopController() {
   let polling = false;
   let connectionError = $state('');
   let modelsError = $state('');
-  const connected = $derived(status?.auth.status === 'connected');
+  const connected = $derived(status?.modelConnected ?? status?.auth.status === 'connected');
   const active = $derived((status?.activeTurns || 0) > 0);
   const locked = $derived(!!busy || active);
   async function refresh() {
@@ -105,13 +106,14 @@ export function createDesktopController() {
       if (!model) {
         model = next.model;
       }
-      if (
-        next.auth.status === 'connected' &&
-        next.auth.activeId !== loadedAccount &&
-        !active &&
-        !busy
-      ) {
-        loadedAccount = next.auth.activeId || '';
+      const catalogRevision = JSON.stringify([
+        next.auth.activeId,
+        next.auth.status,
+        next.auth.revision,
+        next.connections,
+      ]);
+      if (catalogRevision !== loadedAccount && !active && !busy) {
+        loadedAccount = catalogRevision;
         try {
           await loadModels();
         } catch (error) {
@@ -127,10 +129,16 @@ export function createDesktopController() {
       polling = false;
     }
   }
-  async function work(label: string, action: () => Promise<unknown>, success?: string) {
+  async function work(
+    label: string,
+    action: () => Promise<unknown>,
+    success?: string,
+    target = '',
+  ) {
     if (busy) {
       return;
     }
+    busyTarget = target;
     busy = label;
     failed = false;
     feedback = '';
@@ -142,6 +150,7 @@ export function createDesktopController() {
       feedback = String(e).replace(/^Error: /, '');
     } finally {
       busy = '';
+      busyTarget = '';
       await refresh();
     }
   }
@@ -198,6 +207,7 @@ export function createDesktopController() {
         await launchBridge();
       },
       'Addon installed. Restart WoW after the first installation; use /reload for updates.',
+      'installation',
     );
   }
   async function importPrevious() {
@@ -231,6 +241,7 @@ export function createDesktopController() {
       'Updating integration',
       () => request('/integrations/set', { id, enabled }),
       'Integration updated.',
+      id,
     );
   }
   function edit(server: Mcp | null) {
@@ -247,6 +258,7 @@ export function createDesktopController() {
           characterKey: panel.characterKey,
         }),
       'Panel updated.',
+      panel.id,
     );
   }
   function removeMcp(server: Mcp) {
@@ -257,6 +269,7 @@ export function createDesktopController() {
           'Removing connection',
           () => request('/mcps/remove', { name: server.name }),
           'Connection removed.',
+          'mcp:' + server.name,
         ),
     };
   }
@@ -350,6 +363,9 @@ export function createDesktopController() {
     },
     set starting(value: typeof starting) {
       starting = value;
+    },
+    get busyTarget() {
+      return busyTarget;
     },
     get busy() {
       return busy;

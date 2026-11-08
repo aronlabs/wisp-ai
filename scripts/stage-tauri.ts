@@ -20,6 +20,7 @@ export async function stageTauri() {
     '@wisp/bridge',
     '--prod',
     'deploy',
+    '--legacy',
     '--ignore-scripts',
     '--config.node-linker=hoisted',
     stage,
@@ -44,7 +45,12 @@ export async function stageTauri() {
   // npm remains available for user-configured npx MCP servers. It is not used
   // to install Wisp or to assemble its dependency graph.
   let npmDirectory = '';
-  for (const relative of ['npm', 'node_modules/npm', '../lib/node_modules/npm']) {
+  for (const relative of [
+    'npm',
+    'node_modules/npm',
+    '../node_modules/npm',
+    '../lib/node_modules/npm',
+  ]) {
     const candidate = path.resolve(path.dirname(process.execPath), relative);
     try {
       await access(path.join(candidate, 'bin/npx-cli.js'));

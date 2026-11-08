@@ -7,11 +7,11 @@ import { turnInput, characterIdentity } from './context.ts';
 import { chooseChatModel } from './chat-model.ts';
 import { safeErrorMessage } from '@wisp/protocol/model-errors';
 import type { CapabilitySettings } from './capabilities.ts';
-import type { ChatGPTAuth } from './chatgpt-auth.ts';
+import type { ModelCatalog } from './model-connections.ts';
 
 interface TurnDependencies {
   client: Pick<Client, 'sessions'>;
-  auth: Pick<ChatGPTAuth, 'accessToken' | 'models' | 'pending'>;
+  models: ModelCatalog;
   capabilitySettings: Pick<CapabilitySettings, 'publish' | 'enabled' | 'snapshot'>;
   currentTransport: () => string;
   activeChat: () => string;
@@ -26,7 +26,7 @@ interface TurnDependencies {
 export function createTurnRunner(deps: TurnDependencies) {
   const {
     client,
-    auth,
+    models,
     capabilitySettings,
     currentTransport,
     activeChat,
@@ -76,11 +76,12 @@ export function createTurnRunner(deps: TurnDependencies) {
       if (!isReady()) {
         throw new Error('Eve is still starting. Please try again in a few seconds.');
       }
-      if (accountBusy() || auth.pending) {
-        throw Error('Finish the ChatGPT account operation first.');
+      if (accountBusy()) {
+        throw Error('Finish the connection operation first.');
       }
-      await auth.accessToken();
-      const available = await auth.models();
+      const chosenModel = chat.modelSettings?.model || defaultModel();
+      await models.prepare(chosenModel);
+      const available = await models.models();
       assertCurrent();
       chat.modelSettings = chooseChatModel(
         available,

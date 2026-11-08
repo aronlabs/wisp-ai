@@ -1,17 +1,60 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, realpath, rm, cp, symlink } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { appPaths, prepareEngine } from '@wisp/bridge/app-paths';
 import { migrateDesktop } from '@wisp/bridge/desktop-migration';
 import { createHash } from 'node:crypto';
+
+test('the installed bridge can import native adapters from node_modules without TypeScript stripping', async () => {
+  const temporary = await mkdtemp(path.join(tmpdir(), 'wisp-native-import-'));
+  try {
+    const source = appPaths(process.cwd()).agent;
+    const installed = path.join(temporary, 'node_modules/@wisp/agent');
+    await mkdir(installed, { recursive: true });
+    await cp(path.join(source, 'dist'), path.join(installed, 'dist'), { recursive: true });
+    await cp(path.join(source, 'package.json'), path.join(installed, 'package.json'));
+    const manifest = JSON.parse(await readFile(path.join(source, 'package.json'), 'utf8'));
+    for (const name of Object.keys(manifest.dependencies)) {
+      const link = path.join(temporary, 'node_modules', name);
+      await mkdir(path.dirname(link), { recursive: true });
+      await symlink(
+        await realpath(path.join(source, 'node_modules', name)),
+        link,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+    }
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+      import {modelReasoningEfforts} from '@wisp/agent/reasoning';
+      import {createProviderModel} from '@wisp/agent/providers';
+      const model = createProviderModel('anthropic', 'claude-sonnet-4-6', {apiKey:'unused', baseURL:'http://127.0.0.1:1'});
+      console.log(JSON.stringify({version:model.specificationVersion, efforts:modelReasoningEfforts('anthropic','claude-sonnet-4-6')}));
+    `,
+      ],
+      { cwd: temporary, windowsHide: true },
+    );
+    assert.deepEqual(JSON.parse(stdout), {
+      version: 'v4',
+      efforts: ['none', 'low', 'medium', 'high'],
+    });
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+});
 test('installed resources stay separate from writable engine and conversation state', async () => {
   const temporary = await mkdtemp(path.join(tmpdir(), 'wisp-paths-'));
   try {
     const root = path.join(temporary, 'resources'),
       data = path.join(temporary, 'user');
-    for (const name of ['src', 'agent', 'node_modules']) {
+    for (const name of ['src', 'agent', 'dist', 'node_modules']) {
       await mkdir(path.join(root, name), { recursive: true });
     }
     await writeFile(
@@ -20,6 +63,7 @@ test('installed resources stay separate from writable engine and conversation st
     );
     await mkdir(path.join(root, 'node_modules/fixture-package'));
     await writeFile(path.join(root, 'agent/agent.ts'), 'first');
+    await writeFile(path.join(root, 'dist/reasoning.js'), 'export const fixture = true;');
     const paths = appPaths(root, data);
     await prepareEngine(root, paths.engine);
     await mkdir(path.join(paths.engine, '.eve'));
@@ -30,6 +74,10 @@ test('installed resources stay separate from writable engine and conversation st
     assert.equal(await readFile(path.join(paths.engine, 'agent/agent.ts'), 'utf8'), 'updated');
     await assert.rejects(readFile(path.join(paths.engine, 'agent/retired-tool.ts')), /ENOENT/);
     assert.equal(await readFile(path.join(paths.engine, '.eve/history'), 'utf8'), 'keep');
+    assert.equal(
+      await readFile(path.join(paths.engine, 'dist/reasoning.js'), 'utf8'),
+      'export const fixture = true;',
+    );
     assert.equal(
       await realpath(path.join(paths.engine, 'node_modules/fixture-package')),
       await realpath(path.join(root, 'node_modules/fixture-package')),
@@ -47,6 +95,7 @@ test('deployed agent uses its production dependency directory without losing Eve
     const engine = path.join(temporary, 'user/engine');
     await mkdir(path.join(agent, 'agent'), { recursive: true });
     await mkdir(path.join(agent, 'src'));
+    await mkdir(path.join(agent, 'dist'));
     await writeFile(
       path.join(agent, 'package.json'),
       '{"name":"@wisp/agent","dependencies":{"fixture-package":"1.0.0"}}',

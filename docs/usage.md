@@ -4,6 +4,23 @@
 
 Closing the desktop window keeps Wisp running in the Windows system tray. Left-click its tray icon to reopen it, or right-click for **Open Wisp** and **Exit Wisp**. **Exit Wisp** stops the bridge and closes the app; if a turn is active, wait for it to finish and try again.
 
+## AI connections
+
+**Connections** keeps ChatGPT subscription sign-in and API connections side by side. API connections use native AI SDK adapters for OpenAI, Anthropic (Claude), Google (Gemini), DeepSeek, xAI, Groq, Mistral, Cerebras, Cohere, Together AI, Fireworks, DeepInfra, Alibaba (Qwen), Moonshot (Kimi), MiniMax, Baseten and Z.AI. Vercel AI Gateway and OpenRouter expose multiple vendors through one account. **OpenAI compatible / Local** supports other Chat Completions endpoints, including local servers. Bedrock, Vertex and Azure account/deployment setup are not included. The installed native Hugging Face adapter drops tool results from history, so use its Chat Completions endpoint through **OpenAI compatible / Local** instead.
+
+1. Choose **Add connection**, select a provider and enter its API key. API usage is billed separately by the provider; ChatGPT sign-in remains the subscription option.
+2. Choose **Load model list**, or enter an exact model ID. Add the models you want to use. A provider's catalog can include models that do not support tools: choose a language model with tool calling.
+3. Set each model's context window in tokens. Discovery fills this when the provider supplies it. For local models, use the server's allocated context, not the model's theoretical maximum. Wisp requires this value to compact long conversations correctly.
+4. **Test first model** sends a small, potentially billable tool-calling check without executing any game action. It tests the first listed model only. Save the connection, then choose a **Default model**. Each chat can select another configured model in game.
+
+API keys are stored in the operating system's protected credential store and stay in the bridge; the agent receives only a local transport token. Editing with a blank API key retains the saved key. Custom endpoints require HTTPS, except HTTP on localhost. Only use endpoints you trust with the key and chat context. A local server may omit its key. For OpenAI-compatible endpoints, include their API prefix, typically `/v1`.
+
+Use **Effort** in each in-game chat (including inline questions) to choose reasoning for supported models. **Default** keeps the provider's behavior; available levels depend on the exact model. Toggle-only models show **On/Off** instead of effort levels. Claude and Gemini models that use token budgets receive the native SDK's budget for the chosen level. Higher effort can increase latency and billed tokens. Models with unknown or unsupported controls keep the provider default. Existing API chats remain on their provider default until you choose a level; ChatGPT retains its account-provided controls. Gateway discovery preserves its model-specific reasoning metadata. Refresh the model list to pick up newly supported levels.
+
+Switching an API chat to another model or connection starts fresh provider-native history from the visible transcript, preserving the chat and memory. Removing a connection preserves chats but those chats need another model before continuing. There is no automatic fallback to another provider.
+
+Wowhead search works independently of the model. In **Connections → Web search**, **Auto** keeps ChatGPT search for subscription chats and uses Exa for API chats. Exa works without a key through its public MCP endpoint, with free rate limits. **Exa for all chats**, **ChatGPT search only** and **Disabled** are also available. An optional Exa key uses your account’s REST API credits and billing; it is stored in the operating-system vault. **Test Exa** sends one scoped search using the entered/saved key or public access. Removing the key returns Exa to public access. Requests and source excerpts are restricted to Wowhead Forever; empty results remain unknown. Exa failures are reported without silently switching services. See [Exa’s access limits](https://exa.ai/docs/get-started/exa-mcp). Other enabled game, database and MCP tools remain available with API models. Some providers do not expose model discovery; enter model IDs and context windows manually in that case. Included adapters are covered by local transport tests, not a guarantee that every model or account supports Wisp's tools.
+
 ## Conversations and hover questions
 
 After [setup](../README.md#get-started-on-windows), use `/wisp` or `/wispai` to open chat. **+** starts a separate conversation; **−** or Escape minimizes the window. Choose model and effort per chat, or set the default for new chats in the desktop **Connections** page.
@@ -38,7 +55,7 @@ Movement, casting, targeting, training and trading remain with you. Built-in she
 
 ### What leaves your computer
 
-Each message includes available character name/realm, level, class, race, faction, game version/build and location. Other state—such as bags, quests and equipment—is read on demand. Prompts, tool results, conversation context and recalled memory can go to ChatGPT; enabled external sources receive lookup arguments. Built-in knowledge integrations do not upload whole game saves or memory documents. Custom servers have their own behavior and policies.
+Each message includes available character name/realm, level, class, race, faction, game version/build and location. Other state—such as bags, quests and equipment—is read on demand. Prompts, tool results, conversation context and recalled memory go to the selected AI connection (and its gateway, if any); enabled external sources receive lookup arguments. Built-in knowledge integrations do not upload whole game saves or memory documents. Custom servers have their own behavior and policies.
 
 The bridge holds the ChatGPT grant and proxies model requests with `store: false`; this does not mean the provider receives no data or retains nothing. Neither the agent nor desktop webview receives the ChatGPT credentials. Windows credentials use DPAPI for the current user, so changing Windows users requires signing in again. See [OpenAI’s sign-in flow](https://developers.openai.com/siwc/token-sharing-open-source/sign-in).
 
@@ -73,7 +90,7 @@ Missing readings and database coverage remain unknown, not zero or proof of abse
 | Disconnected or replies stop  | Keep the desktop app running. Check **Diagnostics** and `/wisp diag`; use `/wisp reconnect` for a fresh handshake or `/reload` to renew receive channels. Large payloads take several seconds. Significant game updates may change file-loading behavior. |
 | Sign-in or models unavailable | Finish browser authorization in **Connections** and refresh the model list. Expired access, identity-only consent or an ambiguous token refresh may require signing in again.                                                                             |
 | Tool unavailable              | Check the game connection, optional integration switches and required windows; missing APIs or source coverage can also prevent a result.                                                                                                                 |
-| App remains after closing     | Closing hides it in the tray. **Exit Wisp** stops it. If a turn is active, wait for it to finish and try again.                                                                                                                                                            |
+| App remains after closing     | Closing hides it in the tray. **Exit Wisp** stops it. If a turn is active, wait for it to finish and try again.                                                                                                                                           |
 
 For an old portable install, choose **Import your previous installation** on first launch. Existing Wisp saves are preserved; renamed addon folders are backed up under `Interface/WispAI-RenameBackup`. Older Codex-adapter installs need Wisp’s own ChatGPT sign-in. Fully restart WoW after migration.
 

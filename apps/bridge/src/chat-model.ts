@@ -38,16 +38,24 @@ export function accountModel(input: AccountModelInput): AccountModel {
 export function chooseChatModel(models: AccountModel[], model: string, effort?: string): ChatModel {
   const entry = models.find((entry) => entry.slug === model);
   if (!entry) {
-    throw Error('This model is not available for your ChatGPT account.');
+    throw Error('This model is not available. Choose a connected provider in Wisp > Connections.');
   }
   const chosen =
     effort ??
-    (entry.efforts.includes('medium') ? 'medium' : entry.defaultEffort) ??
+    (entry.defaultEffort === 'provider-default'
+      ? 'provider-default'
+      : entry.efforts.includes('medium')
+        ? 'medium'
+        : entry.defaultEffort) ??
     'provider-default';
   if (chosen !== 'provider-default' && !entry.efforts.includes(chosen)) {
     throw Error('Choose a supported effort for this model.');
   }
-  if (chosen === 'provider-default' && entry.efforts.length) {
+  if (
+    chosen === 'provider-default' &&
+    entry.efforts.length &&
+    !entry.efforts.includes('provider-default')
+  ) {
     throw Error('Choose a supported effort for this model.');
   }
   return { model, effort: chosen };

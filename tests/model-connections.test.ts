@@ -1,0 +1,538 @@
+import { test, expect, vi, afterEach } from 'vitest';
+import { mkdtemp, readFile, rm, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import { ModelConnections } from '@wisp/bridge/model-connections';
+import { connectionModel } from '@wisp/agent/connection-model';
+import { providerDefinitions, connectionModelSlug } from '@wisp/protocol/providers';
+import type { ChatGPTAuth } from '@wisp/bridge/chatgpt-auth';
+
+const directories: string[] = [];
+afterEach(async () => {
+  vi.unstubAllGlobals();
+  await Promise.all(
+    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+async function fixture(fetcher: typeof fetch = vi.fn()) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'wisp-connections-'));
+  directories.push(directory);
+  const secrets = new Map<string, string>();
+  const vault = {
+    read: async (key: string) => secrets.get(key) || '',
+    write: async (key: string, value: string) => {
+      secrets.set(key, value);
+    },
+  };
+  const chatgpt = {
+    state: () => ({ status: 'disconnected' }),
+    accessToken: vi.fn(async () => {
+      throw Error('ChatGPT disconnected');
+    }),
+    models: vi.fn(async () => []),
+  };
+  const file = path.join(directory, 'connections.json');
+  const manager = new ModelConnections(file, vault, chatgpt as unknown as ChatGPTAuth, fetcher);
+  await manager.load();
+  return { manager, secrets, vault, chatgpt, file };
+}
+const setup = {
+  provider: 'anthropic',
+  name: 'Claude',
+  apiKey: 'private-test-key',
+  models: [{ id: 'claude-test', contextWindow: 200000 }],
+};
+
+test('connections persist metadata separately from secrets and work without ChatGPT', async () => {
+  const { manager, file, secrets, vault, chatgpt } = await fixture();
+  const { id } = await manager.save(setup);
+  expect(await readFile(file, 'utf8')).not.toContain(setup.apiKey);
+  expect(JSON.stringify(manager.list())).not.toContain(setup.apiKey);
+  expect(secrets.get('ai-connection:' + id)).toBe(setup.apiKey);
+  const slug = connectionModelSlug(id, 'claude-test');
+  await manager.prepare(slug);
+  expect(chatgpt.accessToken).not.toHaveBeenCalled();
+  expect(await manager.models()).toEqual([
+    { slug, displayName: 'Claude / claude-test', efforts: [], contextWindow: 200000 },
+  ]);
+  const restored = new ModelConnections(file, vault, chatgpt as unknown as ChatGPTAuth);
+  await restored.load();
+  expect(restored.list()[0]?.hasKey).toBe(true);
+  await restored.save({ ...setup, id, name: 'Renamed', apiKey: undefined });
+  expect(secrets.get('ai-connection:' + id)).toBe(setup.apiKey);
+  await restored.remove(id);
+  expect(secrets.get('ai-connection:' + id)).toBe('');
+  await expect(restored.prepare(slug)).rejects.toThrow('not found');
+});
+
+test('a failed metadata write rolls back the API key', async () => {
+  const { manager, file, secrets } = await fixture();
+  await mkdir(file);
+  await expect(manager.save(setup)).rejects.toThrow();
+  expect(manager.list()).toEqual([]);
+  expect([...secrets.values()].every((value) => !value)).toBe(true);
+});
+
+test('saved API models expose reasoning choices while keeping the existing default', async () => {
+  const { manager, file, vault, chatgpt } = await fixture();
+  const { id } = await manager.save({
+    ...setup,
+    models: [{ id: 'claude-sonnet-4-6', contextWindow: 200000 }],
+  });
+  const restored = new ModelConnections(file, vault, chatgpt as unknown as ChatGPTAuth);
+  await restored.load();
+  expect((await restored.models())[0]).toMatchObject({
+    slug: connectionModelSlug(id, 'claude-sonnet-4-6'),
+    efforts: ['provider-default', 'none', 'low', 'medium', 'high'],
+    defaultEffort: 'provider-default',
+  });
+});
+
+test('gateway discovery preserves exact advertised effort values and filters unknown levels', async () => {
+  const { manager } = await fixture(async () =>
+    Response.json({
+      data: [
+        {
+          id: 'custom/reasoner',
+          name: 'Reasoner',
+          type: 'language',
+          context_window: 64000,
+          reasoning_options: [{ type: 'effort', values: ['none', 'low', 'high', 'invented'] }],
+        },
+      ],
+    }),
+  );
+  const { models } = await manager.discover({
+    provider: 'gateway',
+    name: 'Gateway',
+    apiKey: 'key',
+  });
+  expect(models[0]?.reasoningEfforts).toEqual(['none', 'low', 'high']);
+  await manager.save({ provider: 'gateway', name: 'Gateway', apiKey: 'key', models });
+  expect((await manager.models())[0]?.efforts).toEqual(['provider-default', 'none', 'low', 'high']);
+});
+
+test('validates endpoints, credentials, unique model IDs and context capacity', async () => {
+  const { manager } = await fixture();
+  for (const baseURL of [
+    'http://remote.example/v1',
+    'https://user:secret@example.com/v1',
+    'https://example.com/v1?key=secret',
+    'file:///tmp/models',
+  ]) {
+    await expect(manager.save({ ...setup, baseURL })).rejects.toThrow();
+  }
+  await expect(manager.save({ ...setup, apiKey: '' })).rejects.toThrow('API key');
+  await expect(manager.save({ ...setup, models: [{ id: 'unknown' }] })).rejects.toThrow(
+    'context window',
+  );
+  await expect(
+    manager.save({ ...setup, models: [setup.models[0], setup.models[0]] }),
+  ).rejects.toThrow('unique');
+  const { id } = await manager.save({
+    ...setup,
+    provider: 'compatible',
+    apiKey: '',
+    baseURL: 'http://127.0.0.1:1234/v1',
+  });
+  await manager.prepare(connectionModelSlug(id, 'claude-test'));
+});
+
+test('the connection check verifies a native tool request without executing tools', async () => {
+  let toolSupport = true;
+  const { manager } = await fixture(async () =>
+    Response.json({
+      id: 'msg_check',
+      type: 'message',
+      role: 'assistant',
+      model: 'claude-test',
+      content: toolSupport
+        ? [{ type: 'tool_use', id: 'check', name: 'connection_check', input: { ok: true } }]
+        : [{ type: 'text', text: 'Hello' }],
+      stop_reason: toolSupport ? 'tool_use' : 'end_turn',
+      stop_sequence: null,
+      usage: { input_tokens: 2, output_tokens: 5 },
+    }),
+  );
+  expect(await manager.test(setup)).toEqual({ ok: true });
+  toolSupport = false;
+  await expect(manager.test(setup)).rejects.toThrow('tool-calling check');
+  expect(manager.list()).toEqual([]);
+});
+
+test.each(providerDefinitions)(
+  '$name native adapter reaches its permitted route with bridge-owned credentials',
+  async (definition) => {
+    let upstream: { url: string; headers: Headers; body: Record<string, unknown> } | undefined;
+    const fetcher: typeof fetch = async (url, init) => {
+      upstream = {
+        url: String(url),
+        headers: new Headers(init?.headers),
+        body: JSON.parse(String(init?.body)),
+      };
+      return Response.json(
+        {
+          object: 'error',
+          type: 'error',
+          param: '',
+          code: 'bad_request',
+          message: 'fixture stop',
+          error: {
+            code: definition.id === 'google' ? 400 : 'bad_request',
+            status: 'INVALID_ARGUMENT',
+            type: 'invalid_request_error',
+            message: 'fixture stop',
+          },
+        },
+        { status: 400 },
+      );
+    };
+    const { manager } = await fixture(fetcher);
+    const { id } = await manager.save({
+      provider: definition.id,
+      name: definition.name,
+      apiKey: 'real-vault-key',
+      baseURL: definition.id === 'compatible' ? 'http://localhost:1234/v1' : undefined,
+      models: [{ id: definition.example, contextWindow: 32768 }],
+    });
+    vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      const headers = new Headers(init?.headers);
+      expect(url.origin).toBe('http://127.0.0.1:43187');
+      expect(headers.get('authorization')).toBe('Bearer loopback-token');
+      expect(headers.has('x-api-key')).toBe(false);
+      expect(headers.has('x-goog-api-key')).toBe(false);
+      const suffix = url.pathname.slice(('/model/connections/' + id).length) + url.search;
+      return manager.forward(id, suffix, String(init?.body), headers, new AbortController().signal);
+    });
+    const model = connectionModel(
+      {
+        model: connectionModelSlug(id, definition.example),
+        effort: 'provider-default',
+        provider: definition.id,
+        connectionId: id,
+        modelId: definition.example,
+        webSearchAvailable: true,
+      },
+      'http://127.0.0.1:43187',
+      'loopback-token',
+      async () => true,
+    );
+    await expect(
+      model.doGenerate({
+        prompt: [
+          { role: 'user', content: [{ type: 'text', text: 'Call check.' }] },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'tool-call', toolCallId: 'calltest1', toolName: 'check', input: '{}' },
+            ],
+          },
+          {
+            role: 'tool',
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: 'calltest1',
+                toolName: 'check',
+                output: { type: 'json', value: { marker: 'roundtrip-marker' } },
+              },
+            ],
+          },
+          { role: 'user', content: [{ type: 'text', text: 'Check again.' }] },
+        ],
+        tools: [
+          { type: 'function', name: 'check', inputSchema: { type: 'object', properties: {} } },
+          {
+            type: 'function',
+            name: 'wowhead__web_search',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+        toolChoice: { type: 'auto' },
+      }),
+    ).rejects.toThrow('fixture stop');
+    expect(upstream).toBeDefined();
+    expect(JSON.stringify(upstream!.body)).toContain('roundtrip-marker');
+    expect(JSON.stringify(upstream!.body)).toContain('wowhead__web_search');
+    const keyHeader = ['anthropic', 'minimax'].includes(definition.id)
+      ? 'x-api-key'
+      : definition.id === 'google'
+        ? 'x-goog-api-key'
+        : 'authorization';
+    expect(upstream!.headers.get(keyHeader)).toBe(
+      keyHeader === 'authorization' ? 'Bearer real-vault-key' : 'real-vault-key',
+    );
+    expect(upstream!.headers.get('authorization')).not.toBe('Bearer loopback-token');
+    expect(upstream!.url).toContain(definition.baseURL || 'http://localhost:1234/v1');
+    if (definition.id === 'gateway') {
+      expect(upstream!.headers.get('ai-language-model-id')).toBe(definition.example);
+      expect(upstream!.headers.has('ai-gateway-protocol-version')).toBe(true);
+    }
+    if (['openai', 'xai'].includes(definition.id)) {
+      expect(upstream!.body.store).toBe(false);
+      expect(upstream!.body.include).toContain('reasoning.encrypted_content');
+    }
+  },
+);
+
+test('proxy rejects unconfigured models and non-model routes, strips arbitrary credentials, and redacts errors', async () => {
+  const upstream = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+    Response.json({ error: { message: 'Invalid private-test-key' } }, { status: 401 }),
+  );
+  const { manager } = await fixture(upstream);
+  const { id } = await manager.save(setup);
+  const headers = new Headers({ authorization: 'Bearer loopback', cookie: 'private-cookie' });
+  const signal = new AbortController().signal;
+  await expect(
+    manager.forward(id, '/messages', '{"model":"other"}', headers, signal),
+  ).rejects.toThrow('configured model');
+  await expect(
+    manager.forward(id, '/models', '{"model":"claude-test"}', headers, signal),
+  ).rejects.toThrow('Unsupported');
+  await expect(
+    manager.forward(id, '/messages?key=oops', '{"model":"claude-test"}', headers, signal),
+  ).rejects.toThrow('Unsupported');
+  expect(upstream).not.toHaveBeenCalled();
+  const response = await manager.forward(
+    id,
+    '/messages',
+    '{"model":"claude-test"}',
+    headers,
+    signal,
+  );
+  expect(await response.text()).toContain('Invalid [redacted]');
+  const forwarded = new Headers(upstream.mock.calls[0]?.[1]?.headers);
+  expect(forwarded.has('cookie')).toBe(false);
+});
+
+test('discovery reads provider metadata and filters Google models without generation support', async () => {
+  const { manager } = await fixture(async () =>
+    Response.json({
+      models: [
+        {
+          name: 'models/gemini-test',
+          displayName: 'Gemini',
+          inputTokenLimit: 1000000,
+          supportedGenerationMethods: ['generateContent'],
+        },
+        { name: 'models/embedding', supportedGenerationMethods: ['embedContent'] },
+      ],
+    }),
+  );
+  expect(await manager.discover({ provider: 'google', name: 'Gemini', apiKey: 'key' })).toEqual({
+    models: [{ id: 'gemini-test', name: 'Gemini', contextWindow: 1000000, reasoningEfforts: [] }],
+  });
+});
+
+test.each(['anthropic', 'google', 'compatible', 'gateway'] as const)(
+  '%s streams native tool calls and accepts their results on the next request',
+  async (provider) => {
+    const events: unknown[] =
+      provider === 'anthropic'
+        ? [
+            {
+              type: 'message_start',
+              message: {
+                id: 'msg_test',
+                type: 'message',
+                role: 'assistant',
+                model: 'native-test',
+                content: [],
+                stop_reason: null,
+                usage: { input_tokens: 2, output_tokens: 0 },
+              },
+            },
+            {
+              type: 'content_block_start',
+              index: 0,
+              content_block: { type: 'tool_use', id: 'call_test', name: 'check', input: {} },
+            },
+            {
+              type: 'content_block_delta',
+              index: 0,
+              delta: { type: 'input_json_delta', partial_json: '{"ok":true}' },
+            },
+            { type: 'content_block_stop', index: 0 },
+            {
+              type: 'message_delta',
+              delta: { stop_reason: 'tool_use', stop_sequence: null },
+              usage: { output_tokens: 5 },
+            },
+            { type: 'message_stop' },
+          ]
+        : provider === 'google'
+          ? [
+              {
+                candidates: [
+                  {
+                    index: 0,
+                    content: {
+                      role: 'model',
+                      parts: [
+                        {
+                          functionCall: { name: 'check', args: { ok: true }, id: 'call_test' },
+                          thoughtSignature: 'signature-test',
+                        },
+                      ],
+                    },
+                    finishReason: 'STOP',
+                  },
+                ],
+                usageMetadata: { promptTokenCount: 2, candidatesTokenCount: 5 },
+              },
+            ]
+          : provider === 'gateway'
+            ? [
+                { type: 'stream-start', warnings: [] },
+                {
+                  type: 'tool-call',
+                  toolCallId: 'call_test',
+                  toolName: 'check',
+                  input: '{"ok":true}',
+                },
+                {
+                  type: 'finish',
+                  finishReason: { unified: 'tool-calls', raw: 'tool_use' },
+                  usage: { inputTokens: { total: 2 }, outputTokens: { total: 5 } },
+                },
+              ]
+            : [
+                {
+                  id: 'chat_test',
+                  model: 'native-test',
+                  created: 1,
+                  choices: [
+                    {
+                      index: 0,
+                      delta: {
+                        role: 'assistant',
+                        tool_calls: [
+                          {
+                            index: 0,
+                            id: 'call_test',
+                            type: 'function',
+                            function: { name: 'check', arguments: '{"ok":true}' },
+                          },
+                        ],
+                      },
+                      finish_reason: null,
+                    },
+                  ],
+                },
+                {
+                  id: 'chat_test',
+                  model: 'native-test',
+                  created: 1,
+                  choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }],
+                },
+              ];
+    let requestBody = '';
+    let requests = 0;
+    const { manager } = await fixture(async (_url, init) => {
+      requestBody = String(init?.body);
+      requests++;
+      if (requests > 1) {
+        return Response.json(
+          {
+            type: 'error',
+            message: 'done',
+            error: {
+              type: 'invalid_request_error',
+              message: 'done',
+              code: provider === 'google' ? 400 : 'bad_request',
+              status: 'INVALID_ARGUMENT',
+            },
+          },
+          { status: 400 },
+        );
+      }
+      return new Response(
+        events.map((event) => 'data: ' + JSON.stringify(event) + '\n\n').join(''),
+        { headers: { 'content-type': 'text/event-stream' } },
+      );
+    });
+    const { id } = await manager.save({
+      provider,
+      name: 'Native',
+      apiKey: 'key',
+      baseURL: provider === 'compatible' ? 'http://localhost:1234/v1' : undefined,
+      models: [{ id: 'native-test', contextWindow: 32000 }],
+    });
+    vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      return manager.forward(
+        id,
+        url.pathname.slice(('/model/connections/' + id).length) + url.search,
+        String(init?.body),
+        new Headers(init?.headers),
+        new AbortController().signal,
+      );
+    });
+    const model = connectionModel(
+      {
+        model: connectionModelSlug(id, 'native-test'),
+        effort: 'provider-default',
+        connectionId: id,
+        provider,
+        modelId: 'native-test',
+      },
+      'http://127.0.0.1:43187',
+      'loopback',
+      async () => true,
+    );
+    const prompt = [
+      { role: 'user' as const, content: [{ type: 'text' as const, text: 'Check.' }] },
+    ];
+    const { stream } = await model.doStream({ prompt });
+    const chunks = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    expect(chunks.filter((chunk) => chunk.type === 'error')).toEqual([]);
+    const call = chunks.find((chunk) => chunk.type === 'tool-call');
+    expect(call).toMatchObject({ toolName: 'check', input: '{"ok":true}' });
+    if (!call || call.type !== 'tool-call') {
+      throw Error('Missing tool call');
+    }
+    expect(
+      chunks.some(
+        (chunk) => chunk.type === 'finish' && chunk.finishReason.unified === 'tool-calls',
+      ),
+    ).toBe(true);
+    await expect(
+      model.doGenerate({
+        prompt: [
+          ...prompt,
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: call.toolCallId,
+                toolName: call.toolName,
+                input: call.input,
+                providerOptions: call.providerMetadata,
+              },
+            ],
+          },
+          {
+            role: 'tool',
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: call.toolCallId,
+                toolName: call.toolName,
+                output: { type: 'json', value: { verified: true } },
+              },
+            ],
+          },
+        ],
+      }),
+    ).rejects.toThrow('done');
+    expect(requestBody).toContain('verified');
+    if (provider === 'google') {
+      expect(requestBody).toContain('signature-test');
+    }
+  },
+);

@@ -4,12 +4,25 @@ C.workStarted = C.workStarted or {}
 local modelControls = {}
 C.modelPending = {}
 local function defaultEffort(model)
+    if model.defaultEffort == "provider-default" then
+        return "provider-default"
+    end
     for _, effort in ipairs(model.efforts or {}) do
         if effort == "medium" then
             return effort
         end
     end
     return model.defaultEffort or model.efforts[1] or "provider-default"
+end
+local function effortLabel(effort)
+    if effort == "provider-default" then
+        return "Default"
+    elseif effort == "none" then
+        return "Off"
+    elseif effort == "enabled" then
+        return "On"
+    end
+    return effort
 end
 function C.SetChatModel(chat, model, effort)
     if not chat or chat.status == "working" or C.modelPending[chat.id] then
@@ -68,7 +81,8 @@ function C.RefreshModelControls()
         )
         setText(
             controls.effort,
-            "Effort: " .. (selection.effort or (selected and defaultEffort(selected)) or "--")
+            "Effort: "
+                .. effortLabel(selection.effort or (selected and defaultEffort(selected)) or "--")
         )
         controls.model:SetEnabled(C.connected and not pending and not working)
         controls.effort:SetEnabled(
@@ -142,7 +156,7 @@ function C.CreateModelControls(parent, name, current, ensure)
                     root:CreateTitle("Reasoning effort")
                     for _, effort in ipairs(candidate.efforts) do
                         local option = effort
-                        root:CreateRadio(option, function()
+                        root:CreateRadio(effortLabel(option), function()
                             return option
                                 == (
                                     chat and chat.modelSettings and chat.modelSettings.effort

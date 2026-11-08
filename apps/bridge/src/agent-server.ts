@@ -19,8 +19,10 @@ import type { MemoryStore } from './memory-store.ts';
 import type { GameRequests } from './game-requests.ts';
 import type { TheWoWDB } from './thewowdb.ts';
 import type { Simulator } from './simulation.ts';
+import type { ModelConnections } from './model-connections.ts';
+import { proxyConnectionModel } from './model-proxy.ts';
 import { proxyModel } from './model-proxy.ts';
-import { searchWowhead } from './wowhead-search.ts';
+import type { WowheadSearch } from './web-search.ts';
 import { chooseChatModel } from './chat-model.ts';
 import { characterIdentity, conversationTitle } from './context.ts';
 export interface MemoryView {
@@ -32,6 +34,8 @@ export interface MemoryView {
 interface AgentDependencies {
   token: string;
   auth: ChatGPTAuth;
+  connections: ModelConnections;
+  webSearch: WowheadSearch;
   mcpRelay: McpRelay;
   capabilitySettings: CapabilitySettings;
   routineStore: RoutineStore;
@@ -52,6 +56,8 @@ export function createAgentHandler(deps: AgentDependencies) {
   const {
     token,
     auth,
+    connections,
+    webSearch,
     mcpRelay,
     capabilitySettings,
     routineStore,
@@ -75,18 +81,27 @@ export function createAgentHandler(deps: AgentDependencies) {
       res.writeHead(403).end('Forbidden');
       return;
     }
-    if (req.method === 'POST' && req.url === '/model/responses') {
+    if (
+      req.method === 'POST' &&
+      (req.url === '/model/responses' || req.url?.startsWith('/model/connections/'))
+    ) {
       try {
-        await proxyModel(req, res, auth);
+        if (req.url === '/model/responses') {
+          await proxyModel(req, res, auth);
+        } else {
+          await proxyConnectionModel(req, res, connections);
+        }
       } catch (e) {
         if (res.headersSent) {
           res.destroy();
         } else {
-          res.writeHead(503, { 'content-type': 'application/json' }).end(
-            JSON.stringify({
-              error: { message: e instanceof Error ? e.message : 'Model request failed' },
-            }),
-          );
+          res
+            .writeHead(503, { 'content-type': 'application/json', 'x-wisp-model-error': 'true' })
+            .end(
+              JSON.stringify({
+                error: { message: e instanceof Error ? e.message : 'Model request failed' },
+              }),
+            );
         }
       }
       return;
@@ -98,7 +113,7 @@ export function createAgentHandler(deps: AgentDependencies) {
         if (!chat?.modelSettings) {
           throw Error('No model selected for this turn.');
         }
-        const models = await auth.models();
+        const models = await connections.models();
         const selected = chooseChatModel(
           models,
           chat.modelSettings.model,
@@ -107,6 +122,9 @@ export function createAgentHandler(deps: AgentDependencies) {
         res.writeHead(200, { 'content-type': 'application/json' }).end(
           JSON.stringify({
             ...selected,
+            ...(await connections.selection(selected.model)),
+            webSearchAvailable:
+              capabilitySettings.enabled('tool:web_search') && webSearch.available(selected.model),
             contextWindow: models.find((m) => m.slug === selected.model)?.contextWindow,
           }),
         );
@@ -220,9 +238,8 @@ export function createAgentHandler(deps: AgentDependencies) {
         const result =
           req.url === '/database'
             ? await database.query(databaseRequest.parse(args), abort.signal)
-            : await searchWowhead(
+            : await webSearch.search(
                 wowheadQuery.parse(args).query,
-                auth,
                 chat.modelSettings?.model || defaultModel(),
                 abort.signal,
               );

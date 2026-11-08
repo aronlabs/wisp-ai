@@ -13,13 +13,14 @@ import type { DiskTransport } from './transport.ts';
 import type { GameRequests } from './game-requests.ts';
 import type { IntegrationState } from './integration-state.ts';
 import type { CapabilitySettings } from './capabilities.ts';
-import type { ChatGPTAuth } from './chatgpt-auth.ts';
+import type { ModelCatalog } from './model-connections.ts';
 import type { RoutineStore } from './routines.ts';
 import type { PanelStore } from './panels.ts';
 import type { MemoryStore } from './memory-store.ts';
 import type { MemoryView } from './agent-server.ts';
 import { characterIdentity } from './context.ts';
 import { chooseChatModel } from './chat-model.ts';
+import { parseConnectionModel } from '@wisp/protocol/providers';
 import { resumeChat } from './sessions.ts';
 import { newChat, openChat, promoteChat, isWorking, settleTurn } from './chat-lifecycle.ts';
 import { errorMessage } from './errors.ts';
@@ -29,7 +30,7 @@ interface ReceiverDependencies {
   pending: GameRequests;
   integrationState: IntegrationState;
   capabilitySettings: CapabilitySettings;
-  auth: Pick<ChatGPTAuth, 'models'>;
+  models: Pick<ModelCatalog, 'models'>;
   routineStore: RoutineStore;
   panelStore: PanelStore;
   memoryStore: MemoryStore;
@@ -50,7 +51,7 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
     pending,
     integrationState,
     capabilitySettings,
-    auth,
+    models,
     routineStore,
     panelStore,
     memoryStore,
@@ -166,13 +167,29 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
             throw Error('Wait for this reply before changing model settings.');
           }
           const input = packet.data;
-          const models = await auth.models();
+          const available = await models.models();
           if (isWorking(chat)) {
             throw Error('Wait for this reply before changing model settings.');
           }
-          chat.modelSettings = chooseChatModel(models, input.model, input.effort);
+          const selected = chooseChatModel(available, input.model, input.effort);
+          if (
+            chat.eveId &&
+            chat.modelSettings?.model !== selected.model &&
+            (parseConnectionModel(chat.modelSettings?.model || '') ||
+              parseConnectionModel(selected.model))
+          ) {
+            // Start clean provider-native history while retaining the visible
+            // conversation. Reasoning signatures/response IDs are not portable.
+            const previous = chat.eveId;
+            chat.eveId = undefined;
+            void client.sessions
+              .attach(previous)
+              .end({ reason: 'AI model or connection changed' })
+              .catch((error) => log('Session cleanup failed: ' + errorMessage(error)));
+          }
+          chat.modelSettings = selected;
           chat.modelError = undefined;
-          state.modelCatalog = models;
+          state.modelCatalog = available;
         } catch (error) {
           chat.modelError = safeErrorMessage(
             error instanceof Error ? error.message : String(error),

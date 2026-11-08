@@ -1,8 +1,12 @@
 <script lang="ts">
   import type { DesktopController } from "../desktop-controller.svelte";
+  import ApiConnections from "../ApiConnections.svelte";
+  import SearchConnection from "../SearchConnection.svelte";
+  import ActionProgress from "../ActionProgress.svelte";
   import Icon from "../Icon.svelte";
   import { request } from "../api";
   let { app }: { app: DesktopController } = $props();
+  let chatgptConnected = $derived(app.status?.auth.status === "connected");
 </script>
 
 <section class="card provider-card">
@@ -12,8 +16,8 @@
       <h2>ChatGPT</h2>
       <p>Connect with your subscription. No API key needed.</p>
     </div>
-    <span class="badge" class:good={app.connected}
-      >{app.connected
+    <span class="badge" class:good={chatgptConnected}
+      >{chatgptConnected
         ? "Connected"
         : app.status?.auth.status === "authorizing"
           ? "Waiting for browser"
@@ -27,17 +31,22 @@
       {app.status.auth.message}
     </p>{/if}
   {#if !app.status}<div class="empty-inline">
-      Start Wisp from Overview to manage connections.
+      Start Wisp to manage your account.
+      <button class="text-button" onclick={() => (app.page = "Overview")}
+        >Go to Overview</button
+      >
     </div>{/if}
   <div class="actions">
+    <ActionProgress {app} />
     <button
-      class:primary={!app.connected}
+      class:primary={!chatgptConnected}
       onclick={() => app.signIn()}
       disabled={app.locked || !app.status}
-      >{app.connected ? "Reconnect" : "Continue with ChatGPT"}<Icon
-        name="arrow"
-        size={17}
-      /></button
+      >{app.busy === "Opening sign-in"
+        ? "Opening browser…"
+        : chatgptConnected
+          ? "Reconnect"
+          : "Continue with ChatGPT"}<Icon name="arrow" size={17} /></button
     ><button
       onclick={() => app.signIn(true)}
       disabled={app.locked || !app.status}>Add account</button
@@ -45,7 +54,7 @@
         onclick={() =>
           app.work("Cancelling sign-in", () => request("/auth/cancel", {}))}
         disabled={!!app.busy}>Cancel sign-in</button
-      >{/if}{#if app.connected}<button
+      >{/if}{#if chatgptConnected}<button
         class="quiet danger"
         onclick={() => {
           app.confirm = {
@@ -71,14 +80,25 @@
             >{/each}</select
         ><button
           onclick={() =>
-            app.work("Switching account", () =>
-              request("/auth/select", { profileId: app.account }),
+            app.work(
+              "Switching account",
+              () => request("/auth/select", { profileId: app.account }),
+              undefined,
+              "accounts",
             )}
           disabled={app.locked || app.account === app.status?.auth.activeId}
           >Use account</button
         >
       </div>
+      <ActionProgress {app} target="accounts" />
     </div>{/if}
+</section>
+
+<ApiConnections {app} />
+<SearchConnection {app} />
+
+<section class="card provider-card">
+  <h2>Default model</h2>
   <div class="field-section">
     {#if app.modelsError}<p class="banner error" role="status">
         Could not load models: {app.modelsError}
@@ -87,8 +107,13 @@
       <label for="models">Default model for new chats</label><button
         class="text-button"
         onclick={() =>
-          app.work("Loading models", app.loadModels, "Models refreshed.")}
-        disabled={app.locked || !app.connected}
+          app.work(
+            "Loading models",
+            app.loadModels,
+            "Models refreshed.",
+            "model",
+          )}
+        disabled={app.locked || !app.status}
         ><Icon name="refresh" size={14} />Refresh</button
       >
     </div>
@@ -98,7 +123,7 @@
         bind:value={app.model}
         disabled={app.locked || !app.models.length}
         ><option value="" disabled
-          >{app.connected
+          >{app.models.length
             ? "Loading available models…"
             : "Connect a provider first"}</option
         >{#each app.models as item}<option value={item.slug}
@@ -110,12 +135,17 @@
             "Updating default model",
             () => request("/auth/model", { model: app.model }),
             "Default model updated.",
+            "model",
           )}
         disabled={app.locked ||
           !app.models.length ||
-          app.model === app.status?.model}>Set default</button
+          app.model === app.status?.model}
+        >{app.busy === "Updating default model"
+          ? "Saving…"
+          : "Set default"}</button
       >
     </div>
+    <ActionProgress {app} target="model" />
     <p class="field-hint">
       You can choose a different model and effort inside each chat.
     </p>
@@ -125,4 +155,3 @@
     system.
   </p>
 </section>
-<p class="footnote">ChatGPT is currently the only supported AI provider.</p>

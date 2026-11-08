@@ -6,6 +6,7 @@ import { routineInput } from './routines.js';
 import { simulationInput } from './simulation.js';
 import { databaseRequest } from './database.js';
 import { wowheadQuery } from './search.js';
+import { providerId } from './providers.js';
 
 export const characterSections = z
   .array(z.enum(['character', 'location', 'talents', 'spells', 'quests', 'gear', 'bags']))
@@ -70,4 +71,8 @@ export const selectedModel = z.object({
   model: z.string().min(1),
   effort: z.string().min(1),
   contextWindow: z.number().positive().optional(),
+  connectionId: z.string().uuid().optional(),
+  provider: providerId.optional(),
+  modelId: z.string().min(1).optional(),
+  webSearchAvailable: z.boolean().optional(),
 });

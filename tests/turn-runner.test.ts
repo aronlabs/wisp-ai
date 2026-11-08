@@ -24,7 +24,7 @@ function fixture() {
   const log = vi.fn();
   const run = createTurnRunner({
     client,
-    auth: { models, accessToken: async () => 'token', pending: undefined },
+    models: { models, prepare: async () => {} },
     capabilitySettings: { publish: async () => {}, enabled: () => true, snapshot: () => [] },
     currentTransport: () => transport,
     activeChat: () => 'chat',

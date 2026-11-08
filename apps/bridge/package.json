@@ -54,7 +54,9 @@
     "./errors": "./src/errors.ts",
     "./integration-state": "./src/integration-state.ts",
     "./runtime-resources": "./src/runtime-resources.ts",
-    "./chat": "./src/chat.ts"
+    "./chat": "./src/chat.ts",
+    "./model-connections": "./src/model-connections.ts",
+    "./web-search": "./src/web-search.ts"
   },
   "scripts": {
     "start": "node src/main.ts",

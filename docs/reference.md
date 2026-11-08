@@ -6,12 +6,12 @@
 
 Wisp reads character state on demand and can inspect references, compare item stats, check progress/resources and create saved panels. See [action controls](usage.md#actions-you-control) for pins, macros and settings; the [agent definitions](../apps/agent/agent) and [protocol schemas](../packages/protocol/src) are the exhaustive tool and UI reference.
 
-| Source                                            | Useful for                                                                                                                                                  |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Installed Forever QuestieDB                       | NPC spawns, class trainers and supported town services. Optional; Wisp neither installs nor modifies it. Locations are database spawns, not live sightings. |
-| [TheWoWDB](https://thewowdb.com/developers/)      | Primary external Forever catalog: search and entity details. Catalog area IDs are not necessarily native map IDs.                                           |
-| [Everloot](https://everloot.app/docs/mcp/clients) | Read-only Forever references, recipes, locations, talent plans and market estimates/history. No API key, uploader or extra addon required.                  |
-| Wowhead search                                    | Forever-only fallback using the existing ChatGPT connection, not unrestricted browsing. It consumes subscription usage.                                     |
+| Source                                            | Useful for                                                                                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Installed Forever QuestieDB                       | NPC spawns, class trainers and supported town services. Optional; Wisp neither installs nor modifies it. Locations are database spawns, not live sightings.   |
+| [TheWoWDB](https://thewowdb.com/developers/)      | Primary external Forever catalog: search and entity details. Catalog area IDs are not necessarily native map IDs.                                             |
+| [Everloot](https://everloot.app/docs/mcp/clients) | Read-only Forever references, recipes, locations, talent plans and market estimates/history. No API key, uploader or extra addon required.                    |
+| Wowhead search                                    | Forever-only fallback via ChatGPT or Exa, independently of the model. Public Exa needs no key and has free rate limits; an optional key uses account credits. |
 
 Source links, build, age and coverage matter; see [how to interpret answers](usage.md#reading-the-answers) and [what leaves your computer](usage.md#what-leaves-your-computer). For filtering and integration contracts, consult [TheWoWDB](../apps/bridge/src/thewowdb.ts), [Everloot’s allowlist](../apps/agent/agent/connections/everloot.ts), [Wowhead search](../apps/bridge/src/wowhead-search.ts) and the agent instructions.
 

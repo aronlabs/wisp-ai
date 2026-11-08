@@ -21,7 +21,7 @@ export async function prepareEngine(root: string, engine: string) {
     return;
   }
   await mkdir(engine, { recursive: true });
-  for (const name of ['src', 'agent', 'package.json']) {
+  for (const name of ['src', 'agent', 'dist', 'package.json']) {
     if (name !== 'package.json') {
       const target = path.resolve(engine, name);
       if (path.dirname(target) !== path.resolve(engine) || target === path.resolve(root)) {

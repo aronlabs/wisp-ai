@@ -102,6 +102,49 @@ assert(packet.data.inline and packet.chat==C.inlineId and packet.chat~='main')
 assert(chat.modelSettings.effort=='ultra','inline choices must not mutate the main conversation')
 `);
 });
+test('API reasoning defaults, toggle labels, and inline effort remain conversation-scoped', () => {
+  vm().run(`
+C.modelCatalog={defaultModel='api',models={
+    {slug='api',displayName='API',efforts={'provider-default','none','low','medium','high'},defaultEffort='provider-default'},
+    {slug='toggle',displayName='Toggle',efforts={'provider-default','none','enabled'},defaultEffort='provider-default'},
+}}
+local options={}
+MenuUtil={CreateContextMenu=function(_,build)
+    options={}
+    build(nil,{CreateTitle=function()end,CreateRadio=function(_,label,selected,choose)
+        options[label]={selected=selected,choose=choose}
+    end})
+end}
+C.Refresh()
+local controls=UI_TEST.frames.WispAIChatModelControls
+assert(controls.effort:GetText()=='Effort: Default')
+controls.effort.scripts.OnClick(controls.effort)
+assert(options.Default.selected() and not options.medium.selected())
+options.high.choose()
+local packet=packets[#packets]
+assert(packet.data.effort=='high' and packet.chat=='main')
+local chat=C.Current()
+chat.modelSettings={model='api',effort='high'}
+chat.modelRequestId=packet.requestId
+C.Refresh()
+C.OpenInline()
+local inline=UI_TEST.frames.WispAIInlineModelControls
+inline.model.scripts.OnClick(inline.model)
+options.Toggle.choose()
+packet=packets[#packets]
+local inlineChat=C.InlineCurrent()
+inlineChat.modelSettings={model='toggle',effort='provider-default'}
+inlineChat.modelRequestId=packet.requestId
+C.Refresh()
+inline.effort.scripts.OnClick(inline.effort)
+assert(options.On and options.Off and options.Default)
+options.On.choose()
+packet=packets[#packets]
+assert(packet.data.effort=='enabled' and packet.chat==C.inlineId)
+assert(chat.modelSettings.effort=='high')
+`);
+});
+
 test('inline item questions preserve named quality colors and full item payloads', () => {
   vm().run(`
 local link = '|cnIQ2:|Hitem:275067::::::::12:1482:::::::::|h[Pergamino de Imbuir gelidaga]|h|r'

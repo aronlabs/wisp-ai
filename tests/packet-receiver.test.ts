@@ -10,6 +10,7 @@ import { RoutineStore } from '@wisp/bridge/routines';
 import { PanelStore } from '@wisp/bridge/panels';
 import { newChat } from '@wisp/bridge/chat-lifecycle';
 import { packetSchema } from '@wisp/protocol/protocol';
+import type { AccountModel } from '@wisp/bridge/chat-model';
 
 function fixture() {
   const chat = { ...newChat('old', 'one'), eveId: 'eve', status: 'working' as const };
@@ -24,6 +25,7 @@ function fixture() {
   const end = vi.fn(async () => {});
   const interrupt = vi.fn();
   const run = vi.fn(async () => {});
+  const models = vi.fn(async (): Promise<AccountModel[]> => []);
   const receive = createPacketReceiver({
     state,
     pending,
@@ -33,7 +35,7 @@ function fixture() {
       Client,
       'sessions'
     >,
-    auth: { models: async () => [] },
+    models: { models },
     routineStore: new RoutineStore('unused'),
     panelStore: new PanelStore('unused'),
     memoryStore: new MemoryStore('unused'),
@@ -47,8 +49,50 @@ function fixture() {
     changed: () => {},
     log: () => {},
   });
-  return { state, pending, receive, cancel, end, interrupt, run };
+  return { state, pending, receive, cancel, end, interrupt, run, models };
 }
+
+test('changing native models resets provider history while preserving the visible chat', async () => {
+  const f = fixture();
+  const chat = f.state.chats[0]!;
+  chat.status = 'done';
+  chat.modelSettings = { model: 'chatgpt-model', effort: 'medium' };
+  chat.messages.push({ role: 'user', text: 'Keep this conversation' });
+  const first = 'connection:35302f8c-128a-48fb-98a1-9eb03bb71f72:anthropic/claude';
+  const second = 'connection:35302f8c-128a-48fb-98a1-9eb03bb71f72:google/gemini';
+  f.models.mockResolvedValue(
+    [first, second].map((slug) => ({ slug, displayName: slug, efforts: [] })),
+  );
+  f.receive(
+    packetSchema.parse({
+      type: 'chat_model_set',
+      requestId: 'model-change',
+      session: 'one',
+      seq: 1,
+      at: 1,
+      chat: 'old',
+      data: { model: first },
+    }),
+  );
+  await vi.waitFor(() => expect(chat.modelSettings?.model).toBe(first));
+  expect(chat.eveId).toBeUndefined();
+  expect(chat.messages[0]?.text).toBe('Keep this conversation');
+  chat.eveId = 'native-session';
+  f.receive(
+    packetSchema.parse({
+      type: 'chat_model_set',
+      requestId: 'model-change',
+      session: 'one',
+      seq: 2,
+      at: 2,
+      chat: 'old',
+      data: { model: second },
+    }),
+  );
+  await vi.waitFor(() => expect(chat.modelSettings?.model).toBe(second));
+  expect(chat.eveId).toBeUndefined();
+  expect(f.end).toHaveBeenCalledTimes(2);
+});
 
 test('reload interrupts old turns, rejects outstanding reads and clears character-specific commands', async () => {
   const f = fixture();

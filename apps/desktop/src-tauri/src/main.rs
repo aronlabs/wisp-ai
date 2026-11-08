@@ -125,6 +125,13 @@ fn permitted(method: &str, route: &str) -> bool {
                 "/auth/select",
                 "/auth/disconnect",
                 "/auth/model",
+                "/connections/save",
+                "/connections/test",
+                "/connections/discover",
+                "/connections/remove",
+                "/search/save",
+                "/search/test",
+                "/search/remove-exa",
                 "/integrations/set",
                 "/mcps/test",
                 "/mcps/save",
@@ -294,6 +301,13 @@ async fn install_addon(host: tauri::State<'_, Host>, wow: String) -> Result<Stri
             .collect());
     }
     Ok("Addon installed. Restart WoW after first installation; use /reload for updates.".into())
+}
+
+#[tauri::command]
+fn open_exa_dashboard(app: tauri::AppHandle) -> Result<(), String> {
+    app.opener()
+        .open_url("https://dashboard.exa.ai/", None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -492,6 +506,7 @@ fn main() {
             pick_folder,
             install_addon,
             open_sign_in,
+            open_exa_dashboard,
             open_logs,
             read_logs,
             import_legacy,

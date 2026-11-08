@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { capabilityViewSchema } from './capabilities.js';
 import { savedRoutine, routineRun } from './routines.js';
+import { connectionView, connectionModel } from './providers.js';
+import { searchState } from './search.js';
 export const desktopInfoSchema = z.object({
   wow: z.string().nullable().optional(),
   configured: z.boolean(),
@@ -48,6 +50,9 @@ export const statusSchema = z.object({
   model: z.string(),
   activeTurns: z.number().int().nonnegative(),
   auth: authStateSchema,
+  connections: z.array(connectionView).default([]),
+  modelConnected: z.boolean().optional(),
+  search: searchState.optional(),
   mcps: z.array(mcpSchema),
   integrations: z.array(capabilityViewSchema),
   panels: z.array(panelSchema),
@@ -65,4 +70,5 @@ export const desktopResponses = {
   '/auth/start': z.object({ authorizationUrl: z.string().url() }).passthrough(),
   '/auth/cancel': authStateSchema,
   '/auth/disconnect': authStateSchema,
+  '/connections/discover': z.object({ models: z.array(connectionModel) }),
 };

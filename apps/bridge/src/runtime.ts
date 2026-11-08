@@ -35,6 +35,8 @@ import { NativeVault, type SecretVault } from './secret-vault.ts';
 import { startDesktopServer } from './desktop-server.ts';
 import { RoutineStore } from './routines.ts';
 import { routineEvents } from '@wisp/protocol/routines';
+import { ModelConnections } from './model-connections.ts';
+import { WebSearch } from './web-search.ts';
 import { ChatGPTAuth } from './chatgpt-auth.ts';
 import { safeErrorMessage } from '@wisp/protocol/model-errors';
 import { TheWoWDB } from './thewowdb.ts';
@@ -108,12 +110,16 @@ export async function startBridge(options: BridgeOptions = {}) {
     resources.defer(() => mcpManager.close());
     const auth = new ChatGPTAuth(runtime, vault);
     await auth.load();
+    const connections = new ModelConnections(path.join(runtime, 'connections.json'), vault, auth);
+    await connections.load();
+    const webSearch = new WebSearch(path.join(runtime, 'search.json'), vault, auth);
+    await webSearch.load();
     resources.defer(() => auth.cancel());
     let modelCatalogLoad: Promise<void> | undefined;
     function refreshModelCatalog() {
       return (modelCatalogLoad ??= (async () => {
         try {
-          state.modelCatalog = await auth.models();
+          state.modelCatalog = await connections.models();
           state.modelCatalogError = undefined;
         } catch (error) {
           state.modelCatalog = [];
@@ -238,7 +244,7 @@ export async function startBridge(options: BridgeOptions = {}) {
     let shutdownRequested = false;
     const run = createTurnRunner({
       client,
-      auth,
+      models: connections,
       capabilitySettings,
       changed,
       log,
@@ -271,7 +277,7 @@ export async function startBridge(options: BridgeOptions = {}) {
       pending,
       integrationState,
       capabilitySettings,
-      auth,
+      models: connections,
       routineStore,
       panelStore,
       memoryStore,
@@ -293,6 +299,8 @@ export async function startBridge(options: BridgeOptions = {}) {
       createAgentHandler({
         token,
         auth,
+        connections,
+        webSearch,
         mcpRelay,
         capabilitySettings,
         routineStore,
@@ -412,6 +420,9 @@ export async function startBridge(options: BridgeOptions = {}) {
           transport.peerRevision >= state.firstReadyRevision,
         ),
         auth: auth.state(),
+        connections: connections.list(),
+        modelConnected: connections.connected(config.model || ''),
+        search: webSearch.state(),
         model: config.model || 'gpt-6-luna',
         activeTurns: state.chats.filter((c) => c.status === 'working').length,
         integrations: capabilitySettings.snapshot(),
@@ -431,6 +442,8 @@ export async function startBridge(options: BridgeOptions = {}) {
       runtime,
       createDesktopHandler({
         auth,
+        connections,
+        webSearch,
         capabilitySettings,
         mcpManager,
         panelStore,

@@ -715,3 +715,14 @@ textarea {
     animation-duration: 2s !important;
   }
 }
+
+.action-progress {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.action-progress:empty {
+  display: none;
+}
