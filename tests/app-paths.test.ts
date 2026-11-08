@@ -9,6 +9,31 @@ import { appPaths, prepareEngine } from '@wisp/bridge/app-paths';
 import { migrateDesktop } from '@wisp/bridge/desktop-migration';
 import { createHash } from 'node:crypto';
 
+test('packaged engine retires legacy source and dependencies while preserving Eve sessions', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wisp-engine-upgrade-'));
+  const previous = process.env.WISP_ENGINE_EXECUTABLE;
+  try {
+    await writeFile(path.join(root, 'package.json'), JSON.stringify({ name: '@wisp/agent' }));
+    for (const name of ['src', 'agent', 'dist', 'node_modules', '.eve']) {
+      await mkdir(path.join(root, name));
+      await writeFile(path.join(root, name, 'marker'), name);
+    }
+    process.env.WISP_ENGINE_EXECUTABLE = 'packaged-engine';
+    await prepareEngine(root, root);
+    assert.equal(await readFile(path.join(root, '.eve/marker'), 'utf8'), '.eve');
+    for (const name of ['src', 'agent', 'dist', 'node_modules', 'package.json']) {
+      await assert.rejects(readFile(path.join(root, name)), { code: 'ENOENT' });
+    }
+  } finally {
+    if (previous === undefined) {
+      delete process.env.WISP_ENGINE_EXECUTABLE;
+    } else {
+      process.env.WISP_ENGINE_EXECUTABLE = previous;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('the installed bridge can import native adapters from node_modules without TypeScript stripping', async () => {
   const temporary = await mkdtemp(path.join(tmpdir(), 'wisp-native-import-'));
   try {

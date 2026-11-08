@@ -5,6 +5,9 @@ packages:
   - tests
   - addon
 
+allowBuilds:
+  esbuild: true
+
 # Package boundaries stay explicit; undeclared transitive imports are not hoisted.
 hoist: false
 

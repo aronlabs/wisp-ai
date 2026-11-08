@@ -6,7 +6,9 @@ Copyright (C) 2026 Eden Blue Ventures LLC.
 Upstream code is licensed under GNU GPL version 3 only.
 This combined project is distributed under GPL-3.0-only. See LICENSE.
 
-Eve and its dependencies retain their own licenses in node_modules.
+Eve and its dependencies retain their own licenses. Packaged Windows builds
+include EVE-LICENSE.txt and EVE-NOTICE.txt; dependency licenses remain embedded
+with their packages in wisp-engine.exe (node_modules in development builds).
 No thott.bot logos, fonts or brand artwork are included.
 
 The local simulation engine is WoWSims Forever, using StewBagger's levelsim branch.

@@ -35,6 +35,10 @@ fn hidden(command: &mut Command) {
 
 impl Host {
     fn node(&self) -> PathBuf {
+        let engine = self.payload.join("wisp-engine.exe");
+        if engine.is_file() {
+            return engine;
+        }
         self.payload
             .join("runtime")
             .join(if cfg!(windows) { "node.exe" } else { "node" })
@@ -42,7 +46,11 @@ impl Host {
     fn command(&self, script: &str) -> Result<Command, String> {
         let mut command = Command::new(self.node());
         command
-            .arg(self.payload.join(script))
+            .arg(if self.payload.join("wisp-engine.exe").is_file() {
+                PathBuf::from(script)
+            } else {
+                self.payload.join(script)
+            })
             .current_dir(&self.payload)
             .env("WISP_DATA_DIR", &self.data)
             .env("WISP_RESOURCE_ROOT", &self.payload)
@@ -456,25 +464,37 @@ fn main() {
                         .ok_or("Missing executable directory")?
                         .join("payload"),
                 );
-            for name in [
-                "src/main.ts",
-                "node_modules/@wisp/agent/agent/agent.ts",
-                "scripts/install.ts",
-                "addon/WispAI/WispAI.toc",
-                "node_modules/eve/bin/eve.js",
-            ] {
+            let engine = payload.join("wisp-engine.exe");
+            let required: &[&str] = if engine.is_file() {
+                &["addon/WispAI/WispAI.toc", "BUILD.json", "package.json"]
+            } else {
+                &[
+                    "src/main.ts",
+                    "node_modules/@wisp/agent/agent/agent.ts",
+                    "scripts/install.ts",
+                    "addon/WispAI/WispAI.toc",
+                    "node_modules/eve/bin/eve.js",
+                ]
+            };
+            for name in required {
                 if !payload.join(name).is_file() {
                     return Err(format!("Missing resource: {name}"));
                 }
             }
-            let mut command = Command::new(payload.join("runtime").join(if cfg!(windows) {
-                "node.exe"
+            let mut command = Command::new(if engine.is_file() {
+                engine.clone()
             } else {
-                "node"
-            }));
+                payload
+                    .join("runtime")
+                    .join(if cfg!(windows) { "node.exe" } else { "node" })
+            });
             hidden(&mut command);
             if !command
-                .arg("--version")
+                .arg(if engine.is_file() {
+                    "--self-test"
+                } else {
+                    "--version"
+                })
                 .output()
                 .map_err(|e| e.to_string())?
                 .status

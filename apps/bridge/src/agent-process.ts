@@ -12,16 +12,18 @@ interface EveProcessOptions {
 
 export function startEveProcess(options: EveProcessOptions): ChildProcess {
   const child = spawn(
-    process.execPath,
-    [
-      path.join(options.root, 'node_modules', 'eve', 'bin', 'eve.js'),
-      'dev',
-      '--no-ui',
-      '--no-default-extensions',
-      '--resume',
-      '--port',
-      String(options.port ?? 43186),
-    ],
+    options.environment.WISP_ENGINE_EXECUTABLE || process.execPath,
+    options.environment.WISP_ENGINE_EXECUTABLE
+      ? ['--eve', String(options.port ?? 43186)]
+      : [
+          path.join(options.root, 'node_modules', 'eve', 'bin', 'eve.js'),
+          'dev',
+          '--no-ui',
+          '--no-default-extensions',
+          '--resume',
+          '--port',
+          String(options.port ?? 43186),
+        ],
     {
       cwd: options.root,
       windowsHide: true,

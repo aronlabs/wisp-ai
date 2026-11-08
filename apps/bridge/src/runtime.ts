@@ -216,7 +216,13 @@ export async function startBridge(options: BridgeOptions = {}) {
     let dirty = true;
     const pending = new GameRequests(changed);
     resources.defer(() => pending.cancelAll('Bridge stopped'));
-    const client = options.client || new Client({ baseUrl: 'http://127.0.0.1:43186' });
+    const token = randomBytes(32).toString('hex');
+    const client =
+      options.client ||
+      new Client({
+        baseUrl: 'http://127.0.0.1:43186',
+        auth: { bearer: () => token },
+      });
     async function readSimulationCharacter(chat = 'desktop-simulation'): Promise<unknown> {
       if (!state.activeTransport || !capabilitySettings.enabled('tool:query_character')) {
         throw Error('Connect WoW and enable Character readings first.');
@@ -228,7 +234,6 @@ export async function startBridge(options: BridgeOptions = {}) {
       });
     }
     mcpRelay.readOnlyMode = () => state.chats.some((c) => c.proactive && c.status === 'working');
-    const token = randomBytes(32).toString('hex');
     function log(message: string) {
       console.log(new Date().toISOString(), message);
     }

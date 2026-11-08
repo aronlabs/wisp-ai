@@ -1,10 +1,11 @@
-import { access, cp, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifySimulator } from './verify-simulator.ts';
+import { findNpmDirectory } from './node-runtime.ts';
 
-export async function stageTauri() {
+export async function stageTauri({ packaged = false } = {}) {
   const root = fileURLToPath(new URL('../', import.meta.url));
   const stage = path.resolve(root, 'apps/desktop/src-tauri/resources/payload');
   if (stage !== path.join(root, 'apps', 'desktop', 'src-tauri', 'resources', 'payload')) {
@@ -14,23 +15,40 @@ export async function stageTauri() {
   await rm(stage, { recursive: true, force: true });
   // Hoisting is restricted to the standalone deployment: Windows installer resources
   // must contain real directories, without junctions back to the developer's store.
-  const executable = process.env.npm_execpath || 'pnpm';
-  const args = [
-    '--filter',
-    '@wisp/bridge',
-    '--prod',
-    'deploy',
-    '--legacy',
-    '--ignore-scripts',
-    '--config.node-linker=hoisted',
-    stage,
-  ];
-  const javascript = /\.(?:c?js|mjs)$/.test(executable);
-  execFileSync(
-    javascript ? process.execPath : executable,
-    javascript ? [executable, ...args] : args,
-    { cwd: root, windowsHide: true, stdio: 'inherit' },
-  );
+  if (packaged) {
+    const { buildEngine } = await import('./build-engine.ts');
+    const executable = await buildEngine();
+    await mkdir(stage, { recursive: true });
+    await copyFile(executable, path.join(stage, 'wisp-engine.exe'));
+    const eve = path.dirname(fileURLToPath(import.meta.resolve('eve/package.json')));
+    await copyFile(path.join(eve, 'LICENSE'), path.join(stage, 'EVE-LICENSE.txt'));
+    await copyFile(path.join(eve, 'NOTICE'), path.join(stage, 'EVE-NOTICE.txt'));
+    await writeFile(
+      path.join(stage, 'package.json'),
+      JSON.stringify({
+        name: '@wisp/engine-payload',
+        version: JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version,
+      }),
+    );
+  } else {
+    const executable = process.env.npm_execpath || 'pnpm';
+    const args = [
+      '--filter',
+      '@wisp/bridge',
+      '--prod',
+      'deploy',
+      '--legacy',
+      '--ignore-scripts',
+      '--config.node-linker=hoisted',
+      stage,
+    ];
+    const javascript = /\.(?:c?js|mjs)$/.test(executable);
+    execFileSync(
+      javascript ? process.execPath : executable,
+      javascript ? [executable, ...args] : args,
+      { cwd: root, windowsHide: true, stdio: 'inherit' },
+    );
+  }
   for (const name of ['addon/WispAI', 'simulator']) {
     await cp(path.join(root, name), path.join(stage, name), { recursive: true });
   }
@@ -44,28 +62,9 @@ export async function stageTauri() {
   );
   // npm remains available for user-configured npx MCP servers. It is not used
   // to install Wisp or to assemble its dependency graph.
-  let npmDirectory = '';
-  for (const relative of [
-    'npm',
-    'node_modules/npm',
-    '../node_modules/npm',
-    '../lib/node_modules/npm',
-  ]) {
-    const candidate = path.resolve(path.dirname(process.execPath), relative);
-    try {
-      await access(path.join(candidate, 'bin/npx-cli.js'));
-      npmDirectory = candidate;
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
-    }
+  if (!packaged) {
+    await cp(await findNpmDirectory(), path.join(stage, 'runtime/npm'), { recursive: true });
   }
-  if (!npmDirectory) {
-    throw Error('Cannot locate npm in the build Node distribution.');
-  }
-  await cp(npmDirectory, path.join(stage, 'runtime/npm'), { recursive: true });
   const license = await fetch(
     'https://raw.githubusercontent.com/nodejs/node/v' + process.versions.node + '/LICENSE',
   );
