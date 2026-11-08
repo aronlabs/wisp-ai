@@ -77,6 +77,21 @@ pnpm build:desktop
 
 `pnpm package:windows` is an alias. Output in `dist/` includes the unsigned per-user installer, SHA-256 checksum and build metrics. Packaged resources include Node/npm, the bridge, agent, protocol, addon and simulator; updates preserve user data. See [packaging code](../scripts/build-desktop.ts), [staging](../scripts/stage-desktop.ts) and the [release workflow](../.github/workflows/release.yml) for resource verification and cache details. Tag builds create draft releases for review before publication.
 
+Windows installers package the bridge, addon installation/migration commands,
+Eve's production server and npm into `payload/wisp-engine.exe`. Dependencies are
+read from its embedded virtual filesystem; the installer does not extract an
+application `node_modules` tree. `payload/runtime/node.exe` remains bundled for
+user-configured external MCP programs. Development staging keeps the source-based
+layout and Eve development server.
+
+`pnpm package:engine` builds just `dist/wisp-engine.exe` and runs the packaged
+integration checks. Those tests relocate the executable to a temporary directory,
+remove Node from the child process PATH, complete a streamed model turn and a
+real tool call against local fixtures, restart Eve to verify session persistence,
+and run a local npm executable offline. They reject loose dependency extraction.
+The installer CI additionally checks the native host, installation, upgrades and
+preservation of user data.
+
 ### Publishing app updates
 
 Installed Windows x64 release builds check `https://github.com/fedeya/wisp-ai/releases/latest/download/latest.json` at startup and every six hours. **Settings > Check for updates** checks manually. Users review release notes and choose **Update and restart**; the app verifies the download before stopping the bridge, waits for active replies and installs through NSIS. Chats, credentials and settings remain in AppData. Development builds and other platforms do not install updates. Overview detects when the bundled addon differs from the installed copy; use **Install / update addon**, then `/reload` in WoW.

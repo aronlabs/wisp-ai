@@ -26,7 +26,7 @@ function tauri(args: string[]) {
   });
 }
 const started = performance.now();
-await stageTauri();
+await stageTauri({ packaged: true });
 const staged = performance.now();
 // Build the frontend first: its actual output, including VITE_* substitutions,
 // belongs to the cache key because Tauri embeds it in the native executable.
