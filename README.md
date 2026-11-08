@@ -79,13 +79,13 @@ It runs the bridge without a console window, minimizes to the system tray on clo
 and stops its bridge from the tray Exit command. User data lives in the operating system application-data directory (`%APPDATA%/com.wisp.ai` on Windows), separate from installed resources. Wisp has its own Sign in with ChatGPT connection,
 using the official OSS dynamic registration flow (PKCE and verified OpenID identity).
 No API key, shared Codex client ID, Codex installation or copied Codex auth file is used.
-Credentials are encrypted with Windows DPAPI under LocalAppData for this Windows
+Credentials are encrypted with Windows DPAPI in the application data directory for this Windows
 user. macOS uses Keychain in the native host. ChatGPT model calls use the public Responses API with
 store:false; Eve only receives a per-process authenticated loopback endpoint.
 
 The ChatGPT connection shows connection state and saved accounts, supports browser sign-in,
 cancellation, account switching and independent disconnection, and lists the models
-available to the active grant. Use model persists the choice and restarts the agent
+available to the active grant. Set default persists the choice and restarts the agent
 when no turn is active. Browser cancellation, identity-only consent, expired access,
 refresh rotation and remote revocation failures have explicit states. Disconnect
 revokes Wisp's own refresh token and clears its local credentials; it leaves

@@ -7,7 +7,14 @@ await stageTauri();
 execFileSync(
   process.execPath,
   [path.resolve('node_modules/@tauri-apps/cli/tauri.js'), 'build', '--bundles', 'nsis'],
-  { windowsHide: true, stdio: 'inherit' },
+  {
+    windowsHide: true,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      PATH: path.dirname(process.execPath) + path.delimiter + (process.env.PATH || ''),
+    },
+  },
 );
 await mkdir('dist', { recursive: true });
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;

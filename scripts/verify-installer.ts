@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Client } from 'eve/client';
 const exec = promisify(execFile);
+if (!process.env.CI || !process.env.APPDATA) {
+  throw Error('Run installer verification in a disposable Windows CI profile.');
+}
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;
 const installer = path.resolve(process.argv[2] || `dist/WispAI-${version}-windows-x64-setup.exe`);
 const temporary = await mkdtemp(path.join(tmpdir(), 'wisp-installer-'));
@@ -12,7 +15,7 @@ if (!temporary.startsWith(path.resolve(tmpdir()) + path.sep)) {
   throw Error('Unsafe test directory.');
 }
 const target = path.join(temporary, 'Installed'),
-  data = path.join(temporary, 'UserData');
+  data = path.join(process.env.APPDATA, 'com.wisp.ai');
 let child: ReturnType<typeof spawn> | undefined;
 try {
   await exec(installer, ['/S', '/D=' + target], { windowsHide: true, timeout: 180000 });
@@ -36,6 +39,14 @@ try {
     }
   }
   await mkdir(data, { recursive: true });
+  try {
+    await access(path.join(data, 'config.local.json'));
+    throw Error('Installer verification requires a fresh user profile.');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
   const env = { ...process.env, WISP_DATA_DIR: data, WISP_DESKTOP_EXE: executable };
   await exec(executable, ['--self-test'], { env, windowsHide: true, timeout: 30000 });
   await writeFile(
@@ -108,7 +119,13 @@ try {
     });
   });
   await writeFile(path.join(data, 'preserve-on-uninstall.txt'), 'keep user data');
-  await exec(path.join(target, 'uninstall.exe'), ['/S'], { windowsHide: true, timeout: 120000 });
+  await exec(installer, ['/S', '/D=' + target], { windowsHide: true, timeout: 180000 });
+  await access(path.join(data, 'config.local.json'));
+  await access(path.join(data, 'runtime/chats.json'));
+  await exec(path.join(target, 'uninstall.exe'), ['/S', '_?=' + target], {
+    windowsHide: true,
+    timeout: 120000,
+  });
   await access(path.join(data, 'preserve-on-uninstall.txt'));
   const report = {
     installer: true,
@@ -118,6 +135,7 @@ try {
     independentSignIn: true,
     noPersonalData: true,
     userDataPreserved: true,
+    upgradePreservesHistory: true,
   };
   await writeFile('dist/installer-smoke.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));

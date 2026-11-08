@@ -15,6 +15,7 @@ export class NativeVault implements SecretVault {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       let output = '';
+      child.stdout.setEncoding('utf8');
       const timer = setTimeout(() => {
         child.kill();
         reject(Error('Native credential storage timed out'));

@@ -18,6 +18,8 @@ jobs:
       - run: npm run check
       - run: npm run test:ui
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -37,12 +39,14 @@ jobs:
         shell: pwsh
       - run: npm test
       - run: npm run build:desktop
-      - run: cargo test --release --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --release --features tauri/custom-protocol --manifest-path src-tauri/Cargo.toml
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml
       - run: node scripts/verify-installer.ts
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: Wisp-windows-x64
+          if-no-files-found: ignore
           path: |
             dist/*-setup.exe
             dist/*.sha256

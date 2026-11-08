@@ -59,6 +59,7 @@
   let status = $state<Status | null>(null);
   let info = $state<DesktopInfo | null>(null);
   let loading = $state(true);
+  let starting = $state(false);
   let busy = $state("");
   let feedback = $state("");
   let failed = $state(false);
@@ -87,6 +88,7 @@
     try {
       const next = await request<Status>("/status");
       status = next;
+      if (next.ready) starting = false;
       if (!account || !next.auth.profiles.some((p) => p.id === account))
         account = next.auth.activeId || "";
       if (!model) model = next.model;
@@ -160,12 +162,19 @@
     const folder = await desktop<string | null>("pick_folder");
     if (folder) wow = folder;
   }
+  async function launchBridge() {
+    starting = true;
+    try {
+      await desktop("start_bridge");
+    } catch (error) {
+      starting = false;
+      throw error;
+    }
+  }
   async function start() {
-    await work(
-      "Starting Wisp",
-      () => desktop("start_bridge"),
-      "Wisp is starting.",
-    );
+    starting = true;
+    await work("Starting Wisp", () => launchBridge(), "Wisp is starting.");
+    if (failed) starting = false;
   }
   async function install() {
     await work(
@@ -173,7 +182,7 @@
       async () => {
         feedback = await desktop<string>("install_addon", { wow });
         info = await desktop<DesktopInfo>("desktop_info");
-        await desktop("start_bridge");
+        await launchBridge();
       },
       "Addon installed. Restart WoW after the first installation; use /reload for updates.",
     );
@@ -187,7 +196,7 @@
         await desktop("import_legacy", { source });
         info = await desktop<DesktopInfo>("desktop_info");
         wow = info.wow || "";
-        await desktop("start_bridge");
+        await launchBridge();
       },
       "Imported chats, memory and protected credentials. Wisp is starting.",
     );
@@ -240,9 +249,11 @@
       info = await desktop<DesktopInfo>("desktop_info");
       wow = info.wow || "";
       if (info.configured) {
+        starting = true;
         try {
-          await desktop("start_bridge");
+          await launchBridge();
         } catch (e) {
+          starting = false;
           failed = true;
           feedback = String(e);
         }
@@ -304,9 +315,11 @@
           ? "Checking connection"
           : status?.gameConnected
             ? "Connected to WoW"
-            : status
-              ? "Waiting for WoW"
-              : "Wisp is stopped"}
+            : (status && !status.ready) || starting
+              ? "Starting Wisp"
+              : status
+                ? "Waiting for WoW"
+                : "Wisp is stopped"}
       </div>
     </header>
     {#if !native}<div class="banner">
@@ -371,7 +384,7 @@
               ? "Working…"
               : status?.ready
                 ? "Ready to help"
-                : status
+                : status || starting
                   ? "Starting…"
                   : "Stopped"}
           </h2>
@@ -418,7 +431,10 @@
             onclick={() =>
               work(
                 "Stopping Wisp",
-                () => desktop("stop_bridge"),
+                async () => {
+                  await desktop("stop_bridge");
+                  starting = false;
+                },
                 "Wisp stopped.",
               )}
             disabled={locked || !status}>Stop Wisp</button
@@ -775,7 +791,7 @@
     {/if}
     <footer class="app-footer">
       <span>Wisp stays available in your system tray.</span><span
-        >Tauri + Svelte</span
+        >History saved locally.</span
       >
     </footer>
   </main>
