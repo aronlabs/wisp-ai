@@ -8,20 +8,46 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
       - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm ui:build
+      - name: Fingerprint native executable inputs
+        id: native-key
+        run: node scripts/native-cache-key.ts
+      - name: Restore optimized native executable
+        id: native-binary
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/wisp-native
+          key: wisp-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.native-key.outputs.key }}
       - uses: Swatinem/rust-cache@v2
+        if: steps.native-binary.outputs.cache-hit != 'true'
         with:
           workspaces: apps/desktop/src-tauri
           cache-on-failure: true
-      - uses: actions/setup-go@v6
+      - name: Restore pinned simulator build
+        id: simulator-binary
+        uses: actions/cache@v4
         with:
-          go-version: '1.25'
+          path: |
+            simulator/wowsimcli.exe
+            simulator/manifest.json
+            simulator/item-ids.json
+            simulator/mage-talents.json
+          key: wisp-simulator-v1-${{ runner.os }}-${{ runner.arch }}-go1.25.14-${{ hashFiles('scripts/build-simulator.ps1', 'scripts/simulator-metadata.ts', 'scripts/verify-simulator.ts', 'simulator/*.json') }}
+      - uses: actions/setup-go@v6
+        if: steps.simulator-binary.outputs.cache-hit != 'true'
+        with:
+          go-version: '1.25.14'
           cache: false
       - run: choco install protoc --yes --no-progress
+        if: steps.simulator-binary.outputs.cache-hit != 'true'
       - uses: actions/cache@v4
+        if: steps.simulator-binary.outputs.cache-hit != 'true'
         with:
           path: |
             ~/go/pkg/mod
@@ -29,6 +55,7 @@ jobs:
             node_modules/.cache/wowsims-levelsim
           key: wowsims-windows-go125-7f9c0e7
       - run: ./scripts/build-simulator.ps1
+        if: steps.simulator-binary.outputs.cache-hit != 'true'
         shell: pwsh
       - run: pnpm build:desktop
       - uses: actions/upload-artifact@v4
@@ -39,6 +66,7 @@ jobs:
           path: |
             dist/*-setup.exe
             dist/*.sha256
+            dist/build-metrics.json
       - if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:

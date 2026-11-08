@@ -4,13 +4,17 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { stageTauri } from './stage-tauri.ts';
 import { createRequire } from 'node:module';
+import {
+  nativeBuildContext,
+  nativeBuildKey,
+  restoreNativeBinary,
+  saveNativeBinary,
+} from './native-cache.ts';
 const desktop = path.resolve('apps/desktop');
 const require = createRequire(path.join(desktop, 'package.json'));
-await stageTauri();
-execFileSync(
-  process.execPath,
-  [require.resolve('@tauri-apps/cli/tauri.js'), 'build', '--bundles', 'nsis'],
-  {
+const cli = require.resolve('@tauri-apps/cli/tauri.js');
+function tauri(args: string[]) {
+  execFileSync(process.execPath, [cli, ...args], {
     windowsHide: true,
     stdio: 'inherit',
     cwd: desktop,
@@ -18,9 +22,71 @@ execFileSync(
       ...process.env,
       PATH: path.dirname(process.execPath) + path.delimiter + (process.env.PATH || ''),
     },
+  });
+}
+const started = performance.now();
+await stageTauri();
+const staged = performance.now();
+// Build the frontend first: its actual output, including VITE_* substitutions,
+// belongs to the cache key because Tauri embeds it in the native executable.
+execFileSync(
+  process.execPath,
+  [path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js'), 'build'],
+  {
+    cwd: desktop,
+    windowsHide: true,
+    stdio: 'inherit',
   },
 );
+const frontendBuilt = performance.now();
+const context = nativeBuildContext();
+const key = await nativeBuildKey(process.cwd(), context);
+const cache = path.resolve('node_modules/.cache/wisp-native');
+const executable = path.join(desktop, 'src-tauri/target/release/wisp.exe');
+// Custom Tauri overrides may reference inputs outside the checked-in project.
+// They always use a fresh build rather than risk reusing the wrong executable.
+const cacheable = !process.env.TAURI_CONFIG;
+const reused =
+  cacheable &&
+  process.env.WISP_FORCE_NATIVE_BUILD !== '1' &&
+  (await restoreNativeBinary(cache, key, executable));
+if (!reused) {
+  tauri(['build', '--no-bundle', '--', '--locked']);
+  if (cacheable) {
+    if (key !== (await nativeBuildKey(process.cwd(), context))) {
+      throw Error('Native build inputs changed during compilation. No binary was cached.');
+    }
+    await saveNativeBinary(cache, key, executable);
+  }
+}
+const nativeBuilt = performance.now();
+const nativeBinarySha256 = createHash('sha256')
+  .update(await readFile(executable))
+  .digest('hex');
+// Always assemble current bridge/agent/addon/simulator resources. Only the
+// unchanged, fully optimized native executable may be reused.
+tauri(['bundle', '--bundles', 'nsis']);
+const bundled = performance.now();
 await mkdir('dist', { recursive: true });
+await writeFile(
+  'dist/build-metrics.json',
+  JSON.stringify(
+    {
+      nativeCacheHit: Boolean(reused),
+      nativeInputsKey: key,
+      nativeBinarySha256,
+      milliseconds: {
+        stage: staged - started,
+        frontend: frontendBuilt - staged,
+        native: nativeBuilt - frontendBuilt,
+        bundle: bundled - nativeBuilt,
+        total: bundled - started,
+      },
+    },
+    null,
+    2,
+  ),
+);
 const version = JSON.parse(await readFile('package.json', 'utf8')).version;
 const folder = 'apps/desktop/src-tauri/target/release/bundle/nsis';
 const installers = (await readdir(folder)).filter((file) => file.endsWith('-setup.exe'));

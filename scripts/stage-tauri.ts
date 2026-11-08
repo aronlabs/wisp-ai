@@ -2,6 +2,7 @@ import { access, cp, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/pr
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifySimulator } from './verify-simulator.ts';
 
 export async function stageTauri() {
   const root = fileURLToPath(new URL('../', import.meta.url));
@@ -9,7 +10,7 @@ export async function stageTauri() {
   if (stage !== path.join(root, 'apps', 'desktop', 'src-tauri', 'resources', 'payload')) {
     throw Error('Invalid payload directory.');
   }
-  await readFile(path.join(root, 'simulator/wowsimcli.exe'));
+  await verifySimulator(root);
   await rm(stage, { recursive: true, force: true });
   // Hoisting is restricted to the standalone deployment: Windows installer resources
   // must contain real directories, without junctions back to the developer's store.
