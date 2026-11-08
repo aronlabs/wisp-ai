@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
@@ -14,7 +14,7 @@ for (const surface of ['main', 'inline']) {
         throw new Error(to_jsstring(lua.lua_tolstring(state, -1)));
       }
     };
-    run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+    run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
     run('C = {}; SlashCmdList = {}; function time() return 1 end');
     for (const file of ['Core.lua', 'RichUI.lua', 'UI.lua', 'Inline.lua']) {
       run(

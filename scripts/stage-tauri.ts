@@ -30,7 +30,7 @@ export async function stageTauri() {
     javascript ? [executable, ...args] : args,
     { cwd: root, windowsHide: true, stdio: 'inherit' },
   );
-  for (const name of ['addon', 'simulator']) {
+  for (const name of ['addon/WispAI', 'simulator']) {
     await cp(path.join(root, name), path.join(stage, name), { recursive: true });
   }
   for (const name of ['LICENSE', 'NOTICE']) {

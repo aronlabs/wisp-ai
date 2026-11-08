@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,7 +7,7 @@ import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import { createHash } from 'node:crypto';
 import { ChatGPTAuth } from '@wisp/bridge/chatgpt-auth';
 
-async function fixture(t: { after(fn: () => Promise<void>): void }) {
+async function fixture(t: Pick<TestContext, 'onTestFinished'>) {
   const root = await mkdtemp(path.join(tmpdir(), 'wisp-auth-')),
     values = new Map<string, string>();
   const vault = {
@@ -100,7 +100,7 @@ async function fixture(t: { after(fn: () => Promise<void>): void }) {
   }) as typeof fetch;
   const auth = new ChatGPTAuth(root, vault, { fetch: mock, now: () => now });
   await auth.load();
-  t.after(async () => {
+  t.onTestFinished(async () => {
     await auth.cancel();
     assert.ok(path.resolve(root).startsWith(path.resolve(tmpdir()) + path.sep));
     await rm(root, { recursive: true, force: true });

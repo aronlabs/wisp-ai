@@ -54,7 +54,14 @@ jobs:
       - run: choco install protoc --yes --no-progress
       - run: ./scripts/build-simulator.ps1
         shell: pwsh
-      - run: pnpm test
+      - run: pnpm test:core
+  addon-tests:
+    if: github.event_name != 'workflow_run'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm test:addon
   ui-tests:
     if: github.event_name != 'workflow_run'
     runs-on: windows-latest

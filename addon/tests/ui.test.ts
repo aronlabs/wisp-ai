@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -11,7 +11,7 @@ test('chat placeholder distinguishes connecting, fetching history and an empty c
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
     }
   };
-  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(`C={db={sidebar=true,showTools=true,drafts={}},active='chat',connected=false}
     C.chats={{id='chat',title='Test',status='idle',activity={}}}
     function C.Current() return C.chats[1] end
@@ -65,7 +65,7 @@ test('context meter distinguishes unknown usage, measured context and compaction
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
     }
   };
-  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(`C={db={sidebar=true,showTools=true,drafts={}},active='chat',connected=true}
     C.chats={{id='chat',title='Test',status='idle',messages={},activity={}}}
     function C.Current() return C.chats[1] end
@@ -101,7 +101,7 @@ test('native renderer reuses rows, has a visible scrollbar, and preserves a read
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
     }
   };
-  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(
     `
 C = { db = { sidebar = true, showTools = true, drafts = {} }, active = "chat", connected = true }
@@ -345,7 +345,7 @@ test('macro references show the actual code and pick up by current name without 
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
     }
   };
-  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(
     `
 C = { db = { sidebar = true, showTools = true, drafts = {} }, active = "chat", connected = true }
@@ -401,7 +401,7 @@ test('structured skill replies use the declared skill and map references support
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
     }
   };
-  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(
     `C={db={sidebar=true,showTools=true,drafts={}},active='chat',connected=true}; C.chats={{id='chat',title='References',status='done',messages={{id='question',role='user',text='|cff71d5ff|Hspell:11070:0|h[Descarga de Escarcha mejorada]|h|r?'},{id='reply',role='assistant',references={skill={kind='spell',id=11070,payload='spell:11070:0',label='Descarga de Escarcha mejorada'},zone={kind='map',mapId=1411,label='Durotar'},ramp={kind='map',mapId=1411,x=45,y=62.5,label='Rampa'}},text='Sí, [[ref:skill]]. Descarga de Escarcha mejoradaExtra. ` +
       '`Descarga de Escarcha mejorada`' +
@@ -420,7 +420,7 @@ test('verified references support hover and quest clicks without reserving trans
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
     }
   };
-  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(`
 C = { db = { sidebar = true, showTools = true, drafts = {} }, active = "chat", connected = true }
 C.chats = {

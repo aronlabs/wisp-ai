@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
 import { FrameDecoder, parseFrame, luaJson } from '@wisp/protocol/protocol';

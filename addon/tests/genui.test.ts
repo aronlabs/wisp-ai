@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -52,7 +52,7 @@ test('native components preserve local edits across snapshots and dispatch regis
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
     }
   };
-  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(
     `
 C = { db = {}, workStarted = {} }
@@ -136,7 +136,7 @@ test('saved panels preserve controls after reload and can regroup or replace nod
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
     }
   };
-  run(readFileSync('tests/wow-ui-stub.lua', 'utf8'));
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(
     `
 C = {}

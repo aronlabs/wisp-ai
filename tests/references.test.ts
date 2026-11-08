@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { linkedReferences } from '@wisp/protocol/references';
 import { turnInput, visibleUserText } from '@wisp/bridge/context';

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { ReplyProjection, ReplyStream } from '@wisp/bridge/reply-stream';
 import { applyEvent, type Chat } from '@wisp/bridge/events';

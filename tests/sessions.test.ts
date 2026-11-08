@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { resumeChat, isAutomaticEmptyChat } from '@wisp/bridge/sessions';
 import type { Chat } from '@wisp/bridge/events';

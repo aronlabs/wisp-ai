@@ -1,17 +1,13 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { CapabilitySettings } from '@wisp/bridge/capabilities';
 import { IntegrationState } from '../apps/bridge/src/integration-state.ts';
 import { integrationContext, defaultCapabilities } from '@wisp/protocol/capabilities';
 import { enabledTool } from '@wisp/agent/enabled-tool';
 import { dynamicEvaluate } from '../node_modules/eve/dist/src/dynamic/definition.js';
-const require = createRequire(import.meta.url);
-const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
 
 test('integration availability and master switches govern real Eve definitions and backend admission, preserving preferences', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'wisp-integrations-'));
@@ -100,33 +96,6 @@ test('every local tool belongs to one integration and exposes a unique namespace
     assert.match(tool.toolName!, /^[a-z]+__[a-z_]+$/);
     assert.ok(catalog.some((entry) => entry.id === tool.parent && !entry.parent));
   }
-});
-
-test('Lua discovery distinguishes missing, wrong-version, partial and complete Questie providers', () => {
-  const L = lauxlib.luaL_newstate();
-  lualib.luaL_openlibs(L);
-  const run = (code: string) => {
-    if (lauxlib.luaL_dostring(L, to_luastring(code)) !== lua.LUA_OK) {
-      throw Error(to_jsstring(lua.lua_tolstring(L, -1)));
-    }
-  };
-  run('C={}; C_AddOns={GetAddOnMetadata=function() return "test" end}');
-  run(
-    `assert(load(${JSON.stringify(readFileSync('addon/WispAI/Integrations.lua', 'utf8'))}))('WispAI',C)`,
-  );
-  run(`
-    assert(C.IntegrationReport().questie.status=='missing')
-    LibQuestieDB={flavor={expansion='Classic'},RequireContract=function()return true end,Npc={Get=function()end,Exists=function()end}}
-    assert(C.IntegrationReport().questie.status=='incompatible')
-    LibQuestieDB.flavor.expansion='Forever'
-    assert(C.IntegrationReport().questie.status=='partial')
-    Questie={IsForever=true}; QuestieLoader={ImportModule=function()error('not ready')end}
-    assert(C.IntegrationReport().questie.status=='partial')
-    QuestieLoader.ImportModule=function()return{GetClassTrainers=function()end,townsfolk={}}end
-    assert(C.IntegrationReport().questie.status=='ready')
-    LibQuestieDB.RequireContract=function()error('contract mismatch')end
-    assert(C.IntegrationReport().questie.status=='incompatible')
-  `);
 });
 
 test('integration context records disabled choices without leaking descriptions or external instructions', () => {

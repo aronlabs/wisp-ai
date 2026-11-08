@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { Simulator } from '@wisp/bridge/simulation';
@@ -96,7 +96,7 @@ test('incomplete, unsupported, changed and mismatched character data cannot prod
 });
 test(
   'native pinned WoWSims executes a nonzero level-11 simulation',
-  { skip: !existsSync('simulator/wowsimcli.exe') },
+  { skip: !existsSync('simulator/wowsimcli.exe'), timeout: 60000 },
   async () => {
     const result = await simulator.run(mageSnapshot(), { ...input, iterations: 100 });
     assert.equal(result.status, 'available', JSON.stringify(result));
@@ -111,7 +111,7 @@ test(
 
 test(
   'native level-11 comparison executes an opener, cooldown, channel and equipped wand',
-  { skip: !existsSync('simulator/wowsimcli.exe') },
+  { skip: !existsSync('simulator/wowsimcli.exe'), timeout: 60000 },
   async () => {
     const snapshot = mageSnapshot();
     snapshot.sections.spells.data.known.push(...[2136, 5143, 5019, 122].map((id) => ({ id })));

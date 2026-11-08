@@ -11,10 +11,27 @@ pnpm install --frozen-lockfile
 pnpm build
 pnpm check
 pnpm test
-pnpm test:ui
 ```
 
-`build` compiles the protocol and desktop frontend, not the native host, simulator or installer. `check` runs formatting, lint and type checks; the two test commands cover backend and desktop UI tests. Simulator engine tests require its binary—offline input tests alone do not validate the engine.
+`build` compiles the protocol and desktop frontend, not the native host, simulator or installer. `check` runs formatting, lint and type checks; `pnpm test` runs all TypeScript tests with Vitest (core, addon and desktop UI). Simulator engine tests require its binary—offline input tests alone do not validate the engine.
+
+## Tests
+
+Vitest projects keep each environment separate:
+
+| Command           | Scope                                                                |
+| ----------------- | -------------------------------------------------------------------- |
+| `pnpm test`       | All TypeScript tests                                                 |
+| `pnpm test:core`  | Bridge, agent, protocol and integration tests in `tests/` (Node)     |
+| `pnpm test:addon` | Addon tests and WoW stubs in `addon/tests/` (Node + Fengari for Lua) |
+| `pnpm test:ui`    | Svelte components in `apps/desktop/src/` (jsdom + Testing Library)   |
+| `pnpm test:watch` | Watch all projects; Lua source and fixture changes rerun addon tests |
+
+Filter tests with `pnpm test --project addon` or `pnpm test:watch --project core`.
+The test commands build the shared protocol first. Existing schema assertions in addon tests
+also verify the TypeScript contracts consumed by Lua. Native Rust tests remain on Cargo;
+see the CI workflow for their build prerequisites and command. Simulator and native-helper
+tests keep their existing skips when the required binaries are absent.
 
 ## Build and run on Windows
 
