@@ -5,6 +5,7 @@ export interface DesktopInfo {
   dataDirectory: string;
   platform: string;
   version: string;
+  addonOutdated?: boolean | null;
 }
 export interface Model {
   slug: string;

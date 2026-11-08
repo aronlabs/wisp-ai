@@ -24,10 +24,10 @@ test('settings persist, filter real tool/MCP definitions, and preserve child set
     process.env.WOW_CAPABILITIES_FILE = settings.file;
     await settings.load();
     const definition = { description: 'target' };
-    const resolve = dynamicEvaluate(enabledTool('inspect_target', definition));
+    const resolve = dynamicEvaluate(enabledTool('search_database', definition));
     assert.equal(await resolve({} as never), definition);
     await Promise.all([
-      settings.set('tool:inspect_target', false),
+      settings.set('tool:search_database', false),
       settings.set('mcp_tool:everloot:market_value', false),
     ]);
     assert.equal(
@@ -35,7 +35,7 @@ test('settings persist, filter real tool/MCP definitions, and preserve child set
       null,
       'disabled tools must be removed from Eve, not only hidden in the UI',
     );
-    assert.equal(await capabilityEnabled('tool:inspect_target'), false);
+    assert.equal(await capabilityEnabled('tool:search_database'), false);
     const connection = await dynamicEvaluate(everloot)({} as never);
     assert.ok(connection);
     const source = {
@@ -99,7 +99,7 @@ test('settings persist, filter real tool/MCP definitions, and preserve child set
     );
     const restarted = new CapabilitySettings(settings.file);
     await restarted.load();
-    assert.equal(restarted.enabled('tool:inspect_target'), false);
+    assert.equal(restarted.enabled('tool:search_database'), false);
     await settings.set('memory:preferences', false);
     const memory = localMemory('preferences');
     assert.equal(
@@ -110,7 +110,7 @@ test('settings persist, filter real tool/MCP definitions, and preserve child set
     await assert.rejects(settings.set('unknown:tool', false));
     await writeFile(settings.file, '{broken json');
     await assert.rejects(
-      capabilityEnabled('tool:inspect_target'),
+      capabilityEnabled('tool:search_database'),
       'corrupt settings must never silently re-enable tools',
     );
   } finally {

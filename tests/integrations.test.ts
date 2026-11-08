@@ -88,7 +88,7 @@ test('integration availability and master switches govern real Eve definitions a
   }
 });
 
-test('every local tool belongs to one integration and exposes a unique namespaced identity', () => {
+test('every local tool belongs to core or one optional integration and exposes a unique namespaced identity', () => {
   const catalog = defaultCapabilities();
   const tools = catalog.filter((entry) => entry.id.startsWith('tool:'));
   assert.equal(new Set(tools.map((entry) => entry.toolName)).size, tools.length);
@@ -101,13 +101,48 @@ test('every local tool belongs to one integration and exposes a unique namespace
 test('integration context records disabled choices without leaking descriptions or external instructions', () => {
   const settings = new CapabilitySettings('unused');
   settings.flags['integration:questie'] = false;
-  settings.flags['tool:inspect_target'] = false;
+  settings.flags['tool:search_database'] = false;
   const context = integrationContext(settings.snapshot());
   assert.equal(context.find((entry) => entry.id === 'integration:questie')?.enabled, false);
   assert.ok(
     context
-      .find((entry) => entry.id === 'integration:wow')
-      ?.disabledTools.includes('wow__inspect_target'),
+      .find((entry) => entry.id === 'integration:thewowdb')
+      ?.disabledTools.includes('thewowdb__search_database'),
   );
   assert.equal(JSON.stringify(context).includes('description'), false);
+});
+
+test('built-in capabilities ignore legacy switches while WoW availability and optional memory remain independent', async () => {
+  const settings = new CapabilitySettings('unused');
+  settings.flags = {
+    'integration:wow': false,
+    'integration:wisp': false,
+    'tool:query_character': false,
+    'tool:set_conversation_title': false,
+    'core:wow': false,
+    'memory:preferences': false,
+  };
+  const state = new IntegrationState(settings);
+  assert.equal(settings.enabled('tool:query_character'), false, 'game connection is required');
+  assert.equal(settings.enabled('tool:set_conversation_title'), true);
+  assert.equal(settings.enabled('tool:manage_panel'), true);
+  state.receive({
+    version: '0.2',
+    questie: { status: 'missing', trainers: false, services: false },
+  });
+  assert.equal(settings.enabled('tool:query_character'), true);
+  assert.equal(settings.enabled('memory:preferences'), false);
+  assert.equal(settings.enabled('memory:character'), true);
+  const context = integrationContext(settings.snapshot());
+  assert.ok(
+    context.every(
+      (entry) =>
+        !['core:wow', 'core:wisp', 'memory:preferences', 'memory:character'].includes(entry.id),
+    ),
+  );
+  await assert.rejects(settings.set('core:wow', false));
+  await assert.rejects(settings.set('tool:set_conversation_title', false));
+  state.reset();
+  assert.equal(settings.enabled('tool:query_character'), false);
+  assert.equal(settings.enabled('tool:set_conversation_title'), true);
 });

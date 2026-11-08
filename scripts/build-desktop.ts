@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { stageTauri } from './stage-tauri.ts';
 import { createRequire } from 'node:module';
+import { writeUpdateManifest } from './update-manifest.ts';
 import {
   nativeBuildContext,
   nativeBuildKey,
@@ -65,7 +66,14 @@ const nativeBinarySha256 = createHash('sha256')
   .digest('hex');
 // Always assemble current bridge/agent/addon/simulator resources. Only the
 // unchanged, fully optimized native executable may be reused.
-tauri(['bundle', '--bundles', 'nsis']);
+const signed = Boolean(process.env.TAURI_SIGNING_PRIVATE_KEY);
+tauri([
+  'bundle',
+  '--bundles',
+  'nsis',
+  '--config',
+  JSON.stringify({ bundle: { createUpdaterArtifacts: signed } }),
+]);
 const bundled = performance.now();
 await mkdir('dist', { recursive: true });
 await writeFile(
@@ -95,6 +103,10 @@ if (installers.length !== 1) {
 }
 const destination = 'dist/WispAI-' + version + '-windows-x64-setup.exe';
 await copyFile(path.join(folder, installers[0]), destination);
+if (signed) {
+  await copyFile(path.join(folder, installers[0] + '.sig'), destination + '.sig');
+  await writeUpdateManifest(version, destination);
+}
 const hash = createHash('sha256')
   .update(await readFile(destination))
   .digest('hex');

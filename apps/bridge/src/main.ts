@@ -300,8 +300,9 @@ function createChat(id: string) {
   chats.push(chat);
   return chat;
 }
+let shutdownRequested = false;
 async function run(chat: Chat, text: string, messageId?: string, context?: unknown) {
-  if (chat.status === 'working') {
+  if (shutdownRequested || chat.status === 'working') {
     return;
   }
   chat.status = 'working';
@@ -1382,6 +1383,7 @@ const desktopServer = await startDesktopServer(runtime, async (method, url, raw)
     if (chats.some((c) => c.status === 'working')) {
       throw Error('Wait for the active turn before stopping Wisp');
     }
+    shutdownRequested = true;
     setTimeout(stop, 200);
     return { ok: true };
   }

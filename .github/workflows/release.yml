@@ -13,6 +13,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
+      - name: Validate release version and signing configuration
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if (!$env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Configure TAURI_SIGNING_PRIVATE_KEY before building a release.' }
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $desktopVersion = (Get-Content apps/desktop/package.json | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $cargoVersion = (Select-String -Path apps/desktop/src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"' | Select-Object -First 1).Matches.Groups[1].Value
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Expected a stable release version.' }
+          if ($version -ne $desktopVersion -or $version -ne $tauriVersion -or $version -ne $cargoVersion) { throw 'App versions must match.' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") { throw 'Release tag must match app version.' }
       - uses: dtolnay/rust-toolchain@stable
       - run: pnpm ui:build
       - name: Fingerprint native executable inputs
@@ -58,6 +71,9 @@ jobs:
         if: steps.simulator-binary.outputs.cache-hit != 'true'
         shell: pwsh
       - run: pnpm build:desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -66,11 +82,20 @@ jobs:
           path: |
             dist/*-setup.exe
             dist/*.sha256
+            dist/*.sig
+            dist/latest.json
             dist/build-metrics.json
       - if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           draft: true
+          generate_release_notes: true
           files: |
             dist/*-setup.exe
             dist/*.sha256
+            dist/*.sig
+      - name: Attach updater manifest with release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/finalize-release.ts
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -52,6 +52,16 @@ pnpm build:desktop
 
 `pnpm package:windows` is an alias. Output in `dist/` includes the unsigned per-user installer, SHA-256 checksum and build metrics. Packaged resources include Node/npm, the bridge, agent, protocol, addon and simulator; updates preserve user data. See [packaging code](../scripts/build-desktop.ts), [staging](../scripts/stage-desktop.ts) and the [release workflow](../.github/workflows/release.yml) for resource verification and cache details. Tag builds create draft releases; the repository currently has no releases.
 
+### Publishing app updates
+
+Installed Windows x64 release builds check `https://github.com/fedeya/wisp-ai/releases/latest/download/latest.json` at startup and every six hours. **Settings > Check for updates** checks manually. Users review release notes and choose **Update and restart**; the app verifies the download before stopping the bridge, waits for active replies and installs through NSIS. Chats, credentials and settings remain in AppData. Development builds and other platforms do not install updates. Overview detects when the bundled addon differs from the installed copy; use **Install / update addon**, then `/reload` in WoW.
+
+The updater public key is checked into `apps/desktop/src-tauri/tauri.conf.json`. Its private key is stored outside the repository at `%USERPROFILE%\.tauri\wisp-ai.key` on the machine where it was generated and in the repository's `TAURI_SIGNING_PRIVATE_KEY` Actions secret. Keep a secure backup: changing the public key breaks updates for existing installations. The generated key has no password; if using a password-protected replacement before the first public release, also configure `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+To prepare a stable release, synchronize the versions in the root and desktop `package.json`, `tauri.conf.json`, and `Cargo.toml`/`Cargo.lock`, then push the matching `vX.Y.Z` tag. The workflow requires the signing secret and uploads the installer, checksum, detached `.sig` and `latest.json` to a **draft** release. The manifest includes generated GitHub release notes. Review the draft and installer CI results, then publish the release and mark it latest. Drafts and prereleases are excluded from the stable feed. The repository and release assets must be public for distributed apps to download them.
+
+Local `pnpm build:desktop` builds remain unsigned unless `TAURI_SIGNING_PRIVATE_KEY` is set to the private key path or contents. Signed builds additionally emit `.sig` and `latest.json`. These updater signatures are independent of Windows Authenticode signing; they do not remove SmartScreen prompts.
+
 ## Bridge and addon work
 
 After configuring the native app and signing in, you can run the bridge separately:

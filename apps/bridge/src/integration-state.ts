@@ -36,13 +36,13 @@ export class IntegrationState {
   }
   refresh() {
     const live = !!this.report && this.now() - this.lastSeen < 180_000;
-    this.settings.availability.set('integration:wow', {
+    this.settings.availability.set('core:wow', {
       available: live,
       status: live ? 'ready' : 'waiting',
       version: live ? this.report!.version : undefined,
       reason: live
         ? 'Connected to the game.'
-        : 'Waiting for an integration report from WoW. Enter the game or reload Wisp.',
+        : 'Waiting for a connection to WoW. Enter the game or reload Wisp.',
     });
     const q = live ? this.report!.questie : undefined;
     this.settings.availability.set('integration:questie', {

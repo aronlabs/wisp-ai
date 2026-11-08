@@ -20,7 +20,7 @@ Suggestions are off by default. Enable level-up or weapon events on the desktop 
 
 ## Controls, privacy and limits
 
-In-game **Settings > Integrations** controls built-in tools, MCP connections, individual MCP tools and memory slots. Changes affect new calls immediately; running calls may finish. Disabling character queries does not remove the basic identity/location context described below.
+In-game **Settings > Integrations** controls optional addons, data sources, MCP connections and individual integration tools. WoW readings, game tools, titles and panels are built into the agent. Memory has separate controls in desktop **Memory** and the in-game **Memory** tab. Changes affect new calls immediately; running calls may finish.
 
 ### Actions you control
 
@@ -69,23 +69,23 @@ Missing readings and database coverage remain unknown, not zero or proof of abse
 | Addon missing                 | Select the folder containing `Wow.exe`, install/update from **Overview**, fully restart WoW, and enable Wisp AI and its helpers.                                                                                                                          |
 | Disconnected or replies stop  | Keep the desktop app running. Check **Diagnostics** and `/wisp diag`; use `/wisp reconnect` for a fresh handshake or `/reload` to renew receive channels. Large payloads take several seconds. Significant game updates may change file-loading behavior. |
 | Sign-in or models unavailable | Finish browser authorization in **Connections** and refresh the model list. Expired access, identity-only consent or an ambiguous token refresh may require signing in again.                                                                             |
-| Tool unavailable              | Check in-game tool toggles and required windows; missing APIs or source coverage can also prevent a result.                                                                                                                                               |
+| Tool unavailable              | Check the game connection, optional integration switches and required windows; missing APIs or source coverage can also prevent a result.                                                                                                                 |
 | App remains after closing     | Closing hides it in the tray. **Exit Wisp** stops it, but waits for any active turn to finish.                                                                                                                                                            |
 
 For an old portable install, choose **Import your previous installation** on first launch. Existing Wisp saves are preserved; renamed addon folders are backed up under `Interface/WispAI-RenameBackup`. Older Codex-adapter installs need Wisp’s own ChatGPT sign-in. Fully restart WoW after migration.
 
 ## Integrations
 
-Desktop **Integrations** and WoW **Settings > Integrations** share the same controls.
+WoW character readings, inventory, progression, references, settings, maps and macros are core agent capabilities. Titles and persistent panels are also built in. These capabilities have no integration switches; game reads still require a live WoW connection. Older switches for these capabilities no longer apply. Memory remains optional with independent controls.
+
+Desktop **Integrations** and WoW **Settings > Integrations** share the same optional integration controls.
 Each integration has a master switch and individual capabilities. Disabling a parent
 preserves child preferences. Enabled and available capabilities are projected into
 Eve's dynamic definitions; the bridge enforces the same checks on game/RPC calls.
 
-- **World of Warcraft:** live character, inventory, progression, references, settings, maps and macros.
 - **Questie:** installed QuestieDB Forever NPC locations, with optional Questie trainer/service indexes. Missing, incompatible and partial providers are distinguished. No addon source is modified.
 - **TheWoWDB / Wowhead / Everloot:** primary Forever catalog, scoped fallback search, and complementary MCP observations respectively. Configured network sources are not claimed to be online until a request succeeds.
 - **WoWSims Forever:** the bundled experimental mage simulator.
-- **Wisp:** titles, persistent panels and optional memory.
 - **Custom MCPs:** Add/Edit/Test/Remove plus per-tool switches after discovery.
 
 Local agent tools have public names such as `questie__find_npc_locations` and

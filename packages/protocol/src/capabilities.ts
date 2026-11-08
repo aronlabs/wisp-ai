@@ -1,7 +1,7 @@
 export interface Capability {
   id: string;
   name: string;
-  group: 'integrations' | 'memory';
+  group: 'core' | 'integrations' | 'memory';
   kind?: 'game' | 'addon' | 'source' | 'service' | 'mcp';
   toolName?: string;
   description: string;
@@ -102,14 +102,24 @@ export const toolDescriptions: Record<string, [string, string]> = {
   ],
 };
 
-export const integrations: Capability[] = [
+export const coreCapabilities: Capability[] = [
   {
-    id: 'integration:wow',
+    id: 'core:wow',
     name: 'World of Warcraft',
-    group: 'integrations',
+    group: 'core',
     kind: 'game',
     description: 'Live character readings, references, maps, macros and game settings.',
   },
+  {
+    id: 'core:wisp',
+    name: 'Wisp',
+    group: 'core',
+    kind: 'service',
+    description: 'Conversation titles and persistent panels.',
+  },
+];
+
+export const integrations: Capability[] = [
   {
     id: 'integration:questie',
     name: 'Questie',
@@ -138,13 +148,6 @@ export const integrations: Capability[] = [
     group: 'integrations',
     kind: 'service',
     description: 'Local experimental mage DPS simulation for levels 1–60.',
-  },
-  {
-    id: 'integration:wisp',
-    name: 'Wisp',
-    group: 'integrations',
-    kind: 'service',
-    description: 'Conversation titles, persistent panels and optional memory.',
   },
 ];
 export function toolIntegration(name: string): string {
@@ -180,13 +183,17 @@ export function defaultCapabilities(): Capability[] {
   const tools = Object.entries(toolDescriptions).map(([name, [label, description]]) => ({
     id: 'tool:' + name,
     name: label,
-    group: 'integrations' as const,
-    parent: 'integration:' + toolIntegration(name),
+    group: ['wow', 'wisp'].includes(toolIntegration(name))
+      ? ('core' as const)
+      : ('integrations' as const),
+    parent:
+      (['wow', 'wisp'].includes(toolIntegration(name)) ? 'core:' : 'integration:') +
+      toolIntegration(name),
     toolName: publicToolName(name),
     description,
   }));
   return [
-    ...integrations.flatMap((entry) => [
+    ...[...coreCapabilities, ...integrations].flatMap((entry) => [
       entry,
       ...tools.filter((tool) => tool.parent === entry.id),
     ]),
@@ -194,7 +201,6 @@ export function defaultCapabilities(): Capability[] {
       id: 'memory:preferences',
       name: 'Player preferences',
       group: 'memory',
-      parent: 'integration:wisp',
       description:
         'Recall and update saved preferences across characters. Disabling this preserves existing notes.',
     },
@@ -202,7 +208,6 @@ export function defaultCapabilities(): Capability[] {
       id: 'memory:character',
       name: 'Character plans',
       group: 'memory',
-      parent: 'integration:wisp',
       description:
         'Recall and update this character’s guide and goals. Disabling this preserves existing notes.',
     },
@@ -228,7 +233,7 @@ export function defaultCapabilities(): Capability[] {
 // Compact, authoritative availability for this turn; never addon descriptions or instructions.
 export function integrationContext(entries: CapabilityView[]) {
   return entries
-    .filter((entry) => !entry.parent)
+    .filter((entry) => entry.group === 'integrations' && !entry.parent)
     .map((entry) => ({
       id: entry.id,
       enabled: entry.enabled,

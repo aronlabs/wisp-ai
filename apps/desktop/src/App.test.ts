@@ -171,3 +171,30 @@ test('integration cards expose availability, master and child switches through t
     }),
   );
 });
+
+test('built-in capabilities stay out of integrations and memory has separate controls', async () => {
+  const { defaultCapabilities } = await import('@wisp/protocol/capabilities');
+  status.integrations = defaultCapabilities().map((entry) => ({
+    ...entry,
+    enabled: true,
+    effective: true,
+    available: true,
+    status: 'ready',
+  }));
+  render(App);
+  await screen.findByText('Ready to help');
+  await fireEvent.click(screen.getByRole('button', { name: 'Integrations' }));
+  expect(screen.queryByRole('checkbox', { name: 'Enable World of Warcraft' })).toBeNull();
+  expect(screen.queryByRole('checkbox', { name: 'Enable Wisp' })).toBeNull();
+  expect(screen.queryByText('Conversation titles')).toBeNull();
+  expect(screen.getByRole('checkbox', { name: 'Enable Questie' })).toBeTruthy();
+  expect(screen.queryByText('Player preferences')).toBeNull();
+  await fireEvent.click(screen.getByRole('button', { name: 'Memory' }));
+  await fireEvent.click(screen.getByRole('checkbox', { name: 'Enable Player preferences' }));
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith('/integrations/set', {
+      id: 'memory:preferences',
+      enabled: false,
+    }),
+  );
+});

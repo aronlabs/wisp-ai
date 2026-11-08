@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod updates;
 mod vault;
 use serde_json::{json, Value};
 use std::{
@@ -154,7 +155,29 @@ fn desktop_info(host: tauri::State<'_, Host>) -> Value {
         .ok()
         .and_then(|s| serde_json::from_slice::<Value>(&s).ok())
         .unwrap_or(json!({}));
-    json!({"wow":config["wow"], "configured":config["wow"].as_str().is_some(), "dataDirectory":host.data.to_string_lossy(), "platform": std::env::consts::OS, "version": env!("CARGO_PKG_VERSION")})
+    let addon_outdated = config["wow"].as_str().and_then(|wow| {
+        addon_differs(
+            &host.payload.join("addon/WispAI"),
+            &Path::new(wow).join("Interface/AddOns/WispAI"),
+        )
+        .ok()
+    });
+    json!({"wow":config["wow"], "configured":config["wow"].as_str().is_some(), "dataDirectory":host.data.to_string_lossy(), "platform": std::env::consts::OS, "version": env!("CARGO_PKG_VERSION"), "addonOutdated": addon_outdated})
+}
+
+fn addon_differs(source: &Path, installed: &Path) -> std::io::Result<bool> {
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let target = installed.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            if addon_differs(&entry.path(), &target)? {
+                return Ok(true);
+            }
+        } else if fs::read(entry.path())? != fs::read(target).unwrap_or_default() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 #[tauri::command]
@@ -440,6 +463,8 @@ fn main() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::Updates::default())
         .invoke_handler(tauri::generate_handler![
             bridge_request,
             desktop_info,
@@ -450,7 +475,9 @@ fn main() {
             open_sign_in,
             open_logs,
             read_logs,
-            import_legacy
+            import_legacy,
+            updates::check_update,
+            updates::install_update
         ])
         .setup(|app| {
             let data = app.path().app_data_dir()?;

@@ -4,6 +4,7 @@
   import IntegrationCard from "./IntegrationCard.svelte";
   import Icon from "./Icon.svelte";
   import McpDialog from "./McpDialog.svelte";
+  import Updates from "./Updates.svelte";
   import logo from "../../../assets/wisp.png";
   import {
     desktop,
@@ -37,6 +38,12 @@
         "Connect tools and data sources, then choose what Wisp can access.",
     },
     {
+      name: "Memory",
+      icon: "logs",
+      title: "Choose what Wisp remembers.",
+      caption: "Control saved preferences and character plans.",
+    },
+    {
       name: "Panels",
       icon: "panel",
       title: "Keep the useful things close.",
@@ -47,6 +54,12 @@
       icon: "spark",
       title: "A nudge at the right moment.",
       caption: "Choose when Wisp can offer a little guidance on its own.",
+    },
+    {
+      name: "Settings",
+      icon: "refresh",
+      title: "Keep Wisp up to date.",
+      caption: "Updates and preferences for the desktop app.",
     },
     {
       name: "Diagnostics",
@@ -367,6 +380,13 @@
           >{/if}
       </div>{/if}
 
+    <Updates
+      showSettings={page === "Settings"}
+      version={info?.version || "0.2.2"}
+      locked={!!busy}
+      openSettings={() => (page = "Settings")}
+      onBusy={(label) => (busy = label)}
+    />
     {#if page === "Overview"}
       <div class="status-grid">
         <section class="card status-card">
@@ -441,6 +461,10 @@
             ><Icon name="folder" size={17} />Choose folder</button
           >
         </div>
+        {#if info?.addonOutdated}<p class="banner" role="status">
+            Your installed addon needs an update. Choose Install / update addon,
+            then type /reload in WoW.
+          </p>{/if}
         <div class="actions">
           <button
             class="primary"
@@ -637,7 +661,7 @@
         >
       </div>
       <div class="connection-list">
-        {#each (status?.integrations || []).filter((entry) => !entry.parent) as entry (entry.id)}
+        {#each (status?.integrations || []).filter((entry) => entry.group === "integrations" && !entry.parent) as entry (entry.id)}
           <div>
             <IntegrationCard
               {entry}
@@ -682,6 +706,27 @@
         Changes apply to new tool calls. Disabling an integration preserves
         individual tool choices. Addon availability updates when WoW connects.
       </p>
+    {:else if page === "Memory"}
+      {#each (status?.integrations || []).filter((entry) => entry.group === "memory") as entry (entry.id)}
+        <section class="card toggle-card">
+          <div class="toggle-description">
+            <div>
+              <h2>{entry.name}</h2>
+              <p>{entry.description}</p>
+            </div>
+          </div>
+          <label class="switch"
+            ><input
+              type="checkbox"
+              checked={entry.enabled}
+              disabled={locked || !status}
+              onchange={(event) =>
+                setIntegration(entry.id, event.currentTarget.checked)}
+            /><span></span><span class="sr-only">Enable {entry.name}</span
+            ></label
+          >
+        </section>
+      {/each}
     {:else if page === "Panels"}
       {#if !status?.panels.length}<section class="card empty-state">
           <Icon name="panel" size={34} />
@@ -780,7 +825,7 @@
             )}>Save changes</button
         >
       </div>
-    {:else}
+    {:else if page === "Diagnostics"}
       <section class="card">
         <div class="section-title">
           <div>

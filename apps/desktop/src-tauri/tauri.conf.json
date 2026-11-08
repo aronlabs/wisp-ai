@@ -26,6 +26,13 @@
       "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'; base-uri 'self'"
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBBNDVDMDRDMzI2RjYyMDgKUldRSVltOHlUTUJGQ2tmalJ4ZGZwNUJmaE1aQTk4ellkd0o1MkJnREJxMUFCM3M3aWFuTmUzMWQK",
+      "endpoints": ["https://github.com/fedeya/wisp-ai/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["nsis"],

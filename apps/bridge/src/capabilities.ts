@@ -46,7 +46,7 @@ export class CapabilitySettings {
   private agentContent = '';
   configured(id: string) {
     const entry = this.catalog.find((entry) => entry.id === id);
-    return this.flags[id] ?? entry?.defaultEnabled ?? true;
+    return entry?.group === 'core' || (this.flags[id] ?? entry?.defaultEnabled ?? true);
   }
   state(id: string): { available: boolean; status: string; reason?: string; version?: string } {
     const entry = this.catalog.find((entry) => entry.id === id);
@@ -104,7 +104,8 @@ export class CapabilitySettings {
     }));
   }
   async set(id: string, enabled: boolean) {
-    if (!this.catalog.some((entry) => entry.id === id) || typeof enabled !== 'boolean') {
+    const entry = this.catalog.find((entry) => entry.id === id);
+    if (!entry || entry.group === 'core' || typeof enabled !== 'boolean') {
       throw new Error('Unknown capability or invalid setting');
     }
     const operation = this.queue
