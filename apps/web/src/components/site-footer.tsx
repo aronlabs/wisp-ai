@@ -19,7 +19,7 @@ export function SiteFooter({ locale }: { locale: Locale }) {
       </div>
       <p>
         {t('Made by ')}
-        <a href="https://fedeya.sh">{t('fedeya')}</a>
+        <a href="https://fedeminaya.com">{t('fedeya')}</a>
         {t(' · GPL-3.0')}
       </p>
       <small>{t('Not affiliated with Blizzard Entertainment or any AI provider.')}</small>

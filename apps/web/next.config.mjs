@@ -1,6 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  async rewrites() {
+    // Match the portfolio's first-party Rybbit proxy; expose only tracking endpoints.
+    return [
+      'script.js',
+      'replay.js',
+      'metrics.js',
+      'track',
+      'identify',
+      'site/tracking-config/:siteId',
+      'site/:siteId/feature-flags/evaluate',
+      'session-replay/record/:siteId',
+    ].map((path) => ({
+      source: `/_fm/${path}`,
+      destination: `https://rybbit.fedeminaya.com/api/${path}`,
+    }));
+  },
   async headers() {
     return [
       {

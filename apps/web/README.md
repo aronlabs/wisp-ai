@@ -57,7 +57,12 @@ is loaded by the landing. Optional earlier recording tools remain documented in
 Stable capabilities are listed explicitly. Panels and trackers are marked Beta;
 combat simulation is Experimental, without claiming complete class coverage.
 SEO, canonical URL, sitemap, robots and a generated 1200×630 PNG social card are
-included. No analytics or tracking scripts are installed.
+included. Production pages load Rybbit for site `61b021a9d037` through the
+first-party `/_fm/` proxy to `https://rybbit.fedeminaya.com/api/`, matching the
+portfolio integration. Development and Vercel previews do not load the tracker.
+Enable **First-Party Proxy** in Rybbit Site Settings → Privacy & Security so
+forwarded visitor IPs are interpreted correctly. Only tracking endpoints are
+exposed; the dashboard and administrative API are not proxied.
 
 The immersive hero uses a generated illustrative background and locally cached
 WoW icons. Equipment, tooltips, auctions, bags and action bars are native React

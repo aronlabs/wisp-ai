@@ -45,6 +45,11 @@ export default async function RootLayout({
   const t = getTranslator(locale);
   return (
     <html lang={locale} className={`${dmSans.variable} ${manrope.variable}`}>
+      <head>
+        {process.env.NODE_ENV === 'production' && !isPreview && (
+          <script src="/_fm/script.js?siteId=61b021a9d037" defer />
+        )}
+      </head>
       <body>
         <a className="skip-link" href="#main">
           {t('Skip to content')}

@@ -45,8 +45,10 @@ These are lab measurements, not real-user Core Web Vitals. Lighthouse navigation
 reports TBT, not field INP. The synthetic selector check observed 16ms pointer/click
 events in its local run and no document navigation; this is not an INP field score.
 Once production has enough traffic, check PageSpeed Insights/CrUX and Search
-Console for real LCP, INP and CLS at the 75th percentile. No analytics or remote
-telemetry was added.
+Console for real LCP, INP and CLS at the 75th percentile. These recorded audits
+predate the Rybbit integration. Production pages now load its deferred script
+through `/_fm/` for site `61b021a9d037`; development and Vercel previews
+do not load it.
 
 ## Delivery choices
 
