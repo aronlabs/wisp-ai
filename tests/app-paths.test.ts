@@ -14,7 +14,11 @@ test('installed resources stay separate from writable engine and conversation st
     for (const name of ['src', 'agent', 'node_modules']) {
       await mkdir(path.join(root, name), { recursive: true });
     }
-    await writeFile(path.join(root, 'package.json'), '{}');
+    await writeFile(
+      path.join(root, 'package.json'),
+      '{"dependencies":{"fixture-package":"1.0.0"}}',
+    );
+    await mkdir(path.join(root, 'node_modules/fixture-package'));
     await writeFile(path.join(root, 'agent/agent.ts'), 'first');
     const paths = appPaths(root, data);
     await prepareEngine(root, paths.engine);
@@ -27,8 +31,8 @@ test('installed resources stay separate from writable engine and conversation st
     await assert.rejects(readFile(path.join(paths.engine, 'agent/retired-tool.ts')), /ENOENT/);
     assert.equal(await readFile(path.join(paths.engine, '.eve/history'), 'utf8'), 'keep');
     assert.equal(
-      await realpath(path.join(paths.engine, 'node_modules')),
-      await realpath(path.join(root, 'node_modules')),
+      await realpath(path.join(paths.engine, 'node_modules/fixture-package')),
+      await realpath(path.join(root, 'node_modules/fixture-package')),
     );
     assert.equal(paths.config, path.join(data, 'config.local.json'));
   } finally {
@@ -43,7 +47,11 @@ test('deployed agent uses its production dependency directory without losing Eve
     const engine = path.join(temporary, 'user/engine');
     await mkdir(path.join(agent, 'agent'), { recursive: true });
     await mkdir(path.join(agent, 'src'));
-    await writeFile(path.join(agent, 'package.json'), '{"name":"@wisp/agent"}');
+    await writeFile(
+      path.join(agent, 'package.json'),
+      '{"name":"@wisp/agent","dependencies":{"fixture-package":"1.0.0"}}',
+    );
+    await mkdir(path.join(payload, 'node_modules/fixture-package'));
     await writeFile(path.join(agent, 'agent/agent.ts'), 'production definition');
     await mkdir(path.join(engine, '.eve'), { recursive: true });
     await writeFile(path.join(engine, '.eve/history'), 'existing sessions');
@@ -53,8 +61,8 @@ test('deployed agent uses its production dependency directory without losing Eve
       'production definition',
     );
     assert.equal(
-      await realpath(path.join(engine, 'node_modules')),
-      await realpath(path.join(payload, 'node_modules')),
+      await realpath(path.join(engine, 'node_modules/fixture-package')),
+      await realpath(path.join(payload, 'node_modules/fixture-package')),
     );
     assert.equal(await readFile(path.join(engine, '.eve/history'), 'utf8'), 'existing sessions');
   } finally {

@@ -25,6 +25,8 @@ test('Lua discovery distinguishes missing, wrong-version, partial and complete Q
     Questie={IsForever=true}; QuestieLoader={ImportModule=function()error('not ready')end}
     assert(C.IntegrationReport().questie.status=='partial')
     QuestieLoader.ImportModule=function()return{GetClassTrainers=function()end,townsfolk={}}end
+    assert(C.IntegrationReport().questie.status=='partial')
+    LibQuestieDB.Quest=LibQuestieDB.Npc; LibQuestieDB.Object=LibQuestieDB.Npc
     assert(C.IntegrationReport().questie.status=='ready')
     LibQuestieDB.RequireContract=function()error('contract mismatch')end
     assert(C.IntegrationReport().questie.status=='incompatible')

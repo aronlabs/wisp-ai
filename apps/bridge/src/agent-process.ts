@@ -7,6 +7,7 @@ interface EveProcessOptions {
   environment: NodeJS.ProcessEnv;
   onError: (error: Error) => void;
   onExit: (code: number | null) => void;
+  port?: number;
 }
 
 export function startEveProcess(options: EveProcessOptions): ChildProcess {
@@ -19,7 +20,7 @@ export function startEveProcess(options: EveProcessOptions): ChildProcess {
       '--no-default-extensions',
       '--resume',
       '--port',
-      '43186',
+      String(options.port ?? 43186),
     ],
     {
       cwd: options.root,

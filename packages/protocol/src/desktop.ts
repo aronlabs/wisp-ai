@@ -1,52 +1,68 @@
-import type { CapabilityView } from './capabilities.js';
-export interface DesktopInfo {
-  wow?: string;
-  configured: boolean;
-  dataDirectory: string;
-  platform: string;
-  version: string;
-  addonOutdated?: boolean | null;
-}
-export interface Model {
-  slug: string;
-  displayName: string;
-  efforts: string[];
-}
-export interface Mcp {
-  name: string;
-  description?: string;
-  transport: 'http' | 'sse' | 'stdio';
-  url?: string;
-  command?: string;
-  args: string[];
-  enabled: boolean;
-  hasToken?: boolean;
-  envKeys?: string[];
-  tools?: { name: string; description?: string }[];
-}
-export interface Panel {
-  id: string;
-  title: string;
-  character: string;
-  characterKey: string;
-  bindings?: unknown[];
-  hidden?: boolean;
-}
-export interface Status {
-  ready: boolean;
-  gameConnected: boolean;
-  model: string;
-  activeTurns: number;
-  auth: {
-    status: string;
-    activeId?: string;
-    account?: string;
-    message?: string;
-    revision: number;
-    profiles: { id: string; label: string; connected: boolean }[];
-  };
-  mcps: Mcp[];
-  integrations: CapabilityView[];
-  panels: Panel[];
-  suggestions: { levelUp: boolean; weapon: boolean };
-}
+import { z } from 'zod';
+import { capabilityViewSchema } from './capabilities.js';
+import { savedRoutine, routineRun } from './routines.js';
+export const desktopInfoSchema = z.object({
+  wow: z.string().nullable().optional(),
+  configured: z.boolean(),
+  dataDirectory: z.string(),
+  platform: z.string(),
+  version: z.string(),
+  addonOutdated: z.boolean().nullable().optional(),
+});
+export const modelSchema = z.object({
+  slug: z.string(),
+  displayName: z.string(),
+  efforts: z.array(z.string()),
+});
+export const mcpSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  transport: z.enum(['http', 'sse', 'stdio']),
+  url: z.string().optional(),
+  command: z.string().optional(),
+  args: z.array(z.string()),
+  enabled: z.boolean(),
+  hasToken: z.boolean().optional(),
+  envKeys: z.array(z.string()).optional(),
+  tools: z.array(z.object({ name: z.string(), description: z.string().optional() })).optional(),
+});
+export const panelSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  character: z.string(),
+  characterKey: z.string(),
+  bindings: z.array(z.unknown()).optional(),
+  hidden: z.boolean().optional(),
+});
+export const authStateSchema = z.object({
+  status: z.string(),
+  activeId: z.string().nullable().optional(),
+  account: z.string().nullable().optional(),
+  message: z.string().optional(),
+  revision: z.number(),
+  profiles: z.array(z.object({ id: z.string(), label: z.string(), connected: z.boolean() })),
+});
+export const statusSchema = z.object({
+  ready: z.boolean(),
+  gameConnected: z.boolean(),
+  model: z.string(),
+  activeTurns: z.number().int().nonnegative(),
+  auth: authStateSchema,
+  mcps: z.array(mcpSchema),
+  integrations: z.array(capabilityViewSchema),
+  panels: z.array(panelSchema),
+  routines: z.array(savedRoutine),
+  routineRuns: z.array(routineRun),
+});
+export type DesktopInfo = z.infer<typeof desktopInfoSchema>;
+export type Model = z.infer<typeof modelSchema>;
+export type Mcp = z.infer<typeof mcpSchema>;
+export type Panel = z.infer<typeof panelSchema>;
+export type Status = z.infer<typeof statusSchema>;
+export const desktopResponses = {
+  '/status': statusSchema,
+  '/auth/models': z.object({ models: z.array(modelSchema) }),
+  '/auth/start': z.object({ authorizationUrl: z.string().url() }).passthrough(),
+  '/auth/cancel': authStateSchema,
+  '/auth/disconnect': authStateSchema,
+};

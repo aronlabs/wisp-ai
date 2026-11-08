@@ -4,7 +4,7 @@ local function finite(value)
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
 end
 
-function C.FindNPCLocations(args)
+local function findLocations(entityName, args)
     local db = LibQuestieDB
     assert(
         db and db.flavor and db.flavor.expansion == "Forever",
@@ -14,8 +14,8 @@ function C.FindNPCLocations(args)
         db.RequireContract and db.RequireContract(4),
         "A compatible QuestieDB contract is required"
     )
-    local npc = db.Npc
-    assert(npc and npc.Get and npc.Exists, "QuestieDB NPC reads are unavailable")
+    local npc = db[entityName]
+    assert(npc and npc.Get and npc.Exists, "QuestieDB spawn reads are unavailable")
     local zoneDB, townsfolk
     if QuestieLoader and QuestieLoader.ImportModule then
         local ok, value = pcall(QuestieLoader.ImportModule, QuestieLoader, "ZoneDB")
@@ -48,22 +48,22 @@ function C.FindNPCLocations(args)
             "The requested service is unavailable in the installed Questie index; this does not prove it is absent from Forever"
         )
         ids = townsfolk.townsfolk[args.service]
-    elseif args.npcId then
-        ids = { args.npcId }
+    elseif args.npcId or args.objectId then
+        ids = { args.npcId or args.objectId }
     elseif args.name and npc.IdsByName then
         ids = npc.IdsByName(args.name) or {}
     else
-        error("Provide an exact localized NPC name, an NPC ID, or class_trainers mode")
+        error("Provide an exact localized entity name or a verified entity ID")
     end
     local limit = math.min(10, math.max(1, args.limit or 5))
     local locations, skippedFrames, unmatchedMaps = {}, 0, 0
     local faction = UnitFactionGroup("player") == "Horde" and "H" or "A"
     for _, id in ipairs(ids) do
         if npc.Exists(id) then
-            local friendly = npc.Get(id, "friendlyToFaction")
+            local friendly = entityName == "Npc" and npc.Get(id, "friendlyToFaction") or nil
             if not friendly or friendly:find(faction, 1, true) then
                 local name = npc.Get(id, "name")
-                local subName = npc.Get(id, "subName")
+                local subName = entityName == "Npc" and npc.Get(id, "subName") or nil
                 local spawns = npc.Get(id, "spawns") or {}
                 for areaId, points in pairs(spawns) do
                     local nativeId
@@ -102,7 +102,8 @@ function C.FindNPCLocations(args)
                                 end
                                 if frameKnown then
                                     locations[#locations + 1] = {
-                                        npcId = id,
+                                        npcId = entityName == "Npc" and id or nil,
+                                        objectId = entityName == "Object" and id or nil,
                                         name = name,
                                         subName = subName,
                                         mapId = mapId,
@@ -112,7 +113,7 @@ function C.FindNPCLocations(args)
                                         y = y,
                                         phase = point[3],
                                         provenance = db.GetProvenance
-                                            and db.GetProvenance("Npc", id, "spawns"),
+                                            and db.GetProvenance(entityName, id, "spawns"),
                                         reference = {
                                             kind = "map",
                                             mapId = mapId,
@@ -135,8 +136,9 @@ function C.FindNPCLocations(args)
         end
     end
     table.sort(locations, function(a, b)
-        if a.npcId ~= b.npcId then
-            return a.npcId < b.npcId
+        local aid, bid = a.npcId or a.objectId, b.npcId or b.objectId
+        if aid ~= bid then
+            return aid < bid
         end
         if a.x ~= b.x then
             return a.x < b.x
@@ -162,6 +164,13 @@ function C.FindNPCLocations(args)
         truncated = total > limit,
         skippedUnverifiedFrames = skippedFrames,
         unmappedAreas = unmatchedMaps,
-        note = "Database spawn positions, not live NPC sightings or guaranteed active phases. Coordinates are percentages on the verified native map. Missing coverage is unknown, not absence. No waypoint was placed.",
+        note = "Database spawn positions, not live sightings or guaranteed active phases. Coordinates are percentages on the verified native map. Missing coverage is unknown, not absence. No waypoint was placed.",
     }
+end
+
+function C.FindNPCLocations(args)
+    return findLocations("Npc", args)
+end
+function C.FindObjectLocations(args)
+    return findLocations("Object", args)
 end

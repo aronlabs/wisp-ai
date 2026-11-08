@@ -1,3 +1,4 @@
+import { addonSource } from './addon-source.ts';
 import { test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -15,7 +16,7 @@ test('chat placeholder distinguishes connecting, fetching history and an empty c
   run(`C={db={sidebar=true,showTools=true,drafts={}},active='chat',connected=false}
     C.chats={{id='chat',title='Test',status='idle',activity={}}}
     function C.Current() return C.chats[1] end
-    assert(load(${JSON.stringify(readFileSync('addon/WispAI/UI.lua', 'utf8'))}))('WispAI',C)
+    assert(load(${JSON.stringify(addonSource('UI.lua'))}))('WispAI',C)
     C.BuildUI()
     local state=UI_TEST.frames.WispAIChatPlaceholder
     assert(state:IsShown() and state.loading and state.title:GetText()=='Waiting for bridge')
@@ -69,7 +70,7 @@ test('context meter distinguishes unknown usage, measured context and compaction
   run(`C={db={sidebar=true,showTools=true,drafts={}},active='chat',connected=true}
     C.chats={{id='chat',title='Test',status='idle',messages={},activity={}}}
     function C.Current() return C.chats[1] end
-    assert(load(${JSON.stringify(readFileSync('addon/WispAI/UI.lua', 'utf8'))}))('WispAI',C)
+    assert(load(${JSON.stringify(addonSource('UI.lua'))}))('WispAI',C)
     C.BuildUI()
     local meter=UI_TEST.frames.WispAIContextUsage
     assert(meter.text:GetText()=='Context --')
@@ -126,9 +127,7 @@ function C.Current()
 end
 `,
   );
-  run(
-    `assert(load(${JSON.stringify(readFileSync('addon/WispAI/UI.lua', 'utf8'))}))('WispAI',C); C.BuildUI()`,
-  );
+  run(`assert(load(${JSON.stringify(addonSource('UI.lua'))}))('WispAI',C); C.BuildUI()`);
   run(
     `
 C.capabilities = {
@@ -389,7 +388,7 @@ end
 `,
   );
   run(
-    `assert(load(${JSON.stringify(readFileSync('addon/WispAI/UI.lua', 'utf8'))}))('WispAI',C); C.BuildUI(); local row; for _,w in ipairs(UI_TEST.widgets) do if w.scripts.OnHyperlinkEnter and type(w.text)=='table' then row=w end end; assert(row.text:GetText():find('|Hwispmacro:4e6f7661|h[Nova]|h',1,true)); row.scripts.OnHyperlinkEnter(row,'wispmacro:4e6f7661','[Nova]'); assert(GameTooltip:GetText()=='Nova'); row.scripts.OnHyperlinkClick(row,'wispmacro:4e6f7661','[Nova]','LeftButton'); assert(UI_TEST.pickedMacro==121); combat=true; UI_TEST.pickedMacro=nil; row.scripts.OnHyperlinkClick(row,'wispmacro:4e6f7661','[Nova]','LeftButton'); assert(UI_TEST.pickedMacro==nil and UI_TEST.notice:find('combat'))`,
+    `assert(load(${JSON.stringify(addonSource('UI.lua'))}))('WispAI',C); C.BuildUI(); local row; for _,w in ipairs(UI_TEST.widgets) do if w.scripts.OnHyperlinkEnter and type(w.text)=='table' then row=w end end; assert(row.text:GetText():find('|Hwispmacro:4e6f7661|h[Nova]|h',1,true)); row.scripts.OnHyperlinkEnter(row,'wispmacro:4e6f7661','[Nova]'); assert(GameTooltip:GetText()=='Nova'); row.scripts.OnHyperlinkClick(row,'wispmacro:4e6f7661','[Nova]','LeftButton'); assert(UI_TEST.pickedMacro==121); combat=true; UI_TEST.pickedMacro=nil; row.scripts.OnHyperlinkClick(row,'wispmacro:4e6f7661','[Nova]','LeftButton'); assert(UI_TEST.pickedMacro==nil and UI_TEST.notice:find('combat'))`,
   );
 });
 
@@ -408,7 +407,7 @@ test('structured skill replies use the declared skill and map references support
       ` [[ref:zone]] [[ref:ramp]]'}}}}; function C.Current() return C.chats[1] end; C_Map={GetMapInfo=function() return {name='Durotar'} end,OpenWorldMap=function(id) UI_TEST.openedMap=id end}`,
   );
   run(
-    `assert(load(${JSON.stringify(readFileSync('addon/WispAI/UI.lua', 'utf8'))}))('WispAI',C); C.BuildUI(); local row; for _,w in ipairs(UI_TEST.widgets) do if w.scripts.OnHyperlinkEnter and type(w.text)=='table' and w.text:GetText():find('Rampa',1,true) then row=w end end; assert(row); local text=row.text:GetText(); assert(text:find('|Hspell:11070:0|h[Descarga de Escarcha mejorada]|h',1,true),'plain text must reuse the exact skill link supplied by the user'); local _,count=text:gsub('|Hspell:', ''); assert(count==1,'code spans and larger words must not be auto-linked'); assert(text:find('|Hwispzone:1411|h[Durotar]|h',1,true)); assert(text:find('|Hworldmap:1411:4500:6250|h[Rampa (45.0, 62.5)]|h',1,true),'map percentages must become native 0–10000 coordinates'); row.scripts.OnHyperlinkEnter(row,'worldmap:1411:4500:6250','[Rampa]'); assert(GameTooltip:GetText()=='Durotar'); row.scripts.OnHyperlinkClick(row,'worldmap:1411:4500:6250','[Rampa]','LeftButton'); assert(UI_TEST.clickedLink=='worldmap:1411:4500:6250'); row.scripts.OnHyperlinkClick(row,'wispzone:1411','[Durotar]','LeftButton'); assert(UI_TEST.openedMap==1411); C.chats[1].messages[2].references.ramp.x=46; C.Refresh(); assert(row.text:GetText():find('worldmap:1411:4600:6250',1,true),'late reference changes must update the existing row even when the text is unchanged')`,
+    `assert(load(${JSON.stringify(addonSource('UI.lua'))}))('WispAI',C); C.BuildUI(); local row; for _,w in ipairs(UI_TEST.widgets) do if w.scripts.OnHyperlinkEnter and type(w.text)=='table' and w.text:GetText():find('Rampa',1,true) then row=w end end; assert(row); local text=row.text:GetText(); assert(text:find('|Hspell:11070:0|h[Descarga de Escarcha mejorada]|h',1,true),'plain text must reuse the exact skill link supplied by the user'); local _,count=text:gsub('|Hspell:', ''); assert(count==1,'code spans and larger words must not be auto-linked'); assert(text:find('|Hwispzone:1411|h[Durotar]|h',1,true)); assert(text:find('|Hworldmap:1411:4500:6250|h[Rampa (45.0, 62.5)]|h',1,true),'map percentages must become native 0–10000 coordinates'); row.scripts.OnHyperlinkEnter(row,'worldmap:1411:4500:6250','[Rampa]'); assert(GameTooltip:GetText()=='Durotar'); row.scripts.OnHyperlinkClick(row,'worldmap:1411:4500:6250','[Rampa]','LeftButton'); assert(UI_TEST.clickedLink=='worldmap:1411:4500:6250'); row.scripts.OnHyperlinkClick(row,'wispzone:1411','[Durotar]','LeftButton'); assert(UI_TEST.openedMap==1411); C.chats[1].messages[2].references.ramp.x=46; C.Refresh(); assert(row.text:GetText():find('worldmap:1411:4600:6250',1,true),'late reference changes must update the existing row even when the text is unchanged')`,
   );
 });
 
@@ -462,9 +461,7 @@ function QuestMapFrame_OpenToQuestDetails(id)
     UI_TEST.openedQuest = id
 end
 `);
-  run(
-    `assert(load(${JSON.stringify(readFileSync('addon/WispAI/UI.lua', 'utf8'))}))('WispAI',C); C.BuildUI()`,
-  );
+  run(`assert(load(${JSON.stringify(addonSource('UI.lua'))}))('WispAI',C); C.BuildUI()`);
   run(
     `
 local row

@@ -3,6 +3,9 @@ import { readdir, readFile, mkdir, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { FrameDecoder, parseFrame, luaJson, type Packet } from '@wisp/protocol/protocol';
 export class DiskTransport {
+  private scans?: Promise<void>;
+  private reads = new Map<string, Promise<void>>();
+  private onError: (error: unknown) => void;
   decoders = new Map<string, FrameDecoder>();
   seen = new Map<string, number>();
   stopped = false;
@@ -14,13 +17,24 @@ export class DiskTransport {
   watchers: ReturnType<typeof watch>[] = [];
   wow: string;
   receive: (packet: Packet) => void;
-  constructor(wow: string, receive: (packet: Packet) => void) {
+  constructor(
+    wow: string,
+    receive: (packet: Packet) => void,
+    onError: (error: unknown) => void = console.error,
+  ) {
     this.wow = wow;
     this.receive = receive;
+    this.onError = onError;
   }
   async start() {
     await this.scan(true);
-    this.timer = setInterval(() => void this.scan(false), 1000);
+    this.timer = setInterval(() => {
+      this.scans ??= this.scan(false)
+        .catch(this.onError)
+        .finally(() => {
+          this.scans = undefined;
+        });
+    }, 1000);
   }
   async scan(baseline: boolean) {
     const account = path.join(this.wow, 'WTF', 'Account');
@@ -45,11 +59,13 @@ export class DiskTransport {
               this.watchers.push(
                 watch(dir, (_, name) => {
                   if (String(name).toLowerCase() === 'addons.txt') {
-                    void this.read(file, false);
+                    void this.read(file, false).catch(this.onError);
                   }
                 }),
               );
-            } catch {}
+            } catch (error) {
+              this.onError(error);
+            }
           }
           await this.read(file, baseline);
         }
@@ -58,6 +74,19 @@ export class DiskTransport {
     await walk(account, 0);
   }
   async read(file: string, baseline: boolean) {
+    const work = (this.reads.get(file) || Promise.resolve())
+      .catch(() => {})
+      .then(() => this.readCurrent(file, baseline));
+    this.reads.set(file, work);
+    try {
+      await work;
+    } finally {
+      if (this.reads.get(file) === work) {
+        this.reads.delete(file);
+      }
+    }
+  }
+  private async readCurrent(file: string, baseline: boolean) {
     if (this.stopped) {
       return;
     }
@@ -71,7 +100,10 @@ export class DiskTransport {
     if (!frame) {
       return;
     }
-    const decoder = this.decoders.get(file)!;
+    const decoder = this.decoders.get(file);
+    if (!decoder) {
+      return;
+    }
     if (baseline) {
       decoder.baseline(frame);
       return;
@@ -117,6 +149,12 @@ export class DiskTransport {
             await new Promise((r) => setTimeout(r, 30));
           }
         }
+      })
+      .catch((error) => {
+        if (this.published === json) {
+          this.published = '';
+        }
+        throw error;
       });
     return this.writing;
   }

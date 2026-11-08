@@ -1,6 +1,5 @@
-import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { writeJson } from './json-file.ts';
 import {
   defaultCapabilities,
   type Capability,
@@ -74,10 +73,7 @@ export class CapabilitySettings {
         if (content === this.agentContent) {
           return;
         }
-        await mkdir(path.dirname(this.agentFile), { recursive: true });
-        const temp = this.agentFile + '.' + randomUUID() + '.tmp';
-        await writeFile(temp, content);
-        await rename(temp, this.agentFile);
+        await writeJson(this.agentFile, { enabled });
         this.agentContent = content;
       });
     this.queue = operation;
@@ -112,10 +108,7 @@ export class CapabilitySettings {
       .catch(() => {})
       .then(async () => {
         const next = { ...this.flags, [id]: enabled };
-        await mkdir(path.dirname(this.file), { recursive: true });
-        const temp = this.file + '.' + randomUUID() + '.tmp';
-        await writeFile(temp, JSON.stringify({ enabled: next }, null, 2));
-        await rename(temp, this.file);
+        await writeJson(this.file, { enabled: next });
         this.flags = next;
       });
     this.queue = operation;

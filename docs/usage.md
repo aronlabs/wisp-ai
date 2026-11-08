@@ -12,11 +12,11 @@ Choose **Bind inline chat** in Wisp’s in-game settings, then hover an item, sp
 
 Replies arrive in batches, with tool/progress indicators while Wisp works. The context indicator estimates model context use, not your subscription quota; compaction preserves the visible transcript. Separate Wowhead search calls are excluded from its totals.
 
-## Trackers and suggestions
+## Trackers and routines
 
 Ask Wisp to save a tracker for your character. Panels survive chats and reloads; restore hidden ones with **Show saved panels** in-game or the desktop **Panels** page. Bag counts, money, level and quest completion update locally without model calls. Panel buttons send follow-up questions; ordinary reply cards are temporary unless saved.
 
-Suggestions are off by default. Enable level-up or weapon events on the desktop **Suggestions** page. They use your connected model, skip combat and active turns, and occur at most once per character every ten minutes. Open a **Read** notification to continue the suggestion as a conversation. Automatic turns cannot perform built-in write actions; external MCP tools require an explicit read-only hint.
+Ask Wisp in chat to create a routine, for example “Every two levels, review my spells and rotation.” Open **Routines** in the in-game sidebar to browse routines and their run conversations; the desktop **Routines** page also offers pause, resume, delete and run history. Supported triggers include level, equipment, money, bags, quests, spells, talents and zone changes, plus intervals of at least one minute. Filters use the event’s documented fields. “Every two levels” can use even levels; Wisp should explain the exact saved condition. Routines run only while that character and the desktop app are connected. Combat and active turns delay work; repeated events and missed intervals coalesce. Automatic runs are read-only and can remain silent when there is nothing useful to report. Each useful run has its own conversation, where you can ask follow-up questions. Routine definitions and history are saved locally in routines.json; they are independent of their creation chat. Old Suggestions toggles are replaced by explicit routines; they are not automatically enabled.
 
 ## Controls, privacy and limits
 
@@ -48,6 +48,7 @@ Installed Windows data lives in `%APPDATA%/com.wisp.ai`, separate from applicati
 | -------------------------------------- | ------------------------------------------------ |
 | Configuration                          | `config.local.json`                              |
 | Conversations                          | `runtime/chats.json`                             |
+| Routine definitions and run history    | `runtime/routines.json`                          |
 | Shared preferences and character plans | `runtime/memory/`                                |
 | Tool choices / custom MCP metadata     | `runtime/capabilities.json` / `runtime/mcp.json` |
 | Agent log                              | `runtime/eve.log`                                |

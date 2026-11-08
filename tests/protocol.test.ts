@@ -1,7 +1,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
-import { FrameDecoder, parseFrame, luaJson } from '@wisp/protocol/protocol';
+import { FrameDecoder, parseFrame, luaJson, packetSchema } from '@wisp/protocol/protocol';
 function frames(body: unknown, start = 0) {
   const compressed = deflateSync(Buffer.from(JSON.stringify(body)));
   const size = Buffer.alloc(2);
@@ -18,11 +18,30 @@ function frames(body: unknown, start = 0) {
 }
 const message = {
   type: 'say',
+  chat: 'chat',
   session: 'test-ui',
   seq: 3,
   at: 1234,
   text: '¿Qué hago ahora? Frost Nova ❄',
 };
+test('packet operations validate their required fields before reaching the bridge', () => {
+  assert.equal(packetSchema.safeParse({ ...message, type: 'unknown_operation' }).success, false);
+  assert.equal(packetSchema.safeParse({ ...message, chat: undefined }).success, false);
+  assert.equal(
+    packetSchema.safeParse({
+      ...message,
+      type: 'capability_set',
+      key: 'tool:query_character',
+      enabled: 'false',
+    }).success,
+    false,
+  );
+  assert.equal(
+    packetSchema.safeParse({ ...message, type: 'state_result', requestId: 'request', data: {} })
+      .success,
+    true,
+  );
+});
 test('enabled/disabled bits preserve all byte positions', () => {
   const expected = Buffer.from(Array.from({ length: 16 }, (_, i) => i * 17));
   const text = Array.from(

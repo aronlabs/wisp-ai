@@ -1,3 +1,4 @@
+import { addonSource } from './addon-source.ts';
 import { test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -41,9 +42,7 @@ end
 `,
   );
   for (const file of ['RichUI.lua', 'Panels.lua']) {
-    run(
-      `assert(load(${JSON.stringify(readFileSync('addon/WispAI/' + file, 'utf8'))}))('WispAI',C)`,
-    );
+    run(`assert(load(${JSON.stringify(addonSource(file))}))('WispAI',C)`);
   }
   run(
     `

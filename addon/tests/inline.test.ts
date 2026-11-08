@@ -1,3 +1,4 @@
+import { addonSource } from './addon-source.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -16,9 +17,7 @@ function vm() {
   run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run(`C={}; SlashCmdList={}; function time() return 1 end`);
   for (const file of ['Core.lua', 'RichUI.lua', 'UI.lua', 'Inline.lua']) {
-    run(
-      `assert(load(${JSON.stringify(readFileSync('addon/WispAI/' + file, 'utf8'))}))('WispAI',C)`,
-    );
+    run(`assert(load(${JSON.stringify(addonSource(file))}))('WispAI',C)`);
   }
   run(
     `
@@ -351,7 +350,7 @@ test('automatic login/resume never selects an inline conversation', () => {
     id: 'main',
     owner: 'game',
     title: 'Main',
-    status: 'done',
+    status: 'done' as const,
     messages: [{ role: 'user' as const, text: 'Hi' }],
     activity: [],
     lastUsedAt: 1,

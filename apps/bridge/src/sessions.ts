@@ -9,7 +9,13 @@ export function isAutomaticEmptyChat(chat: Chat): boolean {
   );
 }
 export function resumeChat(chats: Chat[], requested?: string): Chat | undefined {
-  chats = chats.filter((chat) => !chat.inline && !chat.proactive);
+  const requestedRun = chats.find(
+    (chat) => chat.id === requested && chat.routineId && !chat.proactive,
+  );
+  if (requestedRun) {
+    return requestedRun;
+  }
+  chats = chats.filter((chat) => !chat.inline && !chat.proactive && !chat.routineId);
   const saved = chats.find((c) => c.id === requested);
   if (saved) {
     return saved;

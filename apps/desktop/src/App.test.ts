@@ -2,11 +2,13 @@ import { test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/svelte';
 import App from './App.svelte';
 import { desktop, request, type Status } from './api';
+import { listen } from '@tauri-apps/api/event';
 vi.mock('./api', () => ({ native: true, desktop: vi.fn(), request: vi.fn() }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async () => () => {}) }));
 let status: Status;
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(listen).mockResolvedValue(() => {});
   status = {
     ready: true,
     gameConnected: true,
@@ -22,7 +24,8 @@ beforeEach(() => {
     mcps: [],
     integrations: [],
     panels: [],
-    suggestions: { levelUp: false, weapon: false },
+    routines: [],
+    routineRuns: [],
   };
   vi.mocked(desktop).mockImplementation(async (command) => {
     if (command === 'desktop_info') {
@@ -55,12 +58,83 @@ beforeEach(() => {
   });
 });
 afterEach(cleanup);
+test('an event listener that finishes registering after unmount is immediately removed', async () => {
+  let finish: ((stop: () => void) => void) | undefined;
+  vi.mocked(listen).mockImplementation((event) =>
+    event === 'desktop-error'
+      ? new Promise((resolve) => {
+          finish = resolve;
+        })
+      : Promise.resolve(() => {}),
+  );
+  render(App);
+  await waitFor(() => expect(finish).toBeDefined());
+  cleanup();
+  const stop = vi.fn();
+  finish!(stop);
+  await waitFor(() => expect(stop).toHaveBeenCalledTimes(1));
+});
+
+test('routines replace suggestion toggles and expose run history with character-scoped actions', async () => {
+  status.routines = [
+    {
+      id: 'mage-review',
+      title: 'Mage review',
+      instruction: 'Review current learned spells.',
+      characterKey: '["Forever","Realm","Mage"]',
+      enabled: true,
+      updatedAt: 1000000,
+      nextAt: 9999999,
+      triggers: [
+        {
+          kind: 'event',
+          event: 'level_up',
+          filters: [{ field: 'level', op: 'multiple_of', value: 2 }],
+        },
+      ],
+      cooldownSeconds: 600,
+      once: false,
+    },
+  ];
+  status.routineRuns = [
+    {
+      id: 'run-one',
+      routineId: 'mage-review',
+      characterKey: status.routines[0].characterKey,
+      title: 'Mage review',
+      startedAt: 1000000,
+      event: 'level_up',
+      status: 'done',
+    },
+  ];
+  render(App);
+  await screen.findByText('Ready to help');
+  await fireEvent.click(screen.getByRole('button', { name: 'Routines' }));
+  expect(screen.queryByRole('button', { name: 'Suggestions' })).toBeNull();
+  expect(screen.getByText('Mage review')).toBeTruthy();
+  expect(screen.getByText(/On level up · level is a multiple of 2/)).toBeTruthy();
+  await fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith('/routines/action', {
+      characterKey: status.routines[0].characterKey,
+      id: 'mage-review',
+      operation: 'pause',
+    }),
+  );
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('button', { name: 'Open in game' }) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
+  await fireEvent.click(screen.getByRole('button', { name: 'Open in game' }));
+  await waitFor(() => expect(request).toHaveBeenCalledWith('/routines/open', { id: 'run-one' }));
+});
 
 test('provider-neutral navigation and per-chat default model controls use the bridge contract', async () => {
   render(App);
   await screen.findByText('Ready to help');
   await fireEvent.click(screen.getByRole('button', { name: 'Connections' }));
-  expect(screen.getByText('Your AI, connected.')).toBeTruthy();
+  expect(screen.getByText('AI connections')).toBeTruthy();
   await screen.findByRole('option', { name: 'Sol' });
   await fireEvent.change(screen.getByLabelText('Default model for new chats'), {
     target: { value: 'sol' },

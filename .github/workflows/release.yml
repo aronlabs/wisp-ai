@@ -6,7 +6,12 @@ on:
 permissions:
   contents: write
 jobs:
+  validate:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/check.yml
   windows:
+    needs: validate
     runs-on: windows-latest
     env:
       CARGO_INCREMENTAL: '0'

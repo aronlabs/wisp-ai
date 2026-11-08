@@ -1,30 +1,43 @@
 local _, C = ...
 local toast, body
-local lastWeapons = {}
-local function busy()
+local events, subscribed = nil, {}
+local queued = {}
+local function ready()
     if
         (InCombatLockdown and InCombatLockdown())
         or (UnitAffectingCombat and UnitAffectingCombat("player"))
     then
-        return true
+        return false
     end
     for _, chat in ipairs(C.chats or {}) do
         if chat.status == "working" then
-            return true
+            return false
         end
     end
-    return false
+    return true
 end
-function C.SendAdviceEvent(event)
-    local preferences = C.suggestions or {}
-    if
-        (event.kind == "level_up" and not preferences.levelUp)
-        or (event.kind == "weapon" and not preferences.weapon)
-        or busy()
-    then
+local function send(kind, data)
+    data.ready = ready()
+    C.Send({ type = kind, data = data, context = C.Capture({ "character", "location" }) })
+end
+function C.ReceiveRoutineSubscriptions(subscriptions, enabled)
+    C.routinesEnabled = enabled
+    if not events then
         return
     end
-    C.Send({ type = "advice_event", data = event, context = C.Capture({ "character", "location" }) })
+    local nextSubscriptions = {}
+    for _, item in ipairs(subscriptions or {}) do
+        nextSubscriptions[item.native] = item.event
+        if not subscribed[item.native] then
+            pcall(events.RegisterEvent, events, item.native)
+        end
+    end
+    for native in pairs(subscribed) do
+        if not nextSubscriptions[native] then
+            events:UnregisterEvent(native)
+        end
+    end
+    subscribed = nextSubscriptions
 end
 function C.RefreshAdvice()
     if not toast then
@@ -58,29 +71,42 @@ function C.RefreshAdvice()
     toast:Show()
 end
 function C.InitAdvice()
-    local events = CreateFrame("Frame")
-    events:RegisterEvent("PLAYER_LEVEL_UP")
-    events:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-    for _, slot in ipairs({ 16, 17, 18 }) do
-        lastWeapons[slot] = GetInventoryItemID and GetInventoryItemID("player", slot)
-    end
-    events:SetScript("OnEvent", function(_, event, value)
-        if event == "PLAYER_LEVEL_UP" then
-            local level = value
-            C_Timer.After(2, function()
-                C.SendAdviceEvent({ kind = "level_up", level = level })
-            end)
-        elseif
-            event == "PLAYER_EQUIPMENT_CHANGED" and (value == 16 or value == 17 or value == 18)
-        then
-            local itemId = GetInventoryItemID and GetInventoryItemID("player", value)
-            local previous = lastWeapons[value]
-            lastWeapons[value] = itemId
-            if itemId and itemId ~= previous then
-                C_Timer.After(2, function()
-                    C.SendAdviceEvent({ kind = "weapon", itemId = itemId, slot = value })
-                end)
-            end
+    events = CreateFrame("Frame")
+    events:SetScript("OnEvent", function(_, native, value)
+        local event = subscribed[native]
+        if not event then
+            return
+        end
+        local values = {}
+        if event == "level_up" then
+            values.level = tonumber(value)
+        elseif event == "equipment_changed" then
+            values.slot = tonumber(value)
+            values.itemId = (GetInventoryItemID and GetInventoryItemID("player", value)) or 0
+        elseif event == "money_changed" then
+            values.copper = GetMoney()
+        elseif event == "zone_changed" then
+            values.zone = GetRealZoneText() or ""
+        end
+        local key = event
+            .. ((event == "equipment_changed" or event == "level_up") and tostring(value) or "")
+        queued[key] = { event = event, values = values }
+    end)
+    -- Debounce noisy native events before crossing the file transport.
+    C_Timer.NewTicker(2, function()
+        if not C.connected or not C.routinesEnabled then
+            queued = {}
+            return
+        end
+        local pending = queued
+        queued = {}
+        for _, item in pairs(pending) do
+            send("routine_event", item)
+        end
+    end)
+    C_Timer.NewTicker(15, function()
+        if C.connected and C.routinesEnabled then
+            send("routine_tick", {})
         end
     end)
     toast = CreateFrame("Frame", "WispAISuggestion", UIParent, "BackdropTemplate")
@@ -101,7 +127,7 @@ function C.InitAdvice()
     local title = toast:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", 12, -12)
     title:SetTextColor(0.84, 0.72, 0.43)
-    title:SetText("Wisp suggestion")
+    title:SetText("Wisp routine")
     body = toast:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     body:SetPoint("TOPLEFT", 12, -36)
     body:SetWidth(325)

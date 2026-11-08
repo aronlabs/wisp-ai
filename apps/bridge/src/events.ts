@@ -1,54 +1,11 @@
+import type { Chat } from './chat.ts';
+export type { Chat, Message, Activity } from './chat.ts';
 import { ReplyProjection, ReplyStream } from './reply-stream.ts';
-import { type ReferenceCatalog } from '@wisp/protocol/rich-reference';
-import type { UINode } from '@wisp/protocol/ui-schema';
-import { recordContextUsage, type ContextUsage } from '@wisp/protocol/context-usage';
-import type { ChatModel } from './chat-model.ts';
-export interface Activity {
-  id: string;
-  name: string;
-  label: string;
-  status: string;
-  detail?: string;
-}
-export interface Message {
-  id?: string;
-  role: 'user' | 'assistant' | 'system' | 'tool';
-  text: string;
-  tool?: Activity;
-  phase?: string;
-  references?: ReferenceCatalog;
-  ui?: UINode[];
-  streaming?: boolean;
-}
-export interface Chat {
-  modelSettings?: ChatModel;
-  modelRequestId?: string;
-  modelError?: string;
-  usage?: ContextUsage;
-  id: string;
-  title: string;
-  titleGenerated?: boolean;
-  eveId?: string;
-  characterKey?: string;
-  owner: string;
-  messages: Message[];
-  activity: Activity[];
-  status: string;
-  unread?: boolean;
-  historyVersion?: number;
-  lastUsedAt?: number;
-  lastActivityAt?: number;
-  inline?: boolean;
-  proactive?: boolean;
-  tipSkipped?: boolean;
-  dismissed?: boolean;
-  lastUIResult?: unknown;
-}
-export function applyEvent(
-  chat: Chat,
-  event: { type: string; data: Record<string, unknown> },
-  parts: ReplyProjection,
-): boolean {
+import { recordContextUsage } from '@wisp/protocol/context-usage';
+import { z } from 'zod';
+const streamEvent = z.object({ type: z.string(), data: z.record(z.string(), z.unknown()) });
+export function applyEvent(chat: Chat, rawEvent: unknown, parts: ReplyProjection): boolean {
+  const event = streamEvent.parse(rawEvent);
   const data = event.data;
   if (recordContextUsage(chat, event)) {
     return true;

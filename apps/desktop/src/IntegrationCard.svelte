@@ -53,6 +53,9 @@
           <span
             ><strong>{tool.name}</strong>{#if tool.toolName}<code
                 >{tool.toolName}</code
+              >{/if}{#if !tool.available}<small class="tool-unavailable"
+                >{tool.status}: {tool.reason ||
+                  "Required API unavailable"}</small
               >{/if}<small>{tool.description}</small></span
           >
         </label>{/each}

@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
-import { access } from 'node:fs/promises';
+import { z } from 'zod';
 import path from 'node:path';
-import { cp, mkdir, readlink, symlink, unlink, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, realpath, lstat, symlink, unlink, rm } from 'node:fs/promises';
 
 export function appPaths(root: string, data = process.env.WISP_DATA_DIR) {
   const agent = path.dirname(fileURLToPath(import.meta.resolve('@wisp/agent/package.json')));
@@ -31,35 +31,56 @@ export async function prepareEngine(root: string, engine: string) {
     }
     await cp(path.join(root, name), path.join(engine, name), { recursive: true });
   }
-  // Deployed dependencies can be hoisted; find the nearest package dependency directory.
-  let directory = root;
-  let target = '';
-  while (true) {
-    try {
-      await access(path.join(directory, 'node_modules'));
-      target = path.join(directory, 'node_modules');
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
+  const manifest = z
+    .object({
+      dependencies: z
+        .record(
+          z.string().regex(/^(?:@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$/),
+          z.string(),
+        )
+        .default({}),
+    })
+    .parse(JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')));
+  const dependencies = new Map<string, string>();
+  for (const name of Object.keys(manifest.dependencies)) {
+    let directory = path.resolve(root);
+    while (true) {
+      try {
+        dependencies.set(name, await realpath(path.join(directory, 'node_modules', name)));
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
       }
+      const parent = path.dirname(directory);
+      if (parent === directory) {
+        throw Error('Cannot locate agent dependency: ' + name);
+      }
+      directory = parent;
     }
-    const parent = path.dirname(directory);
-    if (parent === directory) {
-      throw Error('Cannot locate agent dependencies.');
-    }
-    directory = parent;
   }
-  const link = path.join(engine, 'node_modules');
+  // Resolve each package before linking it. A junction to an isolated node_modules
+  // relocates its relative pnpm links on Windows and makes the agent unloadable.
+  const directory = path.resolve(engine, 'node_modules');
+  if (path.dirname(directory) !== path.resolve(engine)) {
+    throw Error('Invalid engine dependency directory.');
+  }
   try {
-    if (path.resolve(await readlink(link)) === target) {
-      return;
+    if ((await lstat(directory)).isSymbolicLink()) {
+      await unlink(directory);
+    } else {
+      await rm(directory, { recursive: true });
     }
-    await unlink(link);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       throw error;
     }
   }
-  await symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+  await mkdir(directory, { recursive: true });
+  for (const [name, target] of dependencies) {
+    const link = path.join(directory, name);
+    await mkdir(path.dirname(link), { recursive: true });
+    await symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+  }
 }

@@ -33,6 +33,11 @@ also verify the TypeScript contracts consumed by Lua. Native Rust tests remain o
 see the CI workflow for their build prerequisites and command. Simulator and native-helper
 tests keep their existing skips when the required binaries are absent.
 
+Core tests also launch the real Eve agent against a local model fixture. This checks
+agent compilation, dependency resolution, model middleware and streamed replies without
+credentials or external inference. Runtime tests exercise startup, shutdown, persistence
+and partial-startup cleanup in temporary data directories.
+
 ## Build and run on Windows
 
 In addition to the workspace prerequisites, install Rust, Windows C++ build tools, Git, Go and protoc. Build the pinned simulator before starting the native app:
@@ -87,7 +92,34 @@ The bridge owns accounts, persistence and tool execution. Eve runs on loopback *
 
 Game transport uses addon enable states for outbound frames and preinstalled load-on-demand helpers for inbound snapshots. Sequence IDs, acknowledgements and revisions handle retries and stale packets. For framing, polling and reply contracts, use [transport.ts](../apps/bridge/src/transport.ts), [reply-stream.ts](../apps/bridge/src/reply-stream.ts) and the protocol source rather than treating documentation as a wire specification.
 
+### Runtime boundaries
+
+The bridge entrypoint only starts the runtime and handles process signals.
+`runtime.ts` composes services; `packet-receiver.ts` owns game-session coordination,
+`turn-runner.ts` executes agent turns, `game-requests.ts` scopes pending game reads,
+and the agent and desktop handlers expose their respective HTTP contracts.
+Dependencies and ports can be supplied to `startBridge` for isolated integration tests.
+
+- Shared Zod schemas define requests, responses and persisted conversation data.
+  Validate external data before using it; derive TypeScript types from schemas.
+- A failed load preserves the source file and prevents conversation saves. JSON
+  writes use temporary files and atomic replacement. Conversation persistence is
+  independent of game snapshots and batches streaming changes with a bounded delay.
+- Reloading or changing characters interrupts obsolete turns and rejects pending
+  reads. Every request belongs to both a transport session and a conversation.
+  Runtime resources unwind on shutdown and failed startup.
+
+Desktop screens live under `apps/desktop/src/pages`; their shared session controller
+uses Svelte runes in `desktop-controller.svelte.ts`. Addon widgets, message formatting,
+message rows and model controls are separate Lua modules loaded before `UI.lua`.
+Agent dependencies link to canonical package paths so isolated pnpm installs remain
+resolvable after moving the engine. The bundled just-bash workspace is configured
+explicitly with runtime package installation disabled.
+
 ## Formatting, CI and diagnostics
+
+Release builds depend on the reusable CI workflow, so formatting, lint, types, all
+Vitest projects and native tests must pass before packaging and signing.
 
 `pnpm format:check` checks Oxfmt, StyLua and Svelte/CSS/HTML Prettier output; `pnpm format` writes across the workspace. For Rust, use `cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml`. The [CI workflow](../.github/workflows/check.yml) contains native test prerequisites and tests the exact installer artifact after successful release builds; packaging alone is not the full check suite.
 

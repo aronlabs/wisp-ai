@@ -17,6 +17,7 @@ struct Host {
     data: PathBuf,
     payload: PathBuf,
     child: Mutex<Option<Child>>,
+    client: reqwest::Client,
 }
 
 fn hidden(command: &mut Command) {
@@ -59,8 +60,11 @@ impl Host {
         Ok(command)
     }
     async fn request(&self, method: &str, route: &str, body: Value) -> Result<Value, String> {
-        let raw =
-            fs::read(self.data.join("runtime/desktop.json")).map_err(|_| "Start Wisp first.")?;
+        let identity_path = self.data.join("runtime/desktop.json");
+        let raw = tauri::async_runtime::spawn_blocking(move || fs::read(identity_path))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|_| "Start Wisp first.")?;
         let identity: Value =
             serde_json::from_slice(&raw).map_err(|_| "Invalid bridge identity.")?;
         let port = identity["port"]
@@ -70,16 +74,8 @@ impl Host {
         let token = identity["token"]
             .as_str()
             .ok_or("Invalid bridge identity.")?;
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(if route == "/mcps/test" {
-                90
-            } else {
-                40
-            }))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|e| e.to_string())?;
-        let request = client
+        let request = self
+            .client
             .request(
                 if method == "GET" {
                     reqwest::Method::GET
@@ -88,7 +84,12 @@ impl Host {
                 },
                 format!("http://127.0.0.1:{port}{route}"),
             )
-            .bearer_auth(token);
+            .bearer_auth(token)
+            .timeout(Duration::from_secs(if route == "/mcps/test" {
+                90
+            } else {
+                40
+            }));
         let response = if method == "GET" {
             request
         } else {
@@ -126,7 +127,8 @@ fn permitted(method: &str, route: &str) -> bool {
                 "/mcps/save",
                 "/mcps/remove",
                 "/panels/action",
-                "/suggestions",
+                "/routines/action",
+                "/routines/open",
                 "/simulator/character",
             ]
             .contains(&route))
@@ -150,19 +152,24 @@ async fn bridge_request(
 }
 
 #[tauri::command]
-fn desktop_info(host: tauri::State<'_, Host>) -> Value {
-    let config = fs::read(host.data.join("config.local.json"))
+async fn desktop_info(host: tauri::State<'_, Host>) -> Result<Value, String> {
+    let data = host.data.clone();
+    let payload = host.payload.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+    let config = fs::read(data.join("config.local.json"))
         .ok()
         .and_then(|s| serde_json::from_slice::<Value>(&s).ok())
         .unwrap_or(json!({}));
     let addon_outdated = config["wow"].as_str().and_then(|wow| {
         addon_differs(
-            &host.payload.join("addon/WispAI"),
+            &payload.join("addon/WispAI"),
             &Path::new(wow).join("Interface/AddOns/WispAI"),
         )
         .ok()
     });
-    json!({"wow":config["wow"], "configured":config["wow"].as_str().is_some(), "dataDirectory":host.data.to_string_lossy(), "platform": std::env::consts::OS, "version": env!("CARGO_PKG_VERSION"), "addonOutdated": addon_outdated})
+    json!({"wow":config["wow"], "configured":config["wow"].as_str().is_some(), "dataDirectory":data.to_string_lossy(), "platform": std::env::consts::OS, "version": env!("CARGO_PKG_VERSION"), "addonOutdated": addon_outdated})
+
+    }).await.map_err(|e| e.to_string())
 }
 
 fn addon_differs(source: &Path, installed: &Path) -> std::io::Result<bool> {
@@ -362,6 +369,10 @@ fn prepare_update() -> Result<(), String> {
         data,
         payload: PathBuf::new(),
         child: Mutex::new(None),
+        client: reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| e.to_string())?,
     };
     let running = tauri::async_runtime::block_on(host.request("GET", "/status", json!({}))).is_ok();
     tauri::async_runtime::block_on(stop_host(&host))?;
@@ -489,6 +500,10 @@ fn main() {
                 data,
                 payload,
                 child: Mutex::new(None),
+                client: reqwest::Client::builder()
+                    .redirect(reqwest::redirect::Policy::none())
+                    .build()
+                    .map_err(|e| e.to_string())?,
             });
             let show =
                 tauri::menu::MenuItem::with_id(app, "show", "Open Wisp", true, None::<&str>)?;
@@ -542,6 +557,9 @@ mod tests {
     fn desktop_routes_are_explicit() {
         assert!(permitted("GET", "/status"));
         assert!(permitted("POST", "/mcps/save"));
+        assert!(permitted("POST", "/routines/action"));
+        assert!(permitted("POST", "/routines/open"));
+        assert!(!permitted("POST", "/suggestions"));
         assert!(!permitted("GET", "http://example.com"));
         assert!(!permitted("POST", "/model/responses"));
         assert!(!permitted("POST", "/status"));

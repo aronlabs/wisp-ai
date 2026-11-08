@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { writeFile, rename } from 'node:fs/promises';
+import { writeJson } from './json-file.ts';
+import { errorMessage } from './errors.ts';
 import path from 'node:path';
 export async function startDesktopServer(
   runtime: string,
@@ -39,29 +40,28 @@ export async function startDesktopServer(
     } catch (error) {
       res
         .writeHead(400, { 'content-type': 'application/json' })
-        .end(JSON.stringify({ error: error instanceof Error ? error.message : 'Request failed' }));
+        .end(JSON.stringify({ error: errorMessage(error) }));
     }
   });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, '127.0.0.1', resolve);
-  });
-  const boundPort = (server.address() as { port: number }).port;
-  const file = path.join(runtime, 'desktop.json'),
-    temp = file + '.tmp';
-  await writeFile(temp, JSON.stringify({ port: boundPort, token, pid: process.pid }), {
-    mode: 0o600,
-  });
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await rename(temp, file);
-      break;
-    } catch (e) {
-      if (attempt >= 5) {
-        throw e;
-      }
-      await new Promise((r) => setTimeout(r, 50));
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, '127.0.0.1', resolve);
+    });
+    const boundPort = (server.address() as { port: number }).port;
+    await writeJson(path.join(runtime, 'desktop.json'), {
+      port: boundPort,
+      token,
+      pid: process.pid,
+    });
+    return server;
+  } catch (error) {
+    if (server.listening) {
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+        server.closeAllConnections();
+      });
     }
+    throw error;
   }
-  return server;
 }

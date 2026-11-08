@@ -29,6 +29,7 @@ function C.NewChat()
     C.chatCounter = (C.chatCounter or 0) + 1
     C.active = C.session .. "-chat-" .. C.chatCounter
     C.db.activeChat = C.active
+    C.sidebarTab = "chats"
     C.chats[#C.chats + 1] = {
         id = C.active,
         title = "New conversation",
@@ -55,9 +56,20 @@ function C.Select(id)
         C.db.drafts[C.active] = C.draft:GetText()
     end
     C.active = id
+    for _, chat in ipairs(C.chats) do
+        if chat.id == id then
+            C.sidebarTab = chat.routineId and "routines" or "chats"
+            C.sidebarRoutine = chat.routineId
+        end
+    end
     C.db.activeChat = id
     if C.draft then
         C.draft:SetText(C.db.drafts[id] or "")
+    end
+    for _, run in ipairs(C.routineRuns or {}) do
+        if run.id == id then
+            C.sidebarTab, C.sidebarRoutine = "routines", run.routineId
+        end
     end
     C.Send({ type = "select", chat = id })
     C.Refresh()
@@ -194,8 +206,14 @@ function WispAI_Receive(json)
     if data.panels and C.ReceivePanels then
         C.ReceivePanels(data.panels, data.panelCommand)
     end
-    if data.suggestions then
-        C.suggestions = data.suggestions
+    if data.routines then
+        C.routines = data.routines
+    end
+    if data.routineRuns then
+        C.routineRuns = data.routineRuns
+    end
+    if data.routineSubscriptions and C.ReceiveRoutineSubscriptions then
+        C.ReceiveRoutineSubscriptions(data.routineSubscriptions, data.routinesEnabled)
     end
     if data.chats then
         for index = #data.chats, 1, -1 do
@@ -251,6 +269,10 @@ function WispAI_Receive(json)
             end
         end
         C.chats = data.chats
+    end
+    if data.routineCommand and C.db.lastRoutineCommand ~= data.routineCommand.seq then
+        C.db.lastRoutineCommand = data.routineCommand.seq
+        C.Select(data.routineCommand.id)
     end
     if not C.Current() then
         C.active = (

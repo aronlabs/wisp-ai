@@ -48,6 +48,9 @@ test(
     try {
       await vault.write(key, 'private-é-测试-value');
       assert.equal(await vault.read(key), 'private-é-测试-value');
+      const large = 'é-测试-'.repeat(10000);
+      await vault.write(key, large);
+      assert.equal(await vault.read(key), large, 'stdout must be fully drained before resolving');
     } finally {
       await vault.write(key, '');
     }

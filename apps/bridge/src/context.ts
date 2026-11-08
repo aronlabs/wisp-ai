@@ -66,7 +66,7 @@ function tagged(name: string, data: unknown) {
 export function turnInput(
   text: string,
   context: unknown,
-  chat: Pick<Chat, 'id' | 'title' | 'titleGenerated' | 'lastUIResult' | 'proactive'>,
+  chat: Pick<Chat, 'id' | 'title' | 'titleGenerated' | 'lastUIResult' | 'proactive' | 'routineId'>,
   capabilities?: CapabilityView[],
 ) {
   const references = linkedReferences(text);
@@ -78,6 +78,7 @@ export function turnInput(
       title: chat.title,
       needsTitle: !chat.titleGenerated,
       automatic: chat.proactive === true,
+      routineId: chat.routineId,
     }),
     ...(references.length ? [tagged('linked_references', references)] : []),
     ...(chat.lastUIResult ? [tagged('last_ui_result', chat.lastUIResult)] : []),

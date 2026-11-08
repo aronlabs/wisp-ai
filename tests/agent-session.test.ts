@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import type { Client } from 'eve/client';
+import { SessionNotActiveError, type Client } from 'eve/client';
 import { sendChatTurn } from '@wisp/bridge/agent-session';
 import { turnInput, visibleUserText } from '@wisp/bridge/context';
 import type { Chat } from '@wisp/bridge/events';
@@ -42,7 +42,7 @@ function fixture(error?: Error) {
 }
 
 test('an inactive session is replaced once and keeps bounded visible history', async () => {
-  const f = fixture(new Error('The session is no longer active. Start a new session.'));
+  const f = fixture(new SessionNotActiveError());
   const input = turnInput('What is next?', undefined, f.chat);
   assert.equal(await sendChatTurn(f.client, f.chat, input), f.delivery);
   assert.equal(f.created(), 1);

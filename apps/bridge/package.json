@@ -10,7 +10,7 @@
   "type": "module",
   "exports": {
     "./package.json": "./package.json",
-    "./advice": "./src/advice.ts",
+    "./routines": "./src/routines.ts",
     "./agent-process": "./src/agent-process.ts",
     "./agent-session": "./src/agent-session.ts",
     "./app-paths": "./src/app-paths.ts",
@@ -38,7 +38,23 @@
     "./snapshots": "./src/snapshots.ts",
     "./thewowdb": "./src/thewowdb.ts",
     "./transport": "./src/transport.ts",
-    "./wowhead-search": "./src/wowhead-search.ts"
+    "./wowhead-search": "./src/wowhead-search.ts",
+    "./runtime": "./src/runtime.ts",
+    "./agent-server": "./src/agent-server.ts",
+    "./desktop-handler": "./src/desktop-handler.ts",
+    "./chat-store": "./src/chat-store.ts",
+    "./chat-lifecycle": "./src/chat-lifecycle.ts",
+    "./chat-projection": "./src/chat-projection.ts",
+    "./game-requests": "./src/game-requests.ts",
+    "./session-state": "./src/session-state.ts",
+    "./packet-receiver": "./src/packet-receiver.ts",
+    "./routine-scheduler": "./src/routine-scheduler.ts",
+    "./turn-runner": "./src/turn-runner.ts",
+    "./json-file": "./src/json-file.ts",
+    "./errors": "./src/errors.ts",
+    "./integration-state": "./src/integration-state.ts",
+    "./runtime-resources": "./src/runtime-resources.ts",
+    "./chat": "./src/chat.ts"
   },
   "scripts": {
     "start": "node src/main.ts",

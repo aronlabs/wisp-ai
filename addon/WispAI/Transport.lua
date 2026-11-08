@@ -38,7 +38,10 @@ local function enqueue(packet)
 end
 function C.Send(packet)
     seq = seq + 1
-    if packet.type == "hello" and C.IntegrationReport then
+    if
+        (packet.type == "hello" or packet.type == "say" or packet.type == "capabilities_list")
+        and C.IntegrationReport
+    then
         packet.integrations = C.IntegrationReport()
     end
     packet.session = C.session

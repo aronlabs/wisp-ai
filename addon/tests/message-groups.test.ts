@@ -1,3 +1,4 @@
+import { addonSource } from './addon-source.ts';
 import { test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -17,9 +18,7 @@ for (const surface of ['main', 'inline']) {
     run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
     run('C = {}; SlashCmdList = {}; function time() return 1 end');
     for (const file of ['Core.lua', 'RichUI.lua', 'UI.lua', 'Inline.lua']) {
-      run(
-        `assert(load(${JSON.stringify(readFileSync(`addon/WispAI/${file}`, 'utf8'))}))('WispAI', C)`,
-      );
+      run(`assert(load(${JSON.stringify(addonSource(file))}))('WispAI', C)`);
     }
     run(`
       C.db = {sidebar = true, showTools = true, drafts = {}}

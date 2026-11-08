@@ -81,6 +81,7 @@ export async function migrateDesktop(
     'memory',
     'mcp.json',
     'panels.json',
+    'routines.json',
     'suggestions.json',
     'capabilities.json',
     'advice-history.json',

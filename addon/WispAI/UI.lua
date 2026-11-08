@@ -1,213 +1,8 @@
 local _, C = ...
-local GOLD, TEXT, MUTED = { 0.84, 0.72, 0.43 }, { 0.89, 0.85, 0.75 }, { 0.64, 0.60, 0.51 }
-local function label(parent, text, tint)
-    local font = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    font:SetText(text)
-    font:SetTextColor(unpack(tint or TEXT))
-    font:SetJustifyH("LEFT")
-    return font
-end
-local function setText(font, value)
-    if font._wispText ~= value then
-        font._wispText = value
-        font:SetText(value)
-    end
-end
-local function box(frame, bg, edge)
-    frame:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true,
-        tileSize = 16,
-        edgeSize = edge or 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
-    frame:SetBackdropColor(unpack(bg))
-    frame:SetBackdropBorderColor(0.43, 0.38, 0.28, 1)
-end
-local function button(parent, text, width, click)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetSize(width, 24)
-    b:SetText(text)
-    b:SetScript("OnClick", click)
-    return b
-end
-local referenceQuests = {}
-local function mapLocation(link)
-    local id, x, y = link:match("^worldmap:(%d+):(%d+):(%d+)$")
-    id, x, y = tonumber(id), tonumber(x), tonumber(y)
-    if id and id > 0 and x and x <= 10000 and y and y <= 10000 then
-        return id, x / 100, y / 100
-    end
-end
-local function refreshReferences()
-    if not C_QuestLog or not C_QuestLog.GetNumQuestLogEntries then
-        return
-    end
-    C.db.questReferences = C.db.questReferences or {}
-    local changed = false
-    for index = 1, C_QuestLog.GetNumQuestLogEntries() do
-        local info = C_QuestLog.GetInfo(index)
-        if info and not info.isHeader and info.questID and info.title then
-            local old = C.db.questReferences[tostring(info.questID)]
-            if not old or old.title ~= info.title or old.level ~= info.level then
-                changed = true
-            end
-            C.db.questReferences[tostring(info.questID)] =
-                { id = info.questID, title = info.title, level = info.level }
-        end
-    end
-    referenceQuests = C.db.questReferences
-    return changed
-end
-local function macroNameFromLink(link)
-    local hex = link:match("^wispmacro:([%x]+)$")
-    if not hex or #hex > 32 or #hex % 2 ~= 0 then
-        return nil
-    end
-    local name = hex:gsub("..", function(pair)
-        return string.char(tonumber(pair, 16))
-    end)
-    if name:find("[%c|]") then
-        return nil
-    end
-    return name
-end
-local function formatted(text, references, fromUser)
-    local links = {}
-    local function keep(link)
-        links[#links + 1] = link
-        return "\1" .. #links .. "\2"
-    end
-    text = tostring(text or "")
-    text = text:gsub("```.-```", function(code)
-        return keep(code:gsub("|", "||"))
-    end)
-    text = text:gsub("`[^`\n]+`", function(code)
-        return keep(code:gsub("|", "||"))
-    end)
-    if fromUser then
-        text = text:gsub("|cn[%w_]+:|H[^|]+|h.-|h|r", keep)
-        text = text:gsub("|c%x%x%x%x%x%x%x%x|H[^|]+|h.-|h|r", keep)
-        text = text:gsub("|H[^|]+|h.-|h", keep)
-    end
-    text = text:gsub("|", "||")
-    text = text:gsub("%[%[ref:([%w_-]+)%]%]", function(key)
-        local ref = references and references[key]
-        if type(ref) ~= "table" then
-            return "(reference unavailable)"
-        end
-        local name = tostring(ref.label or "Reference"):gsub("[|%c%[%]]", "")
-        local payload
-        if ref.kind == "item" or ref.kind == "spell" or ref.kind == "quest" then
-            local id = tonumber(ref.id)
-            if not id or id < 1 then
-                return name
-            end
-            payload = ref.kind .. ":" .. id
-            if
-                type(ref.payload) == "string"
-                and (ref.payload == payload or ref.payload:sub(1, #payload + 1) == payload .. ":")
-                and ref.payload:match("^" .. ref.kind .. ":[%d:%+%.%-]+$")
-            then
-                payload = ref.payload
-            end
-        elseif
-            ref.kind == "unit"
-            and type(ref.guid) == "string"
-            and ref.guid:match("^%a+%-%w[%w%-]*$")
-        then
-            payload = "unit:" .. ref.guid
-        elseif ref.kind == "map" then
-            local id, x, y = tonumber(ref.mapId), tonumber(ref.x), tonumber(ref.y)
-            if not id or id < 1 then
-                return name
-            end
-            if x and y and x >= 0 and x <= 100 and y >= 0 and y <= 100 then
-                payload = string.format(
-                    "worldmap:%d:%d:%d",
-                    id,
-                    math.floor(x * 100 + 0.5),
-                    math.floor(y * 100 + 0.5)
-                )
-                name = name .. string.format(" (%.1f, %.1f)", x, y)
-            else
-                payload = "wispzone:" .. id
-            end
-        elseif
-            ref.kind == "macro"
-            and type(ref.name) == "string"
-            and #ref.name <= 16
-            and not ref.name:find("[%c|]")
-        then
-            payload = "wispmacro:"
-                .. ref.name:gsub(".", function(char)
-                    return string.format("%02x", string.byte(char))
-                end)
-        end
-        if not payload then
-            return name
-        end
-        local icon = "Interface\\Icons\\INV_Misc_QuestionMark"
-        local color = "ffe3c77e"
-        if ref.kind == "item" then
-            icon = (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(tonumber(ref.id)))
-                or (GetItemIcon and GetItemIcon(tonumber(ref.id)))
-                or icon
-            if GetItemInfo and GetItemQualityColor then
-                local _, _, quality = GetItemInfo(tonumber(ref.id))
-                if quality then
-                    local _, _, _, hex = GetItemQualityColor(quality)
-                    color = hex or color
-                end
-            end
-        elseif ref.kind == "spell" then
-            icon = (
-                C_Spell
-                and C_Spell.GetSpellTexture
-                and C_Spell.GetSpellTexture(tonumber(ref.id))
-            )
-                or (GetSpellTexture and GetSpellTexture(tonumber(ref.id)))
-                or icon
-            color = "ff71d5ff"
-        elseif ref.kind == "map" then
-            icon, color = "Interface\\Icons\\INV_Misc_Map_01", "ff80cf91"
-        elseif ref.kind == "quest" then
-            icon = "Interface\\GossipFrame\\AvailableQuestIcon"
-        end
-        return keep(
-            "|T"
-                .. tostring(icon)
-                .. ":12:12:0:-2|t |c"
-                .. color
-                .. "|H"
-                .. payload
-                .. "|h["
-                .. name
-                .. "]|h|r"
-        )
-    end)
-    text = text:gsub("%*%*([^*]+)%*%*", "|cffe3c77e%1|r")
-    text = text:gsub("%*([^*\n]+)%*", "%1"):gsub("_([^_\n]+)_", "%1")
-    text = text:gsub("%[([^%]]+)%]%(https?://[^%)]+%)", "%1")
-    return (text:gsub("\1(%d+)\2", function(index)
-        return links[tonumber(index)]
-    end))
-end
-C.FormatText = formatted
-local function referenceSignature(references)
-    local parts = {}
-    for key, ref in pairs(references or {}) do
-        local values = {}
-        for field, value in pairs(ref) do
-            values[#values + 1] = field .. "=" .. tostring(value)
-        end
-        table.sort(values)
-        parts[#parts + 1] = key .. ":" .. table.concat(values, "\30")
-    end
-    table.sort(parts)
-    return table.concat(parts, "\31")
-end
+local label, setText, box, button =
+    C.Widgets.label, C.Widgets.setText, C.Widgets.box, C.Widgets.button
+local GOLD, TEXT, MUTED = C.Widgets.GOLD, C.Widgets.TEXT, C.Widgets.MUTED
+local refreshReferences = C.MessageFormat.refreshReferences
 local frame, header, body, sidebar, chatPanel, status, transcript, content, scrollBar, sessionTitle, send, mini, settings, contextMeter
 local replyGlow, newMessages
 local emptyState
@@ -374,182 +169,6 @@ function C.RefreshMemory()
     end
     memoryContent:SetHeight(math.max(1, y))
 end
-C.workStarted = C.workStarted or {}
-local modelControls = {}
-C.modelPending = {}
-local function defaultEffort(model)
-    for _, effort in ipairs(model.efforts or {}) do
-        if effort == "medium" then
-            return effort
-        end
-    end
-    return model.defaultEffort or model.efforts[1] or "provider-default"
-end
-function C.SetChatModel(chat, model, effort)
-    if not chat or chat.status == "working" or C.modelPending[chat.id] then
-        return
-    end
-    C.modelCounter = (C.modelCounter or 0) + 1
-    local id = C.session .. "-model-" .. C.modelCounter
-    C.modelPending[chat.id] = id
-    C.Send({
-        type = "chat_model_set",
-        chat = chat.id,
-        requestId = id,
-        data = { model = model, effort = effort, inline = chat.inline },
-    })
-    C.RefreshModelControls()
-end
-function C.RefreshModelControls()
-    local catalog = C.modelCatalog or {}
-    for _, controls in ipairs(modelControls) do
-        local chat = controls.current()
-        if chat and C.modelPending[chat.id] == chat.modelRequestId then
-            C.modelPending[chat.id] = nil
-        end
-        local selection = chat and chat.modelSettings or {}
-        local model = selection.model or catalog.defaultModel
-        local selected
-        for _, candidate in ipairs(catalog.models or {}) do
-            if candidate.slug == model then
-                selected = candidate
-            end
-        end
-        local pending = chat and C.modelPending[chat.id]
-        controls.model:SetWidth(math.max(90, math.min(165, controls:GetParent():GetWidth() - 150)))
-        if controls.composer then
-            local narrow = controls.composer:GetWidth() < 380
-            if controls.narrow ~= narrow then
-                controls.narrow = narrow
-                controls.composer:SetHeight(narrow and 106 or 78)
-                C.draft:ClearAllPoints()
-                C.draft:SetPoint("TOPLEFT", 10, -7)
-                C.draft:SetPoint("BOTTOMRIGHT", -10, narrow and 56 or 28)
-                controls.send:ClearAllPoints()
-                controls.send:SetPoint("BOTTOMRIGHT", -7, narrow and 31 or 5)
-                transcript:SetPoint("BOTTOMRIGHT", -31, narrow and 132 or 104)
-                scrollBar:SetPoint("BOTTOMRIGHT", -10, narrow and 132 or 104)
-            end
-        end
-        local working = chat and chat.status == "working"
-        setText(
-            controls.model,
-            pending and "Saving..."
-                or (
-                    chat and chat.modelError and "Model error"
-                    or (selected and selected.displayName or "Model...")
-                )
-        )
-        setText(
-            controls.effort,
-            "Effort: " .. (selection.effort or (selected and defaultEffort(selected)) or "--")
-        )
-        controls.model:SetEnabled(C.connected and not pending and not working)
-        controls.effort:SetEnabled(
-            C.connected
-                and selected ~= nil
-                and not pending
-                and not working
-                and #selected.efforts > 0
-        )
-    end
-end
-function C.CreateModelControls(parent, name, current, ensure)
-    local controls = CreateFrame("Frame", name, parent)
-    controls:SetSize(280, 22)
-    controls.current = current
-    local function choose(model, effort)
-        local chat = current() or (ensure and ensure())
-        C.SetChatModel(chat, model, effort)
-    end
-    local function selector(text, width, click)
-        local control = CreateFrame("Button", nil, controls)
-        control:SetSize(width, 22)
-        local caption = label(control, text, MUTED)
-        caption:SetFontObject("GameFontNormalSmall")
-        caption:SetPoint("LEFT", 2, 0)
-        caption:SetPoint("RIGHT", -12, 0)
-        caption:SetWordWrap(false)
-        control:SetFontString(caption)
-        control:SetNormalFontObject("GameFontNormalSmall")
-        control:SetHighlightFontObject("GameFontHighlightSmall")
-        local arrow = label(control, "v", MUTED)
-        arrow:SetFontObject("GameFontNormalSmall")
-        arrow:SetPoint("RIGHT", -2, 0)
-        control:SetText(text)
-        control:SetScript("OnClick", click)
-        return control
-    end
-    controls.model = selector("Model...", 165, function(self)
-        local models = C.modelCatalog and C.modelCatalog.models or {}
-        if #models == 0 then
-            C.Send({ type = "model_catalog" })
-            return
-        end
-        if MenuUtil and MenuUtil.CreateContextMenu then
-            MenuUtil.CreateContextMenu(self, function(_, root)
-                root:CreateTitle("Model")
-                for _, candidate in ipairs(models) do
-                    local option = candidate
-                    root:CreateRadio(option.displayName, function()
-                        local chat = current()
-                        return option.slug
-                            == (
-                                chat and chat.modelSettings and chat.modelSettings.model
-                                or C.modelCatalog.defaultModel
-                            )
-                    end, function()
-                        choose(option.slug)
-                    end)
-                end
-            end)
-        end
-    end)
-    controls.model:SetPoint("LEFT")
-    controls.effort = selector("Effort: --", 110, function(self)
-        local chat = current()
-        local model = chat and chat.modelSettings and chat.modelSettings.model
-            or C.modelCatalog.defaultModel
-        for _, candidate in ipairs(C.modelCatalog.models or {}) do
-            if candidate.slug == model and MenuUtil and MenuUtil.CreateContextMenu then
-                MenuUtil.CreateContextMenu(self, function(_, root)
-                    root:CreateTitle("Reasoning effort")
-                    for _, effort in ipairs(candidate.efforts) do
-                        local option = effort
-                        root:CreateRadio(option, function()
-                            return option
-                                == (
-                                    chat and chat.modelSettings and chat.modelSettings.effort
-                                    or defaultEffort(candidate)
-                                )
-                        end, function()
-                            choose(model, option)
-                        end)
-                    end
-                end)
-            end
-        end
-    end)
-    controls.effort:SetPoint("LEFT", controls.model, "RIGHT", 5, 0)
-    for _, control in ipairs({ controls.model, controls.effort }) do
-        control:SetScript("OnEnter", function(self)
-            local chat = current()
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:SetText(
-                chat and chat.modelError
-                    or (C.modelCatalog and C.modelCatalog.error)
-                    or "Applies to the next message in this conversation."
-            )
-            GameTooltip:Show()
-        end)
-        control:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-    end
-    modelControls[#modelControls + 1] = controls
-    C.RefreshModelControls()
-    return controls
-end
 local function refreshProgress()
     local chat = C.Current()
     local working = chat and chat.status == "working"
@@ -649,7 +268,7 @@ function C.RequestDeleteChat(id)
 end
 local sessionContent, sessionScroll
 local sessionButtons, rows, scrollPositions = {}, {}, {}
-local renderedChat, itemRevision = nil, 0
+local renderedChat = nil
 local rendering, scrollRange = false, 0
 local function layout()
     local expanded = not C.db.minimized
@@ -680,375 +299,8 @@ local function layout()
         chatPanel:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", 0, 0)
     end
 end
-local function linked(row)
-    row:EnableMouse(true)
-    row:SetHyperlinksEnabled(true)
-    row:SetScript("OnHyperlinkEnter", function(self, link, text)
-        C.hoverLink = text or ("|H" .. link .. "|h[Reference]|h")
-        GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
-        local zone = tonumber(link:match("^wispzone:(%d+)$"))
-        if zone then
-            local info = C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(zone)
-            GameTooltip:SetText(info and info.name or "Map", 1, 0.82, 0)
-            GameTooltip:AddLine("Click to open this map.", 0.65, 0.65, 0.65, true)
-            GameTooltip:Show()
-            return
-        end
-        local mapId, x, y = mapLocation(link)
-        if mapId then
-            local info = C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(mapId)
-            GameTooltip:SetText(info and info.name or "Map location", 1, 0.82, 0)
-            GameTooltip:AddLine(string.format("%.2f, %.2f", x, y), 0.9, 0.87, 0.8)
-            GameTooltip:AddLine("Click to view this location on the map.", 0.65, 0.65, 0.65, true)
-            GameTooltip:Show()
-            return
-        end
-        local macroName = macroNameFromLink(link)
-        if macroName then
-            local index = GetMacroIndexByName and GetMacroIndexByName(macroName)
-            GameTooltip:SetText(macroName, 1, 0.82, 0)
-            if index and index > 0 and GetMacroInfo then
-                local _, _, code = GetMacroInfo(index)
-                GameTooltip:AddLine((code or ""):gsub("|", "||"), 0.9, 0.87, 0.8, true)
-                GameTooltip:AddLine(
-                    "Click to pick up this macro, then place it on your action bar.",
-                    0.65,
-                    0.65,
-                    0.65,
-                    true
-                )
-            else
-                GameTooltip:AddLine("This macro is no longer available.", 0.8, 0.5, 0.4, true)
-            end
-            GameTooltip:Show()
-            return
-        end
-        local id = tonumber(link:match("^quest:(%d+)"))
-        local quest = id and referenceQuests[tostring(id)]
-        if quest then
-            GameTooltip:SetText(quest.title, 1, 0.82, 0)
-            if quest.level then
-                GameTooltip:AddLine("Level " .. quest.level, 0.7, 0.7, 0.7)
-            end
-            local objectives = C_QuestLog.GetQuestObjectives and C_QuestLog.GetQuestObjectives(id)
-                or {}
-            for _, objective in ipairs(objectives) do
-                GameTooltip:AddLine(
-                    objective.text or "",
-                    objective.finished and 0.4 or 1,
-                    objective.finished and 1 or 0.85,
-                    0.4,
-                    true
-                )
-            end
-            GameTooltip:AddLine("Click to view quest. Shift-click to link.", 0.65, 0.65, 0.65, true)
-            GameTooltip:Show()
-            return
-        end
-        if pcall(GameTooltip.SetHyperlink, GameTooltip, link) then
-            GameTooltip:Show()
-        end
-    end)
-    row:SetScript("OnHyperlinkLeave", function()
-        C.hoverLink = nil
-        GameTooltip:Hide()
-    end)
-    row:SetScript("OnHyperlinkClick", function(self, link, text, mouse)
-        if IsShiftKeyDown() then
-            C.draft:Insert(text)
-            C.draft:SetFocus()
-            return
-        end
-        local zone = tonumber(link:match("^wispzone:(%d+)$"))
-        if zone then
-            if C_Map and C_Map.OpenWorldMap then
-                C_Map.OpenWorldMap(zone)
-            else
-                C.Log("The map UI is unavailable.")
-            end
-            return
-        end
-        local macroName = macroNameFromLink(link)
-        if macroName then
-            if InCombatLockdown and InCombatLockdown() then
-                C.Log("Leave combat before picking up a macro.")
-                return
-            end
-            local index = GetMacroIndexByName and GetMacroIndexByName(macroName)
-            if index and index > 0 and PickupMacro then
-                PickupMacro(index)
-            else
-                C.Log("This macro is no longer available.")
-            end
-            return
-        end
-        local id = tonumber(link:match("^quest:(%d+)"))
-        if id and QuestMapFrame_OpenToQuestDetails then
-            QuestMapFrame_OpenToQuestDetails(id)
-        else
-            SetItemRef(link, text, mouse, self)
-        end
-    end)
-    row:EnableMouseWheel(true)
-    row:SetScript("OnMouseWheel", function(_, delta)
-        local parent = row
-        while parent do
-            local target = parent._wispScroll
-            if target then
-                target:SetVerticalScroll(
-                    math.max(
-                        0,
-                        math.min(
-                            target:GetVerticalScrollRange(),
-                            target:GetVerticalScroll() - delta * 45
-                        )
-                    )
-                )
-                return
-            end
-            parent = parent:GetParent()
-        end
-        scrollBar:SetValue(math.max(0, math.min(scrollRange, scrollBar:GetValue() - delta * 45)))
-    end)
-end
-C.LinkWidget = linked
-local function makeRow(parent)
-    local row = CreateFrame("Frame", nil, parent or content)
-    linked(row)
-    row.author = label(row, "", GOLD)
-    row.author:SetPoint("TOPLEFT", 0, 0)
-    row.text = label(row, "")
-    row.text:SetFontObject(ChatFontNormal)
-    row.text:SetWordWrap(true)
-    row.text:SetSpacing(3)
-    row.icon = row:CreateTexture(nil, "ARTWORK")
-    row.icon:SetSize(14, 14)
-    row.icon:SetPoint("TOPLEFT", 0, -1)
-    row.bubble = CreateFrame("Frame", nil, row, "BackdropTemplate")
-    row.bubble:SetFrameLevel(row:GetFrameLevel())
-    row.bubble:SetAllPoints(row)
-    row.bubble:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
-    row.bubble:SetBackdropColor(0.25, 0.19, 0.115, 0.96)
-    row.bubble:SetBackdropBorderColor(0.45, 0.35, 0.20, 0.5)
-    row.bubble:EnableMouse(false)
-    row.bubble:Hide()
-    row.disclosure = CreateFrame("Button", nil, row)
-    row.disclosure:SetAllPoints(row)
-    row.disclosure:SetScript("OnClick", function()
-        C.toolGroupsExpanded = C.toolGroupsExpanded or {}
-        C.toolGroupsExpanded[row.groupKey] = not C.toolGroupsExpanded[row.groupKey]
-        C.Refresh()
-        if C.RefreshInline then
-            C.RefreshInline()
-        end
-    end)
-    row.disclosure:Hide()
-    return row
-end
-C.MakeMessageRow = makeRow
-C.toolGroupsExpanded = {}
-function C.DisplayMessages(chat)
-    local messages, group = {}, nil
-    for index, message in ipairs(chat and chat.messages or {}) do
-        if message.role == "tool" then
-            if C.db.showTools then
-                if not group then
-                    group = {
-                        id = "tools-" .. (message.id or index),
-                        role = "tool",
-                        text = "",
-                        calls = {},
-                    }
-                    messages[#messages + 1] = group
-                end
-                group.calls[#group.calls + 1] = message
-            end
-        else
-            group = nil
-            messages[#messages + 1] = message
-        end
-    end
-    for _, message in ipairs(messages) do
-        if message.calls then
-            local labels, details, running, failed = {}, {}, nil, false
-            local extraDetails = {}
-            for _, call in ipairs(message.calls) do
-                local tool = call.tool or {}
-                local name = tool.label or call.text or "Tool"
-                labels[#labels + 1] = name
-                details[#details + 1] = name .. " - " .. (tool.status or "completed")
-                if type(tool.detail) == "string" and tool.detail ~= "" and tool.detail ~= name then
-                    extraDetails[#extraDetails + 1] = tool.detail
-                    details[#details] = details[#details] .. "\n" .. tool.detail
-                end
-                if tool.status == "running" then
-                    running = name
-                end
-                if tool.status and tool.status ~= "running" and tool.status ~= "completed" then
-                    failed = true
-                end
-            end
-            if #labels > 1 or #extraDetails > 0 then
-                message.groupKey = chat.id .. ":" .. message.id
-            end
-            local expanded = message.groupKey and C.toolGroupsExpanded[message.groupKey]
-            local summary = running or table.concat(labels, " / ", 1, math.min(2, #labels))
-            if #labels > 2 and not running then
-                summary = summary .. " / +" .. (#labels - 2)
-            end
-            message.text = (message.groupKey and (expanded and "- " or "+ ") or "")
-                .. summary
-                .. (
-                    expanded
-                        and ("\n" .. table.concat(#labels == 1 and extraDetails or details, "\n"))
-                    or ""
-                )
-            message.tool = {
-                label = message.text,
-                status = running and "running" or (failed and "failed" or "completed"),
-            }
-        end
-    end
-    return messages
-end
-function C.PositionMessageRow(row, parent, y, width)
-    local x = row.speaker == "user" and width - row:GetWidth() or 0
-    if row.y ~= y or row.x ~= x then
-        row.y, row.x = y, x
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
-    end
-end
-function C.MessageGap(previous, speaker)
-    return previous and previous ~= speaker and 12 or 0
-end
-function C.ChatSignature(chat)
-    local parts = { chat and chat.id or "" }
-    for _, message in ipairs(chat and chat.messages or {}) do
-        parts[#parts + 1] = (message.id or "")
-            .. (message.text or "")
-            .. (message.tool and message.tool.status or "")
-            .. (C.RichSignature and C.RichSignature(message.ui) or "")
-    end
-    return table.concat(parts, "\31")
-end
-function C.UpdateNewMessages(button, chat, follow, switched)
-    local signature = C.ChatSignature(chat)
-    if not switched and button.signature and button.signature ~= signature and not follow then
-        button.pending = true
-    end
-    if follow or switched then
-        button.pending = false
-    end
-    button.signature = signature
-    button:SetShown(button.pending == true and not follow)
-end
-function C.MessageSpeaker(message)
-    return (message.role == "tool" or message.role == "assistant") and "assistant" or message.role
-end
-function C.RenderMessageRow(row, chat, message, width, showAuthor)
-    local tool = message.tool
-    local signature = (message.role or "")
-        .. "\31"
-        .. (message.text or "")
-        .. "\31"
-        .. (tool and tool.status or "")
-        .. "\31"
-        .. width
-        .. "\31"
-        .. itemRevision
-        .. "\31"
-        .. referenceSignature(message.references)
-        .. "\31"
-        .. (C.RichSignature and C.RichSignature(message.ui) or "")
-        .. "\31"
-        .. (chat.status or "")
-        .. "\31"
-        .. tostring(showAuthor)
-        .. "\31"
-        .. tostring(message.groupKey)
-    if row.signature ~= signature then
-        row.signature = signature
-        row.speaker = message.role
-        local padding = message.role == "user" and 8 or 0
-        if message.role == "user" then
-            width = math.floor(width * 0.84)
-        end
-        row:SetWidth(width)
-        row.bubble:SetShown(message.role == "user")
-        row.groupKey = message.groupKey
-        row.disclosure:SetShown(message.groupKey ~= nil)
-        row.text:ClearAllPoints()
-        local top = message.role == "user" and padding or (showAuthor and 20 or 0)
-        row.author:ClearAllPoints()
-        row.author:SetPoint(
-            message.role == "user" and "TOPRIGHT" or "TOPLEFT",
-            message.role == "user" and -10 or 0,
-            -padding
-        )
-        row.author:SetShown(showAuthor and message.role ~= "user")
-        setText(
-            row.author,
-            message.role == "user" and "You" or (message.role == "system" and "Notice" or "Wisp AI")
-        )
-        if message.role == "tool" then
-            if row.rich then
-                row.rich:Hide()
-            end
-            row.icon:ClearAllPoints()
-            row.icon:SetPoint("TOPLEFT", 0, -top - 1)
-            row.icon:Show()
-            local state = tool and tool.status or "completed"
-            row.icon:SetTexture(
-                state == "completed" and "Interface\\RaidFrame\\ReadyCheck-Ready"
-                    or (
-                        state == "running" and "Interface\\RaidFrame\\ReadyCheck-Waiting"
-                        or "Interface\\RaidFrame\\ReadyCheck-NotReady"
-                    )
-            )
-            row.text:SetPoint("TOPLEFT", 21, -top)
-            row.text:SetWidth(width - 21)
-            row.text:SetTextColor(unpack(MUTED))
-            local suffix = state == "running" and "  |cffe0c070Running|r"
-                or (state == "completed" and "" or "  |cffd98575Failed|r")
-            setText(row.text, formatted(tool and tool.label or message.text) .. suffix)
-            row.height = top + math.max(18, row.text:GetStringHeight()) + 7
-        else
-            row.icon:Hide()
-            row.text:SetPoint("TOPLEFT", padding, -top)
-            row.text:SetWidth(width - padding * 2)
-            row.text:SetTextColor(unpack(message.role == "system" and MUTED or TEXT))
-            setText(row.text, formatted(message.text, message.references, message.role == "user"))
-            if message.role == "user" and not (message.ui and #message.ui > 0) then
-                local natural = row.text.GetUnboundedStringWidth
-                    and row.text:GetUnboundedStringWidth()
-                if type(natural) == "number" and natural > 0 then
-                    width = math.min(width, math.max(64, math.ceil(natural) + padding * 2))
-                    row:SetWidth(width)
-                    row.text:SetWidth(width - padding * 2)
-                end
-            end
-            row.height = top
-                + math.max(1, message.text ~= "" and row.text:GetStringHeight() or 0)
-                + (message.role == "user" and padding or 10)
-            if C.RenderRichUI then
-                row.rich = row.rich or CreateFrame("Frame", nil, row)
-                row.rich:Show()
-                row.rich:ClearAllPoints()
-                row.rich:SetPoint("TOPLEFT", 0, -row.height)
-                row.height = row.height + C.RenderRichUI(row.rich, chat, message, width)
-            end
-            if message.role ~= "user" then
-                row.height = row.height + 8
-            end
-        end
-        row:SetHeight(row.height)
-    end
+function C.ScrollTranscript(delta)
+    scrollBar:SetValue(math.max(0, math.min(scrollRange, scrollBar:GetValue() - delta * 45)))
 end
 local function renderTranscript(chat)
     local id = chat and chat.id or "empty"
@@ -1072,7 +324,7 @@ local function renderTranscript(chat)
             local key = id .. ":" .. (message.id or tostring(index))
             local row = rows[key]
             if not row then
-                row = makeRow()
+                row = C.MakeMessageRow(content)
                 rows[key] = row
             end
             used[key] = true
@@ -1194,8 +446,45 @@ function C.Refresh()
         end
         return aTime > bTime
     end)
+    if C.sidebarTab == "routines" then
+        ordered = {}
+        if C.sidebarRoutine then
+            for index = #(C.routineRuns or {}), 1, -1 do
+                local run = C.routineRuns[index]
+                if run.routineId == C.sidebarRoutine then
+                    local stamp = date and date("%d/%m %H:%M", run.startedAt / 1000) or run.event
+                    ordered[#ordered + 1] = {
+                        id = run.id,
+                        title = stamp .. " - " .. run.event,
+                        status = run.status,
+                        runEntry = true,
+                    }
+                end
+            end
+        else
+            for _, routine in ipairs(C.routines or {}) do
+                ordered[#ordered + 1] = {
+                    id = "routine-header:" .. routine.id,
+                    title = routine.title,
+                    status = routine.enabled and "Active" or "Paused",
+                    routine = routine,
+                }
+            end
+        end
+        if #ordered == 0 then
+            ordered[1] = {
+                id = "routine-empty",
+                title = C.sidebarRoutine and "No runs yet" or "Ask Wisp in chat",
+                status = C.sidebarRoutine and "Waiting for an event" or "to create a routine",
+                emptyEntry = true,
+            }
+        end
+    end
     for _, session in ipairs(ordered) do
-        if not session.inline and not session.proactive then
+        if
+            C.sidebarTab == "routines"
+            or (not session.inline and not session.proactive and not session.routineId)
+        then
             sessionCount = sessionCount + 1
             local index = sessionCount
             local b = sessionButtons[session.id]
@@ -1209,7 +498,12 @@ function C.Refresh()
                 b.info = label(b, "", MUTED)
                 b.info:SetPoint("TOPLEFT", 7, -24)
                 b:SetScript("OnClick", function(self)
-                    C.Select(self.chatId)
+                    if self.routine then
+                        C.sidebarRoutine = self.routine.id
+                        C.Refresh()
+                    elseif not self.emptyEntry and self.runStatus ~= "no_tip" then
+                        C.Select(self.chatId)
+                    end
                 end)
                 b:SetScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1220,13 +514,26 @@ function C.Refresh()
                     GameTooltip:Hide()
                 end)
                 b.delete = button(b, "x", 20, function()
-                    C.RequestDeleteChat(b.chatId)
+                    if b.routine then
+                        C.Send({
+                            type = "routine_action",
+                            data = {
+                                operation = b.routine.enabled and "pause" or "resume",
+                                id = b.routine.id,
+                            },
+                            context = C.Capture({ "character" }),
+                        })
+                    else
+                        C.RequestDeleteChat(b.chatId)
+                    end
                 end)
                 b.delete:SetSize(20, 20)
                 b.delete:SetPoint("TOPRIGHT", -3, -3)
                 b.delete:SetScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetText("Delete conversation")
+                    GameTooltip:SetText(
+                        b.routine and "Pause / resume routine" or "Delete conversation"
+                    )
                     GameTooltip:Show()
                 end)
                 b.delete:SetScript("OnLeave", function()
@@ -1236,6 +543,14 @@ function C.Refresh()
             end
             used[session.id] = true
             b.chatId, b.fullTitle = session.id, session.title
+            b.routine, b.emptyEntry, b.runStatus =
+                session.routine, session.emptyEntry, session.runEntry and session.status or nil
+            b.delete:SetShown(not session.emptyEntry and not session.runEntry)
+            local deleteText = session.routine and (session.routine.enabled and "||" or ">") or "x"
+            if b.deleteText ~= deleteText then
+                b.deleteText = deleteText
+                b.delete:SetText(deleteText)
+            end
             if b.index ~= index then
                 b.index = index
                 b:ClearAllPoints()
@@ -1245,6 +560,8 @@ function C.Refresh()
             setText(
                 b.info,
                 session.status == "working" and "Working..."
+                    or (session.runEntry and (session.status == "no_tip" and "No updates" or session.status))
+                    or ((session.routine or session.emptyEntry) and session.status)
                     or (session.unread and "Unread" or "Conversation")
             )
             local selected = session.id == C.active
@@ -1399,7 +716,17 @@ function C.BuildUI()
         GameTooltip:Hide()
     end)
     sessionScroll = CreateFrame("ScrollFrame", nil, sidebar)
-    sessionScroll:SetPoint("TOPLEFT", 7, -38)
+    local chatsTab = button(sidebar, "Chats", 64, function()
+        C.sidebarTab = "chats"
+        C.Refresh()
+    end)
+    chatsTab:SetPoint("TOPLEFT", 6, -35)
+    local routinesTab = button(sidebar, "Routines", 75, function()
+        C.sidebarTab, C.sidebarRoutine = "routines", nil
+        C.Refresh()
+    end)
+    routinesTab:SetPoint("LEFT", chatsTab, "RIGHT", 2, 0)
+    sessionScroll:SetPoint("TOPLEFT", 7, -64)
     sessionScroll:SetPoint("BOTTOMRIGHT", -7, 8)
     sessionContent = CreateFrame("Frame", nil, sessionScroll)
     sessionContent:SetSize(139, 1)
@@ -1556,6 +883,7 @@ function C.BuildUI()
     )
     modelPicker:SetPoint("BOTTOMLEFT", 10, 5)
     modelPicker.composer, modelPicker.send = inputBox, send
+    modelPicker.transcript, modelPicker.scrollBar = transcript, scrollBar
     status = label(chatPanel, "Waiting for bridge...", MUTED)
     status:SetPoint("BOTTOMLEFT", 12, 6)
     contextMeter = CreateFrame("Button", "WispAIContextUsage", chatPanel)
@@ -1790,7 +1118,7 @@ function C.BuildUI()
         if event == "QUEST_LOG_UPDATE" and not refreshReferences() then
             return
         end
-        itemRevision = itemRevision + 1
+        C.itemRevision = C.itemRevision + 1
         C.Refresh()
     end)
     frame:EnableKeyboard(true)

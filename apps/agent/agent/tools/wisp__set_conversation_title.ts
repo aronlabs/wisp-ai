@@ -1,3 +1,4 @@
+import { agentRPC } from '@wisp/agent/agent-rpc';
 import { defineTool } from 'eve/tools';
 import { z } from 'zod';
 import { enabledTool } from '@wisp/agent/enabled-tool';
@@ -16,20 +17,7 @@ export default enabledTool(
         ),
     }),
     label: { start: () => 'Naming conversation' },
-    async execute({ title }, ctx) {
-      const res = await fetch('http://127.0.0.1:43187/title', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: 'Bearer ' + process.env.WOW_BRIDGE_TOKEN,
-        },
-        body: JSON.stringify({ eveSession: ctx.session.id, title }),
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (!res.ok) {
-        throw new Error('Unable to update conversation title: ' + (await res.text()));
-      }
-      return await res.json();
-    },
+    execute: ({ title }, ctx) =>
+      agentRPC('title', { eveSession: ctx.session.id, title }, ctx.abortSignal, 5000),
   }),
 );

@@ -1,5 +1,7 @@
-import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
-import { createHash, randomUUID } from 'node:crypto';
+import { z } from 'zod';
+import { readJson, writeJson } from './json-file.ts';
+import { memoryEntry } from '@wisp/protocol/agent-rpc';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 export type MemorySlot = 'preferences' | 'character';
 export interface MemoryEntry {
@@ -22,25 +24,13 @@ export class MemoryStore {
     );
   }
   async read(slot: MemorySlot, owner: string): Promise<MemoryEntry[]> {
-    try {
-      const data = JSON.parse(await readFile(this.file(slot, owner), 'utf8'));
-      if (
-        !Array.isArray(data.entries) ||
-        data.entries.some(
-          (entry: MemoryEntry) =>
-            !entry || typeof entry.key !== 'string' || typeof entry.text !== 'string',
-        )
-      ) {
-        throw new Error('Saved memory could not be read; the file was preserved');
-      }
-      return data.entries;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return [];
-      }
-      throw error;
-    }
+    return (
+      await readJson(this.file(slot, owner), z.object({ entries: z.array(memoryEntry) }), () => ({
+        entries: [],
+      }))
+    ).entries;
   }
+
   async update(
     slot: MemorySlot,
     owner: string,
@@ -67,10 +57,7 @@ export class MemoryStore {
         ) {
           throw new Error('Memory is full; remove or shorten outdated entries first');
         }
-        await mkdir(this.directory, { recursive: true });
-        const temp = file + '.' + randomUUID() + '.tmp';
-        await writeFile(temp, JSON.stringify({ slot, owner, entries }, null, 2), 'utf8');
-        await rename(temp, file);
+        await writeJson(file, { slot, owner, entries });
         return entries;
       });
     this.queues.set(file, operation);

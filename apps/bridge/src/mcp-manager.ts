@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+import { writeJson } from './json-file.ts';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -238,10 +238,7 @@ export class McpManager {
     return tested;
   }
   private async persist(next: Record<string, MCPDefinition>) {
-    await mkdir(path.dirname(this.file), { recursive: true });
-    const temp = this.file + '.' + randomUUID() + '.tmp';
-    await writeFile(temp, JSON.stringify({ servers: next }, null, 2));
-    await rename(temp, this.file);
+    await writeJson(this.file, { servers: next });
     this.servers = next;
   }
   async setEnabled(key: string, enabled: boolean) {

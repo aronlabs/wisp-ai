@@ -1,10 +1,19 @@
 import { z } from 'zod';
 import type { CapabilitySettings } from './capabilities.ts';
+const addonReport = z.object({
+  status: z.enum(['ready', 'partial', 'waiting', 'missing', 'incompatible']),
+  version: z.string().max(80).optional(),
+});
 const reportSchema = z.object({
+  syndicator: addonReport.optional(),
+  auctionator: addonReport.optional(),
   version: z.string().max(80),
   questie: z.object({
     status: z.enum(['ready', 'partial', 'missing', 'incompatible']),
     version: z.string().max(80).optional(),
+    npcs: z.boolean().optional().default(false),
+    quests: z.boolean().optional().default(false),
+    objects: z.boolean().optional().default(false),
     trainers: z.boolean(),
     services: z.boolean(),
   }),
@@ -40,9 +49,7 @@ export class IntegrationState {
       available: live,
       status: live ? 'ready' : 'waiting',
       version: live ? this.report!.version : undefined,
-      reason: live
-        ? 'Connected to the game.'
-        : 'Waiting for a connection to WoW. Enter the game or reload Wisp.',
+      reason: live ? 'Connected to the game.' : 'Open WoW and load Wisp to connect.',
     });
     const q = live ? this.report!.questie : undefined;
     this.settings.availability.set('integration:questie', {
@@ -54,10 +61,51 @@ export class IntegrationState {
         : q.status === 'missing'
           ? 'QuestieDB is not loaded.'
           : q.status === 'incompatible'
-            ? 'QuestieDB Forever with contract 4 is required.'
+            ? 'Update QuestieDB to a compatible Forever version.'
             : q.status === 'partial'
-              ? 'NPC reads available. Some trainer or service indexes are unavailable.'
-              : 'Forever NPC locations, trainer and service indexes available.',
+              ? 'Some quest or location data is unavailable. See the tools below.'
+              : undefined,
     });
+
+    for (const [id, feature] of [
+      ['find_npc_locations', 'npcs'],
+      ['get_quest', 'quests'],
+      ['get_quest_chain', 'quests'],
+      ['find_object_locations', 'objects'],
+    ] as const) {
+      const available = !!q && ['ready', 'partial'].includes(q.status) && q[feature];
+      this.settings.availability.set('tool:' + id, {
+        available,
+        status: !q ? 'waiting' : available ? 'ready' : 'unavailable',
+        reason: available
+          ? undefined
+          : !q
+            ? 'Waiting for WoW.'
+            : q.status === 'missing'
+              ? 'Install or enable QuestieDB Forever.'
+              : q.status === 'incompatible'
+                ? 'Update QuestieDB to a compatible Forever version.'
+                : 'Your installed QuestieDB does not provide this data.',
+      });
+    }
+    for (const id of ['syndicator', 'auctionator'] as const) {
+      const addon = live ? this.report![id] : undefined;
+      this.settings.availability.set('integration:' + id, {
+        available: !!addon && ['ready', 'partial'].includes(addon.status),
+        status: addon?.status || 'waiting',
+        version: addon?.version,
+        reason: !addon
+          ? 'Open WoW and reload Wisp to check this addon.'
+          : addon.status === 'missing'
+            ? 'The addon is not loaded.'
+            : addon.status === 'incompatible'
+              ? 'This addon version is not supported.'
+              : addon.status === 'waiting'
+                ? 'The addon has not finished initializing.'
+                : id === 'syndicator'
+                  ? 'Saved inventory may be out of date.'
+                  : 'Prices reflect the last scan. Their age is shown when available.',
+      });
+    }
   }
 }

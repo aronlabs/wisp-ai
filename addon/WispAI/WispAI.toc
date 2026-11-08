@@ -5,15 +5,20 @@
 ## Version: 0.1.0
 ## SavedVariables: WispAIDB
 ## DefaultState: enabled
-## OptionalDeps: QuestieDB, Questie
+## OptionalDeps: QuestieDB, Questie, Syndicator, Auctionator
 
 Core.lua
 Transport.lua
 Integrations.lua
 Character.lua
 Locations.lua
+AddonAdapters.lua
 Settings.lua
 RichUI.lua
+Widgets.lua
+MessageFormat.lua
+ModelControls.lua
+MessageRows.lua
 UI.lua
 Inline.lua
 Panels.lua

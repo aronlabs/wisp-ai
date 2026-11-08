@@ -32,7 +32,7 @@ export class NativeVault implements SecretVault {
         clearTimeout(timer);
         reject(error);
       });
-      child.on('exit', (code) => {
+      child.on('close', (code) => {
         clearTimeout(timer);
         if (code === 0) {
           resolve(output);

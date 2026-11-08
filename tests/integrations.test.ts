@@ -26,7 +26,7 @@ test('integration availability and master switches govern real Eve definitions a
     assert.equal(
       state.receive({
         version: '0.2',
-        questie: { status: 'partial', trainers: false, services: false, version: '4' },
+        questie: { status: 'partial', npcs: true, trainers: false, services: false, version: '4' },
       }),
       true,
     );
@@ -62,7 +62,10 @@ test('integration availability and master switches govern real Eve definitions a
     await settings.publish();
     assert.equal(await resolve({} as never), null);
     assert.equal(state.receive({ arbitrary: true }), false);
-    state.receive({ version: '0.2', questie: { status: 'ready', trainers: true, services: true } });
+    state.receive({
+      version: '0.2',
+      questie: { status: 'ready', npcs: true, trainers: true, services: true },
+    });
     now += 180_001;
     state.refresh();
     await settings.publish();

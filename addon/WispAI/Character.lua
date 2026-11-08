@@ -640,6 +640,12 @@ function inspectors.macros(args)
     }
 end
 function C.Inspect(inspection)
+    if inspection and C.InspectIntegration then
+        local result = C.InspectIntegration(inspection)
+        if result then
+            return result
+        end
+    end
     if inspection and inspection.kind == "npc_locations" then
         local ok, data = pcall(C.FindNPCLocations, inspection.args or {})
         return {

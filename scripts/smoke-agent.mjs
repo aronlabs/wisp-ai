@@ -12,7 +12,8 @@ const bridge = process.env.WISP_RESOURCE_ROOT || path.join(repository, 'apps/bri
 const require = createRequire(path.join(bridge, 'package.json'));
 const agent = path.dirname(require.resolve('@wisp/agent/package.json'));
 const eve = fileURLToPath(new URL('../../bin/eve.js', pathToFileURL(require.resolve('eve'))));
-const dir = path.resolve(repository, '../../work', 'agent-smoke-' + Date.now());
+const dir =
+  process.env.WISP_SMOKE_DIR || path.resolve(repository, '../../work', 'agent-smoke-' + Date.now());
 await mkdir(dir, { recursive: true });
 const load = (p) => import(pathToFileURL(path.join(bridge, p)).href);
 const { ChatGPTAuth } = await load('src/chatgpt-auth.ts'),
@@ -26,6 +27,10 @@ const { ChatGPTAuth } = await load('src/chatgpt-auth.ts'),
 const { Client } = await import(pathToFileURL(require.resolve('eve/client')).href);
 const { Simulator } = await load('src/simulation.ts');
 const { CapabilitySettings } = await load('src/capabilities.ts');
+const addonFixtures =
+  process.env.WISP_SMOKE_ADDONS === '1'
+    ? (await import('./addon-smoke-fixtures.ts')).addonSmokeFixtures(repository)
+    : undefined;
 const simulationSnapshot = process.env.WISP_SMOKE_CHARACTER
   ? JSON.parse(await readFile(process.env.WISP_SMOKE_CHARACTER, 'utf8'))
   : undefined;
@@ -64,7 +69,14 @@ capabilities.agentFile = path.join(dir, 'agent-capabilities.json');
 await capabilities.load();
 await capabilities.set('integration:questie', false);
 if (!simulationSnapshot) {
-  await capabilities.set('integration:wow', false);
+  capabilities.availability.set('core:wow', { available: false, status: 'waiting' });
+}
+if (addonFixtures) {
+  const { IntegrationState } = await load('src/integration-state.ts');
+  const state = new IntegrationState(capabilities);
+  assert.ok(state.receive(addonFixtures.report));
+  await capabilities.set('integration:questie', true);
+  await capabilities.set('mcp:everloot', false);
 }
 await capabilities.publish();
 const token = randomBytes(32).toString('hex'),
@@ -95,7 +107,28 @@ const server = createServer(async (req, res) => {
     let value;
     const call = { endpoint: req.url, operation: data.operation };
     rpc.push(call);
-    if (req.url === '/database') {
+    if (req.url === '/inspect' && addonFixtures) {
+      const { inspectionSchema } = await import('../packages/protocol/dist/game-inspection.js');
+      const inspection = inspectionSchema.parse(data.inspection);
+      if (inspection.kind === 'questie_quest' || inspection.kind === 'questie_chain') {
+        assert.equal(inspection.args.questId, 600001);
+      }
+      if (inspection.kind === 'object_locations') {
+        assert.equal(inspection.args.objectId, 99);
+        assert.equal(inspection.args.mapId, 1454);
+      }
+      if (inspection.kind === 'stored_item') {
+        assert.equal(inspection.args.itemId, 123);
+      }
+      if (inspection.kind === 'item_prices') {
+        assert.deepEqual(inspection.args.itemIds, [123, 999]);
+      }
+      value = addonFixtures.inspections[inspection.kind];
+      if (!value) {
+        throw Error('No synthetic fixture for ' + inspection.kind);
+      }
+      call.kind = inspection.kind;
+    } else if (req.url === '/database') {
       value = await database.query(args);
     } else if (req.url === '/simulate' && simulationSnapshot) {
       value = await simulator.run(simulationSnapshot, args);
@@ -147,7 +180,7 @@ const client = new Client({ baseUrl: 'http://127.0.0.1:43196' }),
 let session;
 try {
   let ready = false;
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 400; i++) {
     try {
       await client.health();
       ready = true;
@@ -204,7 +237,36 @@ try {
     assert.deepEqual(failures, [], 'real tool calls must succeed');
     return row;
   };
-  if (simulationSnapshot) {
+  if (addonFixtures) {
+    let result = await run(
+      'Questie Lua adapter fixtures',
+      'Prueba con datos sintéticos, no mi personaje: usá questie__get_quest y questie__get_quest_chain para questId=600001, y questie__find_object_locations para objectId=99,mapId=1454. Resumí requisitos, cadena y posición sin inferir elegibilidad real. No uses otras fuentes.',
+    );
+    for (const name of [
+      'questie__get_quest',
+      'questie__get_quest_chain',
+      'questie__find_object_locations',
+    ]) {
+      assert.ok(result.calls.includes(name), name);
+    }
+    result = await run(
+      'Syndicator Lua adapter fixture',
+      'Con estos datos sintéticos consultá syndicator__find_item para itemId=123 y decime dónde está guardado. No consultes el inventario actual ni otras fuentes y aclará que es caché.',
+    );
+    assert.ok(result.calls.includes('syndicator__find_item'));
+    result = await run(
+      'Auctionator Lua adapter fixture',
+      'Usá auctionator__get_item_prices para los itemIds 123 y 999 de la prueba sintética. Decime precio unitario y antigüedad; si falta alguno, no inventes cero. No consultes otras fuentes.',
+    );
+    assert.ok(result.calls.includes('auctionator__get_item_prices'));
+    await capabilities.set('integration:syndicator', false);
+    result = await run(
+      'Disabled addon on existing Eve session',
+      'Volvé a consultar syndicator__find_item para itemId=123. Si la integración está apagada, decímelo sin usar otras fuentes ni tools.',
+    );
+    assert.ok(!result.calls.includes('syndicator__find_item'));
+    assert.equal(rpc.filter((call) => call.endpoint === '/inspect').length, 5);
+  } else if (simulationSnapshot) {
     const result = await run(
       'current-level DPS simulation',
       'Compará con simulate_dps, al nivel real del personaje, estas dos rotaciones de 30 segundos a 5 yardas: A) repetir Descarga de Escarcha; B) apertura una vez de Descarga de Escarcha, Nova de Escarcha, Explosión de Fuego y Misiles Arcanos, después usar la varita. Primero consultá mis hechizos para elegir sus rangos aprendidos. Usá 500 iteraciones para ambas y explicá el resultado sin fingir kiteo ni ataques del enemigo.',
