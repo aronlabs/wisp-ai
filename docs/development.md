@@ -15,6 +15,12 @@ pnpm test
 
 `build` compiles the protocol and desktop frontend, not the native host, simulator or installer. `check` runs formatting, lint and type checks; `pnpm test` runs all TypeScript tests with Vitest (core, addon and desktop UI). Simulator engine tests require its binary—offline input tests alone do not validate the engine.
 
+Use the root entry points on a fresh checkout: `pnpm ui:build` builds the desktop
+and its protocol dependency in order; `pnpm typecheck` first builds the agent
+and protocol exports. Those packages expose generated files in `dist`, so checks
+must not rely on a previous local build. The web deployment installs independently
+with its own lockfile and configuration in `apps/web`; see its README.
+
 ## Tests
 
 Vitest projects keep each environment separate:

@@ -33,7 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
-      - run: pnpm --filter @wisp/protocol build
       - run: pnpm typecheck
   unit-tests:
     if: github.event_name != 'workflow_run'
