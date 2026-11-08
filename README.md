@@ -15,7 +15,7 @@ These are example prompts, not recorded results:
 
 ## Get started on Windows
 
-This repository is private and has **no published releases**. For now, [build from source](docs/development.md#build-and-run-on-windows); there is no release installer to download. Future installers will appear under [Releases](https://github.com/fedeya/wisp-ai/releases).
+Download the [Windows x64 installer](https://github.com/fedeya/wisp-ai/releases/download/v0.0.1/WispAI-0.0.1-windows-x64-setup.exe) from [Releases](https://github.com/fedeya/wisp-ai/releases), or [build from source](docs/development.md#build-and-run-on-windows).
 
 Once the desktop app is running:
 
