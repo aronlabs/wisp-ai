@@ -116,11 +116,19 @@ export class RoutineStore {
   }
   claim(characterKey: string, now = Date.now()) {
     return this.transact(() => {
-      const r = this.list(characterKey).find(
+      const eligible = this.list(characterKey).filter(
         (r) =>
           r.enabled &&
           (r.pending || r.nextAt <= now) &&
           now - (r.lastStartedAt ?? 0) >= r.cooldownSeconds * 1000,
+      );
+      // Strict comparison preserves saved order for ties, including never-started routines.
+      const r = eligible.reduce<Routine | undefined>(
+        (oldest, candidate) =>
+          !oldest || (candidate.lastStartedAt ?? -Infinity) < (oldest.lastStartedAt ?? -Infinity)
+            ? candidate
+            : oldest,
+        undefined,
       );
       if (!r) {
         return null;
