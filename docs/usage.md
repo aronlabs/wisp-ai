@@ -2,6 +2,8 @@
 
 [Home](../README.md) · [Development](development.md) · [Integrations](reference.md)
 
+Closing the desktop window keeps Wisp running in the Windows system tray. Left-click its tray icon to reopen it, or right-click for **Open Wisp** and **Exit Wisp**. **Exit Wisp** stops the bridge and closes the app; if a turn is active, wait for it to finish and try again.
+
 ## Conversations and hover questions
 
 After [setup](../README.md#get-started-on-windows), use `/wisp` or `/wispai` to open chat. **+** starts a separate conversation; **−** or Escape minimizes the window. Choose model and effort per chat, or set the default for new chats in the desktop **Connections** page.
@@ -71,7 +73,7 @@ Missing readings and database coverage remain unknown, not zero or proof of abse
 | Disconnected or replies stop  | Keep the desktop app running. Check **Diagnostics** and `/wisp diag`; use `/wisp reconnect` for a fresh handshake or `/reload` to renew receive channels. Large payloads take several seconds. Significant game updates may change file-loading behavior. |
 | Sign-in or models unavailable | Finish browser authorization in **Connections** and refresh the model list. Expired access, identity-only consent or an ambiguous token refresh may require signing in again.                                                                             |
 | Tool unavailable              | Check the game connection, optional integration switches and required windows; missing APIs or source coverage can also prevent a result.                                                                                                                 |
-| App remains after closing     | Closing hides it in the tray. **Exit Wisp** stops it, but waits for any active turn to finish.                                                                                                                                                            |
+| App remains after closing     | Closing hides it in the tray. **Exit Wisp** stops it. If a turn is active, wait for it to finish and try again.                                                                                                                                                            |
 
 For an old portable install, choose **Import your previous installation** on first launch. Existing Wisp saves are preserved; renamed addon folders are backed up under `Interface/WispAI-RenameBackup`. Older Codex-adapter installs need Wisp’s own ChatGPT sign-in. Fully restart WoW after migration.
 

@@ -9,7 +9,10 @@ use std::{
     sync::Mutex,
     time::Duration,
 };
-use tauri::{Emitter, Manager};
+use tauri::{
+    tray::{MouseButton, MouseButtonState, TrayIconEvent},
+    Emitter, Manager,
+};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -404,6 +407,14 @@ fn prepare_update() -> Result<(), String> {
     Ok(())
 }
 
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("--prepare-update") {
@@ -467,10 +478,7 @@ fn main() {
     }
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            show_main_window(app);
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -514,12 +522,20 @@ fn main() {
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("Wisp AI")
                 .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        show_main_window(tray.app_handle());
+                    }
+                })
                 .on_menu_event(|app, event| {
                     if event.id.as_ref() == "show" {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        show_main_window(app);
                     } else if event.id.as_ref() == "exit" {
                         let app = app.clone();
                         tauri::async_runtime::spawn(async move {
@@ -527,10 +543,7 @@ fn main() {
                             match stop_host(&host).await {
                                 Ok(()) => app.exit(0),
                                 Err(error) => {
-                                    if let Some(window) = app.get_webview_window("main") {
-                                        let _ = window.show();
-                                        let _ = window.set_focus();
-                                    }
+                                    show_main_window(&app);
                                     let _ = app.emit("desktop-error", error);
                                 }
                             }
