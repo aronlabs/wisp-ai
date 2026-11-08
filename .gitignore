@@ -33,3 +33,6 @@ apps/desktop/src-tauri/icons/*
 !apps/desktop/src-tauri/icons/128x128@2x.png
 !apps/desktop/src-tauri/icons/icon.icns
 !apps/desktop/src-tauri/icons/icon.ico
+
+# Generated agent server output
+**/.output/

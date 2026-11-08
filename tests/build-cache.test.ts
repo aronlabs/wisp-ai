@@ -1,4 +1,5 @@
 import { test } from 'vitest';
+import { adapters } from '../apps/bridge/src/simulation/adapters/index.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -138,15 +139,30 @@ test('production packaging refuses a simulator that does not match its pinned me
       JSON.stringify({
         commit: '7f9c0e733fe3f8823407566dd417aca11f833e6f',
         sha256: createHash('sha256').update(binary).digest('hex'),
+        supportedClasses: Object.keys(adapters),
       }),
     );
-    await put(root, 'simulator/item-ids.json', '[1,2]');
-    await put(root, 'simulator/mage-talents.json', '[]');
+    await put(root, 'simulator/items.json', '[{"id":1},{"id":2}]');
+    await put(
+      root,
+      'simulator/classes.json',
+      JSON.stringify(
+        Object.fromEntries(
+          Object.values(adapters).map((a) => [
+            a.token,
+            {
+              talents: [[], [], []],
+              ranks: Object.fromEntries(a.families.map((f) => [f, [{ id: 1, level: 1 }]])),
+            },
+          ]),
+        ),
+      ),
+    );
     await verifySimulator(root);
     await put(root, 'simulator/wowsimcli.exe', 'different binary');
     await assert.rejects(verifySimulator(root), /pinned manifest/);
     await put(root, 'simulator/wowsimcli.exe', binary);
-    await put(root, 'simulator/item-ids.json', '{}');
+    await put(root, 'simulator/items.json', '{}');
     await assert.rejects(verifySimulator(root), /Invalid simulator metadata/);
   } finally {
     await rm(root, { recursive: true, force: true });

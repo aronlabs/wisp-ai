@@ -9,7 +9,7 @@ vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async () => () => {}) })
 const release = { version: '0.3.0', notes: 'Improved game connection.' };
 const props = () => ({
   showSettings: true,
-  version: '0.2.2',
+  version: '0.0.1',
   locked: false,
   openSettings: vi.fn(),
   onBusy: vi.fn(),
@@ -27,7 +27,7 @@ test('checks on startup and shows the release notes and manual check', async () 
   render(Updates, props());
   await screen.findByText(release.notes);
   expect(desktop).toHaveBeenCalledWith('check_update');
-  expect(screen.getByText('Installed version: 0.2.2')).toBeTruthy();
+  expect(screen.getByText('Installed version: 0.0.1')).toBeTruthy();
   await fireEvent.click(screen.getByRole('button', { name: 'Check for updates' }));
   expect(
     vi.mocked(desktop).mock.calls.filter(([command]) => command === 'check_update'),

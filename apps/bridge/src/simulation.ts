@@ -6,6 +6,9 @@ import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 const execute = promisify(execFile);
 import { simulationInput, rotationAction } from '@wisp/protocol/simulation';
+import { adapters } from './simulation/adapters/index.ts';
+import type { ClassMetadata } from './simulation/adapters/types.ts';
+import { equipmentSlots, replaceEquipment, type CatalogItem } from './simulation/equipment.ts';
 const reading = z.object({
   sections: z.object({
     character: z.object({
@@ -15,7 +18,7 @@ const reading = z.object({
         realm: z.string(),
         game: z.literal('WoW Forever'),
         level: z.number().int().min(1).max(60),
-        class: z.literal('MAGE'),
+        class: z.string(),
         raceToken: z.string(),
         build: z.string().optional(),
       }),
@@ -49,13 +52,11 @@ const reading = z.object({
 });
 interface Manifest {
   wandIds: number[];
-  triggerParents: Record<string, number>;
   name: string;
   source: string;
   upstream: string;
   commit: string;
   sha256: string;
-  ranks: Record<string, { id: number; level: number }[]>;
 }
 const raceMap: Record<string, string> = {
   Human: 'RaceHuman',
@@ -68,7 +69,6 @@ const raceMap: Record<string, string> = {
   Orc: 'RaceOrc',
   Tauren: 'RaceTauren',
 };
-const slots = [1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18];
 export class Simulator {
   readonly root: string;
   readonly runtime: string;
@@ -76,16 +76,31 @@ export class Simulator {
     this.root = path.resolve(root);
     this.runtime = path.resolve(runtime);
   }
-  async prepare(snapshot: unknown, input: z.input<typeof simulationInput>) {
-    const options = simulationInput.parse(input);
+  async prepare(
+    snapshot: unknown,
+    input: z.input<typeof simulationInput>,
+    replacements: { slot: number; itemId: number }[] = [],
+  ) {
+    const parsedOptions = simulationInput.parse(input);
     const parsed = reading.safeParse(snapshot);
     if (!parsed.success) {
       throw Error(
-        'Fresh, complete Forever mage character, raceToken, talents, spells and gear readings are required. Reload the addon if needed. Other classes are not supported by this adapter.',
+        'Fresh, complete Forever character, raceToken, talents, spells and gear readings are required. Reload the addon if needed.',
       );
     }
     const s = parsed.data.sections,
       c = s.character.data;
+    const adapter = adapters[c.class];
+    if (!adapter) {
+      throw Error('No validated damage adapter for class ' + c.class + '.');
+    }
+    const options = {
+      ...parsedOptions,
+      targetDistanceYards: parsedOptions.targetDistanceYards ?? (adapter.melee ? 5 : 20),
+    };
+    if (adapter.melee && options.targetDistanceYards > 5) {
+      throw Error('This melee adapter requires a target within 5 yards.');
+    }
     if (s.talents.data.hasPendingChanges) {
       throw Error('Apply or discard pending talent edits before simulating.');
     }
@@ -97,14 +112,33 @@ export class Simulator {
     const manifest = JSON.parse(
       await readFile(path.join(directory, 'manifest.json'), 'utf8'),
     ) as Manifest;
-    const trees = JSON.parse(await readFile(path.join(directory, 'mage-talents.json'), 'utf8')) as {
-      id: number;
-      max: number;
-    }[][];
-    const itemIds = new Set<number>(
-      JSON.parse(await readFile(path.join(directory, 'item-ids.json'), 'utf8')),
+    const metadata = (
+      JSON.parse(await readFile(path.join(directory, 'classes.json'), 'utf8')) as Record<
+        string,
+        ClassMetadata
+      >
+    )[c.class];
+    if (!metadata) {
+      throw Error('Missing pinned metadata for class ' + c.class + '.');
+    }
+    const trees = metadata.talents;
+    const catalog = new Map(
+      (JSON.parse(await readFile(path.join(directory, 'items.json'), 'utf8')) as CatalogItem[]).map(
+        (i) => [i.id, i],
+      ),
+    );
+    const equipped = replaceEquipment(
+      s.gear.data.items,
+      replacements,
+      catalog,
+      c.class,
+      c.level,
+      c.raceToken,
     );
     const selected = new Map(s.talents.data.selected.map((t) => [t.id, t.rank]));
+    if (selected.size !== s.talents.data.selected.length) {
+      throw Error('The talent reading contains duplicate talents.');
+    }
     const mapped = new Set<number>();
     const talentsString = trees
       .map((tree) =>
@@ -140,7 +174,10 @@ export class Simulator {
         throw Error('Spell ' + id + ' is not confirmed learned by this character.');
       }
       if (id === 5019) {
-        if (!s.gear.data.items.some((i) => i.slot === 18 && manifest.wandIds.includes(i.id))) {
+        if (
+          !adapter.wand ||
+          !equipped.some((i) => i.slot === 18 && manifest.wandIds.includes(i.id))
+        ) {
           throw Error('Shoot requires an equipped wand.');
         }
         continue;
@@ -148,11 +185,17 @@ export class Simulator {
       if (id === 20572 && c.raceToken === 'Orc') {
         continue;
       }
-      const family = Object.entries(manifest.ranks).find(([, ranks]) =>
+      const family = Object.entries(metadata.ranks).find(([, ranks]) =>
         ranks.some((r) => r.id === id),
       );
       if (!family) {
         throw Error('Spell ' + id + ' has not been validated for this adapter.');
+      }
+      const requiredTalent = adapter.requiredTalents?.[family[0]];
+      if (requiredTalent && !selected.has(requiredTalent)) {
+        throw Error(
+          'Spell ' + id + ' requires an applied talent that is missing from this snapshot.',
+        );
       }
       const expected = family[1].filter((r) => r.level <= c.level).at(-1);
       if (expected?.id !== id) {
@@ -162,18 +205,32 @@ export class Simulator {
             ' does not match the engine-selected rank at this level. No unlearned rank was substituted.',
         );
       }
-      if (
-        ['frostNova', 'arcaneExplosion'].includes(family[0]) &&
-        options.targetDistanceYards > 10
-      ) {
-        throw Error('This area spell requires the fixed target to be within 10 yards.');
+      const areaRange = adapter.areaRanges?.[family[0]];
+      if (areaRange && options.targetDistanceYards > areaRange) {
+        throw Error('This area spell requires the fixed target within ' + areaRange + ' yards.');
       }
-      if (family[0] === 'fireBlast' && options.targetDistanceYards > 20) {
-        throw Error('Fire Blast requires the target within 20 yards.');
+      const rank = family[1].find((r) => r.id === id)!;
+      if (
+        (rank.maxRange > 0 && options.targetDistanceYards > rank.maxRange) ||
+        options.targetDistanceYards < rank.minRange
+      ) {
+        throw Error('Target distance is outside the validated range for spell ' + id + '.');
       }
     }
+    if (adapter.melee && !equipped.some((i) => i.slot === 16)) {
+      throw Error('This melee adapter requires an equipped main-hand weapon.');
+    }
+    if (
+      adapter.requiresRangedAuto &&
+      (!known.has(75) ||
+        !equipped.some(
+          (i) => i.slot === 18 && [1, 2, 3].includes(catalog.get(i.id)?.rangedWeaponType ?? 0),
+        ))
+    ) {
+      throw Error('Hunter damage requires learned Auto Shot and an equipped bow, gun or crossbow.');
+    }
     const channels = spellIds.filter((id) =>
-      manifest.ranks.arcaneMissiles.some((r) => r.id === id),
+      (adapter.channels ?? []).some((family) => metadata.ranks[family].some((r) => r.id === id)),
     );
     const compileAction = (a: z.infer<typeof rotationAction>, isPriority = false) => {
       const vals: Record<string, unknown>[] = [];
@@ -186,7 +243,9 @@ export class Simulator {
       if (a.spellId === 5019) {
         vals.push({ gcdIsReady: {} });
         for (const id of spellIds.filter((id) =>
-          [...manifest.ranks.frostbolt, ...manifest.ranks.fireball].some((r) => r.id === id),
+          Object.values(metadata.ranks)
+            .flat()
+            .some((r) => r.id === id),
         )) {
           vals.push({ not: { val: { spellIsCasting: { spellId: { spellId: id } } } } });
         }
@@ -209,9 +268,42 @@ export class Simulator {
           },
         });
       }
+      if (
+        (a.manaBelowPercent !== undefined || a.manaAbovePercent !== undefined) &&
+        adapter.resource !== 'mana'
+      ) {
+        throw Error('Mana conditions require a mana class.');
+      }
+      for (const [threshold, resource, expected] of [
+        [a.rageAbove, 'currentRage', 'rage'],
+        [a.energyAbove, 'currentEnergy', 'energy'],
+        [a.comboPointsAtLeast, 'currentComboPoints', 'energy'],
+      ] as const) {
+        if (threshold === undefined) {
+          continue;
+        }
+        if (adapter.resource !== expected) {
+          throw Error('Resource condition is not supported for this class.');
+        }
+        vals.push({
+          cmp: { op: 'OpGe', lhs: { [resource]: {} }, rhs: { const: { val: String(threshold) } } },
+        });
+      }
+      if (a.dotRefreshBelowSeconds !== undefined) {
+        if (!(adapter.dots ?? []).some((f) => metadata.ranks[f]?.some((r) => r.id === a.spellId))) {
+          throw Error('DoT refresh conditions require a supported damage-over-time spell.');
+        }
+        vals.push({
+          cmp: {
+            op: 'OpLe',
+            lhs: { dotRemainingTime: { spellId: { spellId: a.spellId } } },
+            rhs: { const: { val: a.dotRefreshBelowSeconds + 's' } },
+          },
+        });
+      }
       return {
         ...(vals.length ? { condition: vals.length === 1 ? vals[0] : { and: { vals } } } : {}),
-        ...(manifest.ranks.arcaneMissiles.some((r) => r.id === a.spellId)
+        ...(channels.includes(a.spellId)
           ? {
               channelSpell: {
                 spellId: { spellId: a.spellId },
@@ -230,16 +322,13 @@ export class Simulator {
       });
     }
     priorityList.push(...plan.priority.map((a) => ({ action: compileAction(a, true) })));
-    const gear = new Map(s.gear.data.items.map((i) => [i.slot, i]));
-    if (gear.size !== s.gear.data.items.length) {
-      throw Error('The gear reading contains duplicate slots.');
-    }
-    const items = slots.map((slot) => {
+    const gear = new Map(equipped.map((i) => [i.slot, i]));
+    const items = equipmentSlots.map((slot) => {
       const item = gear.get(slot);
       if (!item) {
         return {};
       }
-      if (!itemIds.has(item.id)) {
+      if (!catalog.has(item.id)) {
         throw Error('Equipped item ' + item.id + ' is absent from the pinned simulator database.');
       }
       const fields = item.link.match(/item:([^|]+)/)?.[1].split(':');
@@ -260,11 +349,11 @@ export class Simulator {
               {
                 name: c.name,
                 race,
-                class: 'ClassMage',
+                class: adapter.engineClass,
                 level: c.level,
                 equipment: { items },
                 talentsString,
-                mage: { options: { classOptions: {} } },
+                [adapter.spec]: { options: { classOptions: adapter.options ?? {} } },
                 distanceFromTarget: options.targetDistanceYards,
                 rotation: {
                   type: 'TypeAPL',
@@ -284,7 +373,9 @@ export class Simulator {
     return {
       request,
       manifest,
-      character: { name: c.name, realm: c.realm, level: c.level, build: c.build },
+      metadata,
+      adapter,
+      character: { name: c.name, realm: c.realm, class: c.class, level: c.level, build: c.build },
       scenario: {
         ...options,
         targetLevel,
@@ -292,6 +383,8 @@ export class Simulator {
         plan,
         talentPoints: points,
         equippedItems: items.filter((i) => 'id' in i).length,
+        equipment: equipped.map((i) => ({ slot: i.slot, id: i.id })),
+        replacements,
       },
     };
   }
@@ -308,34 +401,62 @@ export class Simulator {
       [];
     const budget = AbortSignal.timeout(45000);
     const runSignal = signal ? AbortSignal.any([signal, budget]) : budget;
-    for (const plan of options.data.plans) {
-      const result = await this.runSingle(snapshot, { ...options.data, plans: [plan] }, runSignal);
-      if (result.status !== 'available') {
-        return result;
+    const sets = [
+      { label: 'Current equipment', replacements: [] as { slot: number; itemId: number }[] },
+      ...options.data.equipmentSets,
+    ];
+    for (const set of sets) {
+      for (const plan of options.data.plans) {
+        const result = await this.runSingle(
+          snapshot,
+          { ...options.data, plans: [plan] },
+          runSignal,
+          set.replacements,
+        );
+        if (result.status !== 'available') {
+          return result;
+        }
+        results.push(result);
       }
-      results.push(result);
     }
     return {
       status: 'available' as const,
       version: 'forever',
       character: results[0].character,
       engine: results[0].engine,
-      results: results.map((r, i) => ({
-        ...r,
-        label: options.data.plans[i].label,
-        relativeToFirstPercent: (r.dps.average / results[0].dps.average - 1) * 100,
-      })),
-      note: 'All plans use the same character snapshot, scenario, iterations and random seed. Differences compare these plans only; they do not prove a globally optimal rotation.',
+      coverage: {
+        class: results[0].character.class,
+        families: adapters[results[0].character.class].families,
+        roles: ['damage'],
+        pets: false,
+      },
+      results: results.map((r, i) => {
+        const planIndex = i % options.data.plans.length;
+        const setIndex = Math.floor(i / options.data.plans.length);
+        const baseline = results[planIndex];
+        return {
+          ...r,
+          label: options.data.plans[planIndex].label,
+          equipmentLabel: sets[setIndex].label,
+          planIndex,
+          equipmentSetIndex: setIndex,
+          relativeToFirstPercent: (r.dps.average / results[0].dps.average - 1) * 100,
+          equipmentDeltaDps: r.dps.average - baseline.dps.average,
+          equipmentDeltaPercent: (r.dps.average / baseline.dps.average - 1) * 100,
+        };
+      }),
+      note: 'All results use one character snapshot, duration, target, iterations and seed. Equipment deltas compare the SAME plan against current equipment; relativeToFirstPercent compares to the first plan with current equipment. Small differences require attention to sampling variation. Replacements are unenchanted base catalog items, with no random suffix. These comparisons do not prove a globally optimal rotation or build.',
     };
   }
   private async runSingle(
     snapshot: unknown,
     input: z.input<typeof simulationInput>,
     signal?: AbortSignal,
+    replacements: { slot: number; itemId: number }[] = [],
   ) {
     let temporary: string | undefined;
     try {
-      const prepared = await this.prepare(snapshot, input);
+      const prepared = await this.prepare(snapshot, input, replacements);
       const executable = path.join(this.root, 'simulator', 'wowsimcli.exe');
       const hash = createHash('sha256')
         .update(await readFile(executable))
@@ -367,16 +488,40 @@ export class Simulator {
       ) {
         throw Error('Simulator did not finish with a valid positive DPS result.');
       }
-      const damageBySpell = (player.actions ?? [])
-        .map((a: any) => ({
-          spellId: prepared.manifest.triggerParents[a.id?.spellId] ?? a.id?.spellId,
-          damagePerFight:
-            (a.targets ?? []).reduce((sum: number, t: any) => sum + (t.damage ?? 0), 0) /
-            result.iterationsDone,
-        }))
-        .filter((a: any) => a.damagePerFight > 0);
-      if (!damageBySpell.some((a: any) => prepared.scenario.spellIds.includes(a.spellId))) {
-        throw Error('The selected learned spell did not deal damage.');
+      const damage = new Map<
+        string,
+        { spellId?: number; otherId?: string | number; damagePerFight: number }
+      >();
+      const casts = new Map<number, number>();
+      for (const action of player.actions ?? []) {
+        const rawSpellId = action.id?.spellId;
+        const spellId = prepared.metadata.triggerParents[rawSpellId] ?? rawSpellId;
+        const otherId = action.id?.otherId;
+        const key = spellId ? 'spell:' + spellId : 'other:' + otherId;
+        const damagePerFight =
+          (action.targets ?? []).reduce((sum: number, t: any) => sum + (t.damage ?? 0), 0) /
+          result.iterationsDone;
+        const castCount =
+          (action.targets ?? []).reduce((sum: number, t: any) => sum + (t.casts ?? 0), 0) /
+          result.iterationsDone;
+        if (rawSpellId && prepared.scenario.spellIds.includes(rawSpellId)) {
+          casts.set(rawSpellId, (casts.get(rawSpellId) ?? 0) + castCount);
+        }
+        if (damagePerFight > 0) {
+          damage.set(key, {
+            spellId,
+            otherId,
+            damagePerFight: (damage.get(key)?.damagePerFight ?? 0) + damagePerFight,
+          });
+        }
+      }
+      const damageBySpell = [...damage.values()];
+      if (
+        !prepared.scenario.spellIds.some(
+          (id) => (casts.get(id) ?? 0) > 0 || damageBySpell.some((a) => a.spellId === id),
+        )
+      ) {
+        throw Error('None of the selected learned actions executed.');
       }
       return {
         status: 'available' as const,
@@ -389,18 +534,31 @@ export class Simulator {
         },
         character: prepared.character,
         scenario: prepared.scenario,
-        dps: { average: dps.avg, standardDeviation: dps.stdev, min: dps.min, max: dps.max },
+        dps: {
+          average: dps.avg,
+          standardDeviation: dps.stdev,
+          standardError: dps.stdev / Math.sqrt(result.iterationsDone),
+          min: dps.min,
+          max: dps.max,
+        },
         damageBySpell,
+        castsBySpell: [...casts].map(([spellId, castsPerFight]) => ({ spellId, castsPerFight })),
         secondsOutOfMana: player.secondsOomAvg,
         unusedSpellIds: prepared.scenario.spellIds.filter(
-          (id) => !damageBySpell.some((a: any) => a.spellId === id),
+          (id) => !(casts.get(id) || damageBySpell.some((a) => a.spellId === id)),
+        ),
+        zeroDamageSpellIds: prepared.scenario.spellIds.filter(
+          (id) => !damageBySpell.some((a) => a.spellId === id),
         ),
         assumptions: [
-          'Experimental WoWSims Forever levelsim fork; mage adapter only.',
+          'Experimental WoWSims Forever levelsim fork; ' +
+            prepared.adapter.token +
+            ' damage adapter.',
           'Stationary single target, fixed duration and seed. Opening sequence runs once, then actions follow priority, mana conditions, cooldowns and engine cast/channel timing.',
-          'Current equipped items and applied talents. The engine automatically applies level-scaled Arcane Intellect as a self-buff; no other external buffs, consumables or temporary enchants. Requested racial cooldowns are explicit actions.',
-          'Shoot uses the equipped wand and assumes maximum wand skill for this level; current weapon skill is not read. Zero-damage actions may be utility cooldowns or may never be reached under the selected priorities.',
+          'Applied talents and current equipment, except explicit catalog replacements. No external buffs, consumables or temporary enchants. Orc Blood Fury requires an explicit action.',
+          'The engine assumes trained weapon types and level-appropriate weapon skills; current weapon training/skill is not read. Zero-damage actions may be utility cooldowns or may never be reached under the selected priorities.',
           'No incoming attacks, movement, kiting or player latency. This is a scenario estimate, not measured combat DPS.',
+          ...prepared.adapter.assumptions,
         ],
       };
     } catch (error) {

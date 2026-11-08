@@ -4,7 +4,9 @@ import App from './App.svelte';
 import { desktop, request, type Status } from './api';
 import { listen } from '@tauri-apps/api/event';
 vi.mock('./api', () => ({ native: true, desktop: vi.fn(), request: vi.fn() }));
-vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async () => () => {}) }));
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn(async () => () => {}),
+}));
 let status: Status;
 beforeEach(() => {
   vi.clearAllMocks();
@@ -33,7 +35,7 @@ beforeEach(() => {
       return {
         configured: true,
         wow: 'E:\\WoW',
-        version: '0.2.2',
+        version: '0.0.1',
         platform: 'windows',
         dataDirectory: 'userdata',
       } as never;
@@ -53,7 +55,9 @@ beforeEach(() => {
       } as never;
     }
     if (route === '/auth/start') {
-      return { authorizationUrl: 'https://auth.openai.com/authorize?test=1' } as never;
+      return {
+        authorizationUrl: 'https://auth.openai.com/authorize?test=1',
+      } as never;
     }
     return { ok: true, count: 3 } as never;
   });
@@ -222,6 +226,7 @@ test('routines replace suggestion toggles and expose run history with character-
   await fireEvent.click(screen.getByRole('button', { name: 'Routines' }));
   expect(screen.queryByRole('button', { name: 'Suggestions' })).toBeNull();
   expect(screen.getByText('Mage review')).toBeTruthy();
+  await fireEvent.click(screen.getByText('Run history (1)'));
   expect(screen.getByText(/On level up · level is a multiple of 2/)).toBeTruthy();
   await fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
   await waitFor(() =>
@@ -233,7 +238,11 @@ test('routines replace suggestion toggles and expose run history with character-
   );
   await waitFor(() =>
     expect(
-      (screen.getByRole('button', { name: 'Open in game' }) as HTMLButtonElement).disabled,
+      (
+        screen.getByRole('button', {
+          name: 'Open in game',
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(false),
   );
   await fireEvent.click(screen.getByRole('button', { name: 'Open in game' }));
@@ -260,8 +269,13 @@ test('an active reply disables operations that would interrupt the bridge', asyn
   expect((screen.getByRole('button', { name: 'Stop Wisp' }) as HTMLButtonElement).disabled).toBe(
     true,
   );
+  await fireEvent.click(screen.getByRole('button', { name: 'Manage installation' }));
   expect(
-    (screen.getByRole('button', { name: 'Install / update addon' }) as HTMLButtonElement).disabled,
+    (
+      screen.getByRole('button', {
+        name: 'Install / update addon',
+      }) as HTMLButtonElement
+    ).disabled,
   ).toBe(true);
 });
 
@@ -270,7 +284,9 @@ test('MCP add dialog preserves structured arguments and saves without browser cr
   await screen.findByText('Ready to help');
   await fireEvent.click(screen.getByRole('button', { name: 'Integrations' }));
   await fireEvent.click(screen.getByRole('button', { name: 'Add MCP' }));
-  await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'my_tools' } });
+  await fireEvent.input(screen.getByLabelText('Name'), {
+    target: { value: 'my_tools' },
+  });
   await fireEvent.input(screen.getByLabelText('Endpoint URL'), {
     target: { value: 'https://example.com/mcp' },
   });
@@ -294,7 +310,7 @@ test('sign-in URL is handed to the native allowlisted opener', async () => {
   status.auth.activeId = undefined;
   status.auth.profiles = [];
   render(App);
-  await screen.findByText('Ready to help');
+  await screen.findByText('Connect your AI account');
   await fireEvent.click(screen.getByRole('button', { name: 'Connections' }));
   await fireEvent.click(screen.getByRole('button', { name: 'Continue with ChatGPT' }));
   await waitFor(() =>
@@ -381,4 +397,102 @@ test('built-in capabilities stay out of integrations and memory has separate con
       enabled: false,
     }),
   );
+});
+
+test('a configured installation stays compact until explicitly opened', async () => {
+  render(App);
+  await screen.findByText('Everything is ready');
+  expect(screen.queryByLabelText('WoW client folder')).toBeNull();
+  await fireEvent.click(screen.getByRole('button', { name: 'Manage installation' }));
+  expect((screen.getByLabelText('WoW client folder') as HTMLInputElement).value).toBe('E:\\WoW');
+  await fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+  expect(screen.queryByLabelText('WoW client folder')).toBeNull();
+});
+
+test('the next action follows the missing connection', async () => {
+  status.auth.status = 'signed_out';
+  render(App);
+  await fireEvent.click(await screen.findByRole('button', { name: 'Connect AI' }));
+  expect(screen.getByRole('button', { name: 'Continue with ChatGPT' })).toBeTruthy();
+  cleanup();
+  status.auth.status = 'connected';
+  status.gameConnected = false;
+  render(App);
+  await screen.findByText('Ready when you enter Azeroth');
+  expect(screen.queryByRole('button', { name: 'Connect AI' })).toBeNull();
+  await fireEvent.click(screen.getByRole('button', { name: 'Check installation' }));
+  expect(screen.getByLabelText('WoW client folder')).toBeTruthy();
+});
+
+test('unreachable data pages do not report empty collections', async () => {
+  const original = vi.mocked(request).getMockImplementation()!;
+  vi.mocked(request).mockImplementation((route, body) =>
+    route === '/status' ? Promise.reject(new Error('Service unreachable')) : original(route, body),
+  );
+  render(App);
+  await screen.findByText('Start Wisp to continue');
+  for (const page of ['Memory', 'Panels', 'Routines', 'Integrations']) {
+    await fireEvent.click(screen.getByRole('button', { name: page }));
+    expect(screen.getByText('Connect to Wisp to view your data')).toBeTruthy();
+    expect(screen.queryByText('No panels yet.')).toBeNull();
+    expect(screen.queryByText('No routines yet')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Go to Overview' })).toBeTruthy();
+  }
+});
+
+test('data pages show loading while the first status request is pending', async () => {
+  let finish!: (value: Status) => void;
+  vi.mocked(request).mockImplementation(async (route) =>
+    route === '/status'
+      ? (new Promise<Status>((resolve) => {
+          finish = resolve;
+        }) as never)
+      : ({ models: [] } as never),
+  );
+  render(App);
+  await fireEvent.click(screen.getByRole('button', { name: 'Panels' }));
+  expect(screen.getByText('Loading your workspace…')).toBeTruthy();
+  await waitFor(() => expect(finish).toBeDefined());
+  finish(status);
+  await screen.findByText('No panels yet.');
+});
+
+test('first-time setup leads from choosing a folder to installing the addon', async () => {
+  const original = vi.mocked(desktop).getMockImplementation()!;
+  vi.mocked(desktop).mockImplementation(async (command, args) => {
+    if (command === 'desktop_info') {
+      return {
+        configured: false,
+        wow: '',
+        version: '0.0.1',
+        platform: 'windows',
+        dataDirectory: 'userdata',
+      } as never;
+    }
+    if (command === 'pick_folder') {
+      return 'D:\\WoW' as never;
+    }
+    return original(command, args);
+  });
+  render(App);
+  await fireEvent.click(await screen.findByRole('button', { name: 'Choose game folder' }));
+  await fireEvent.click(await screen.findByRole('button', { name: 'Install addon' }));
+  await waitFor(() => expect(desktop).toHaveBeenCalledWith('install_addon', { wow: 'D:\\WoW' }));
+});
+
+test('an outdated addon becomes the next action even with healthy connections', async () => {
+  const original = vi.mocked(desktop).getMockImplementation()!;
+  vi.mocked(desktop).mockImplementation(async (command, args) => {
+    const result = await original(command, args);
+    return command === 'desktop_info'
+      ? ({ ...(result as object), addonOutdated: true } as never)
+      : result;
+  });
+  render(App);
+  await screen.findByText('Update your Wisp addon');
+  expect(screen.queryByText('Everything is ready')).toBeNull();
+  expect((screen.getByRole('button', { name: 'Update addon' }) as HTMLButtonElement).disabled).toBe(
+    false,
+  );
+  expect(screen.getByText('Update the addon, then type /reload in WoW.')).toBeTruthy();
 });

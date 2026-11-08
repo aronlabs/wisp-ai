@@ -23,7 +23,8 @@
     </div>
     <p class="tagline">A little help in Azeroth.</p>
     <nav aria-label="Main navigation">
-      {#each app.pages as item}<button
+      <span class="nav-label">Workspace</span>
+      {#each app.pages.filter((item) => !["Settings", "Diagnostics"].includes(item.name)) as item}<button
           class:selected={app.page === item.name}
           onclick={() => {
             app.page = item.name;
@@ -33,9 +34,25 @@
           ><Icon name={item.icon} />{item.name}</button
         >{/each}
     </nav>
+    <nav class="utility-nav" aria-label="App settings">
+      <span class="nav-label">Application</span>
+      {#each app.pages.filter( (item) => ["Settings", "Diagnostics"].includes(item.name) ) as item}
+        <button
+          class:selected={app.page === item.name}
+          aria-current={app.page === item.name ? "page" : undefined}
+          onclick={() => {
+            app.page = item.name;
+            if (item.name === "Diagnostics") void app.showLogs();
+          }}
+        >
+          <Icon name={item.icon} />{item.name}
+        </button>
+      {/each}
+    </nav>
     <div class="rail-footer">
-      <span class="live-dot" class:online={app.status?.gameConnected}></span>WOW
-      FOREVER<span class="version">v{app.info?.version || "0.2.2"}</span>
+      <span>Wisp AI</span><span class="version"
+        >v{app.info?.version || "0.0.1"}</span
+      >
     </div>
   </aside>
   <main>
@@ -44,41 +61,14 @@
         <h1>{app.current.title}</h1>
         <p>{app.current.caption}</p>
       </div>
-      <div class="connection-pill" class:good={app.status?.gameConnected}>
-        <span class="live-dot" class:online={app.status?.gameConnected}
-        ></span>{app.loading
-          ? "Checking connection"
-          : app.status?.gameConnected
-            ? "Connected to WoW"
-            : (app.status && !app.status.ready) || app.starting
-              ? "Starting Wisp"
-              : app.status
-                ? "Waiting for WoW"
-                : "Wisp is stopped"}
-      </div>
     </header>
     {#if !native}<div class="banner">
         Design preview. Desktop actions are available in the installed Wisp app.
       </div>{/if}
-    {#if app.busy || app.feedback}<div
-        class="banner"
-        class:error={app.failed}
-        role="status"
-        aria-live="polite"
-      >
-        {#if app.busy}<span class="spinner"></span>{/if}<span
-          >{app.busy || app.feedback}</span
-        >{#if !app.busy}<button
-            class="icon-button"
-            aria-label="Dismiss notification"
-            onclick={() => (app.feedback = "")}
-            ><Icon name="close" size={16} /></button
-          >{/if}
-      </div>{/if}
 
     <Updates
       showSettings={app.page === "Settings"}
-      version={app.info?.version || "0.2.2"}
+      version={app.info?.version || "0.0.1"}
       locked={!!app.busy}
       openSettings={() => (app.page = "Settings")}
       onBusy={(label) => (app.busy = label)}
@@ -98,6 +88,22 @@
     </footer>
   </main>
 </div>
+{#if app.feedback && !app.busy}<div
+    class="notification"
+    class:error={app.failed}
+    role="status"
+    aria-live="polite"
+  >
+    <Icon name={app.failed ? "logs" : "check"} size={18} /><span
+      >{app.feedback}</span
+    >
+    <button
+      class="icon-button"
+      aria-label="Dismiss notification"
+      onclick={() => (app.feedback = "")}
+      ><Icon name="close" size={16} /></button
+    >
+  </div>{/if}
 {#if app.dialog}<McpDialog
     server={app.editing}
     close={() => (app.dialog = false)}

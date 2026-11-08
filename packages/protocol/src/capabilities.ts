@@ -81,7 +81,7 @@ export const toolDescriptions: Record<string, [string, string]> = {
   ],
   simulate_dps: [
     'Simulate DPS',
-    'Estimate mage DPS and compare rotations at levels 1–60. Experimental.',
+    'Compare damage plans and equipment for all nine classes, levels 1–60. Experimental; supported abilities only.',
   ],
   search_database: [
     'Search Forever database',
@@ -200,7 +200,8 @@ export const integrations: Capability[] = [
     name: 'WoWSims Forever',
     group: 'integrations',
     kind: 'service',
-    description: 'Simulate mage DPS and compare rotations at levels 1–60. Experimental.',
+    description:
+      'Compare class damage plans and equipment at levels 1–60. Experimental; no pets, healing or tanking.',
   },
 ];
 export function toolIntegration(name: string): string {

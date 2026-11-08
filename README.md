@@ -36,6 +36,7 @@ Windows is the tested distribution target. Other WoW versions and macOS distribu
 
 - [Usage and troubleshooting](docs/usage.md) — conversations, trackers, actions and local data
 - [Development](docs/development.md) — prerequisites, builds and checks
-- [Integrations and simulator](docs/reference.md) — knowledge sources, custom MCPs and mage DPS comparisons
+- [Integrations and simulator](docs/reference.md) — knowledge sources, custom MCPs and class damage and equipment comparisons
+- [Landing page](apps/web/README.md) — Next.js site for wisp.fedeya.sh, local preview and Vercel deployment
 
 [GPL-3.0-only](LICENSE) · [Attributions](NOTICE) · [WoWSims license](simulator/LICENSE-WoWSims.txt)

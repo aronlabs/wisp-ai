@@ -80,7 +80,7 @@ Use **Settings > Memory** to view, edit or forget notes. Deleting a chat does no
 
 ### Reading the answers
 
-Missing readings and database coverage remain unknown, not zero or proof of absence. External references can be stale or from a different build; market estimates come from uploaded scans, not live listings. Trainer and auction readings need their windows open, and auctions expose only already-loaded partial results. Item comparisons report raw stat differences; [experimental simulations](reference.md#experimental-local-dps-simulations) estimate specific mage scenarios, not live combat or an optimal build.
+Missing readings and database coverage remain unknown, not zero or proof of absence. External references can be stale or from a different build; market estimates come from uploaded scans, not live listings. Trainer and auction readings need their windows open, and auctions expose only already-loaded partial results. Item comparisons report raw stat differences; [experimental simulations](reference.md#experimental-local-dps-simulations) compare supported class damage scenarios and equipment alternatives, not live combat or an optimal build.
 
 ## Troubleshooting
 
@@ -105,7 +105,7 @@ Eve's dynamic definitions; the bridge enforces the same checks on game/RPC calls
 
 - **Questie:** installed QuestieDB Forever NPC locations, with optional Questie trainer/service indexes. Missing, incompatible and partial providers are distinguished. No addon source is modified.
 - **TheWoWDB / Wowhead / Everloot:** primary Forever catalog, scoped fallback search, and complementary MCP observations respectively. Configured network sources are not claimed to be online until a request succeeds.
-- **WoWSims Forever:** the bundled experimental mage simulator.
+- **WoWSims Forever:** the bundled experimental class damage and equipment simulator.
 - **Custom MCPs:** Add/Edit/Test/Remove plus per-tool switches after discovery.
 
 Local agent tools have public names such as `questie__find_npc_locations` and

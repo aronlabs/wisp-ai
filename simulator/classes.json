@@ -1,0 +1,3583 @@
+{
+  "MAGE": {
+    "talents": [
+      [
+        {
+          "id": 6057,
+          "max": 2
+        },
+        {
+          "id": 11237,
+          "max": 5
+        },
+        {
+          "id": 28574,
+          "max": 3
+        },
+        {
+          "id": 11210,
+          "max": 2
+        },
+        {
+          "id": 29441,
+          "max": 2
+        },
+        {
+          "id": 11213,
+          "max": 5
+        },
+        {
+          "id": 400588,
+          "max": 2
+        },
+        {
+          "id": 11247,
+          "max": 2
+        },
+        {
+          "id": 11242,
+          "max": 3
+        },
+        {
+          "id": 400574,
+          "max": 1
+        },
+        {
+          "id": 11252,
+          "max": 2
+        },
+        {
+          "id": 11255,
+          "max": 2
+        },
+        {
+          "id": 18462,
+          "max": 3
+        },
+        {
+          "id": 1326079,
+          "max": 1
+        },
+        {
+          "id": 12043,
+          "max": 1
+        },
+        {
+          "id": 11232,
+          "max": 5
+        },
+        {
+          "id": 15058,
+          "max": 3
+        },
+        {
+          "id": 12042,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 18459,
+          "max": 5
+        },
+        {
+          "id": 11069,
+          "max": 5
+        },
+        {
+          "id": 11119,
+          "max": 5
+        },
+        {
+          "id": 11100,
+          "max": 2
+        },
+        {
+          "id": 11103,
+          "max": 3
+        },
+        {
+          "id": 11083,
+          "max": 3
+        },
+        {
+          "id": 11108,
+          "max": 3
+        },
+        {
+          "id": 11366,
+          "max": 1
+        },
+        {
+          "id": 11078,
+          "max": 2
+        },
+        {
+          "id": 11095,
+          "max": 3
+        },
+        {
+          "id": 11094,
+          "max": 2
+        },
+        {
+          "id": 400624,
+          "max": 1
+        },
+        {
+          "id": 29074,
+          "max": 3
+        },
+        {
+          "id": 11115,
+          "max": 3
+        },
+        {
+          "id": 11113,
+          "max": 1
+        },
+        {
+          "id": 11124,
+          "max": 3
+        },
+        {
+          "id": 11129,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 11189,
+          "max": 2
+        },
+        {
+          "id": 11070,
+          "max": 5
+        },
+        {
+          "id": 29438,
+          "max": 3
+        },
+        {
+          "id": 11207,
+          "max": 5
+        },
+        {
+          "id": 11071,
+          "max": 3
+        },
+        {
+          "id": 11165,
+          "max": 2
+        },
+        {
+          "id": 11175,
+          "max": 3
+        },
+        {
+          "id": 11160,
+          "max": 3
+        },
+        {
+          "id": 11185,
+          "max": 3
+        },
+        {
+          "id": 1312002,
+          "max": 1
+        },
+        {
+          "id": 16757,
+          "max": 2
+        },
+        {
+          "id": 11958,
+          "max": 1
+        },
+        {
+          "id": 11170,
+          "max": 3
+        },
+        {
+          "id": 11190,
+          "max": 3
+        },
+        {
+          "id": 12472,
+          "max": 1
+        },
+        {
+          "id": 400647,
+          "max": 2
+        },
+        {
+          "id": 11180,
+          "max": 5
+        },
+        {
+          "id": 11426,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "Frostbolt": [
+        {
+          "id": 116,
+          "level": 4,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 205,
+          "level": 8,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 837,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 7322,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8406,
+          "level": 26,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8407,
+          "level": 32,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8408,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10179,
+          "level": 44,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10180,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10181,
+          "level": 56,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 25304,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "Fireball": [
+        {
+          "id": 133,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 143,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 145,
+          "level": 12,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 3140,
+          "level": 18,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 8400,
+          "level": 24,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 8401,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 8402,
+          "level": 36,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 10148,
+          "level": 42,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 10149,
+          "level": 48,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 10150,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 10151,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 35
+        },
+        {
+          "id": 25306,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 35
+        }
+      ],
+      "FireBlast": [
+        {
+          "id": 2136,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 2137,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 2138,
+          "level": 22,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 8412,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 8413,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 10197,
+          "level": 46,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 10199,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 20
+        }
+      ],
+      "ArcaneMissiles": [
+        {
+          "id": 5143,
+          "level": 8,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 5144,
+          "level": 16,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 5145,
+          "level": 24,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8416,
+          "level": 32,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8417,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10211,
+          "level": 48,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10212,
+          "level": 56,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 25345,
+          "level": 56,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "FrostNova": [
+        {
+          "id": 122,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 865,
+          "level": 26,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 6131,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 10230,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 0
+        }
+      ],
+      "ArcaneExplosion": [
+        {
+          "id": 1449,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 8437,
+          "level": 22,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 8438,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 8439,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 10201,
+          "level": 46,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 10202,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 0
+        }
+      ]
+    },
+    "triggerParents": {
+      "7268": 5143,
+      "7269": 5144,
+      "7270": 5145,
+      "8418": 8417,
+      "8419": 8416,
+      "10273": 10211,
+      "10274": 10212,
+      "25346": 25345
+    }
+  },
+  "WARRIOR": {
+    "talents": [
+      [
+        {
+          "id": 12282,
+          "max": 3
+        },
+        {
+          "id": 16462,
+          "max": 5
+        },
+        {
+          "id": 12286,
+          "max": 3
+        },
+        {
+          "id": 12285,
+          "max": 2
+        },
+        {
+          "id": 12295,
+          "max": 5
+        },
+        {
+          "id": 12290,
+          "max": 2
+        },
+        {
+          "id": 12296,
+          "max": 1
+        },
+        {
+          "id": 12834,
+          "max": 3
+        },
+        {
+          "id": 1310222,
+          "max": 1
+        },
+        {
+          "id": 12163,
+          "max": 3
+        },
+        {
+          "id": 16493,
+          "max": 2
+        },
+        {
+          "id": 1289682,
+          "max": 5
+        },
+        {
+          "id": 12292,
+          "max": 1
+        },
+        {
+          "id": 1290261,
+          "max": 5
+        },
+        {
+          "id": 12862,
+          "max": 2
+        },
+        {
+          "id": 12289,
+          "max": 3
+        },
+        {
+          "id": 12294,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 12321,
+          "max": 5
+        },
+        {
+          "id": 12320,
+          "max": 5
+        },
+        {
+          "id": 1323964,
+          "max": 5
+        },
+        {
+          "id": 12322,
+          "max": 5
+        },
+        {
+          "id": 1323963,
+          "max": 3
+        },
+        {
+          "id": 12323,
+          "max": 1
+        },
+        {
+          "id": 16487,
+          "max": 3
+        },
+        {
+          "id": 23584,
+          "max": 5
+        },
+        {
+          "id": 1310315,
+          "max": 1
+        },
+        {
+          "id": 12317,
+          "max": 5
+        },
+        {
+          "id": 20502,
+          "max": 2
+        },
+        {
+          "id": 20500,
+          "max": 2
+        },
+        {
+          "id": 12328,
+          "max": 1
+        },
+        {
+          "id": 20504,
+          "max": 2
+        },
+        {
+          "id": 12319,
+          "max": 5
+        },
+        {
+          "id": 1323967,
+          "max": 2
+        },
+        {
+          "id": 23881,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 12301,
+          "max": 2
+        },
+        {
+          "id": 12298,
+          "max": 5
+        },
+        {
+          "id": 12962,
+          "max": 5
+        },
+        {
+          "id": 12297,
+          "max": 5
+        },
+        {
+          "id": 12797,
+          "max": 3
+        },
+        {
+          "id": 12287,
+          "max": 3
+        },
+        {
+          "id": 12975,
+          "max": 1
+        },
+        {
+          "id": 1310316,
+          "max": 2
+        },
+        {
+          "id": 12313,
+          "max": 3
+        },
+        {
+          "id": 12792,
+          "max": 3
+        },
+        {
+          "id": 12308,
+          "max": 3
+        },
+        {
+          "id": 1310317,
+          "max": 1
+        },
+        {
+          "id": 12311,
+          "max": 2
+        },
+        {
+          "id": 12312,
+          "max": 2
+        },
+        {
+          "id": 12809,
+          "max": 1
+        },
+        {
+          "id": 29787,
+          "max": 3
+        },
+        {
+          "id": 16538,
+          "max": 5
+        },
+        {
+          "id": 23922,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "HeroicStrike": [
+        {
+          "id": 78,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 284,
+          "level": 8,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 285,
+          "level": 16,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 1608,
+          "level": 24,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11564,
+          "level": 32,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11565,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11566,
+          "level": 48,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11567,
+          "level": 56,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 25286,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 5
+        }
+      ],
+      "Rend": [
+        {
+          "id": 772,
+          "level": 4,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 6546,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 6547,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 6548,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11572,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11573,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11574,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 5
+        }
+      ],
+      "Slam": [
+        {
+          "id": 1240193,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 1464,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 8820,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11604,
+          "level": 46,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11605,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 5
+        }
+      ],
+      "ThunderClap": [
+        {
+          "id": 6343,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 8198,
+          "level": 18,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 8204,
+          "level": 28,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 8205,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 11580,
+          "level": 48,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 11581,
+          "level": 58,
+          "minRange": 0,
+          "maxRange": 0
+        }
+      ],
+      "Bloodrage": [
+        {
+          "id": 2687,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 0
+        }
+      ]
+    },
+    "triggerParents": {
+      "29131": 2687
+    }
+  },
+  "ROGUE": {
+    "talents": [
+      [
+        {
+          "id": 13741,
+          "max": 3
+        },
+        {
+          "id": 14144,
+          "max": 2
+        },
+        {
+          "id": 14138,
+          "max": 5
+        },
+        {
+          "id": 14156,
+          "max": 3
+        },
+        {
+          "id": 14158,
+          "max": 2
+        },
+        {
+          "id": 14165,
+          "max": 3
+        },
+        {
+          "id": 14179,
+          "max": 1
+        },
+        {
+          "id": 14168,
+          "max": 2
+        },
+        {
+          "id": 14128,
+          "max": 5
+        },
+        {
+          "id": 16513,
+          "max": 5
+        },
+        {
+          "id": 14177,
+          "max": 1
+        },
+        {
+          "id": 14113,
+          "max": 5
+        },
+        {
+          "id": 14983,
+          "max": 2
+        },
+        {
+          "id": 1310707,
+          "max": 1
+        },
+        {
+          "id": 14174,
+          "max": 2
+        },
+        {
+          "id": 14186,
+          "max": 5
+        },
+        {
+          "id": 1310703,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 14162,
+          "max": 3
+        },
+        {
+          "id": 13732,
+          "max": 2
+        },
+        {
+          "id": 13712,
+          "max": 5
+        },
+        {
+          "id": 1224716,
+          "max": 3
+        },
+        {
+          "id": 13713,
+          "max": 3
+        },
+        {
+          "id": 13705,
+          "max": 3
+        },
+        {
+          "id": 13742,
+          "max": 2
+        },
+        {
+          "id": 14251,
+          "max": 1
+        },
+        {
+          "id": 13743,
+          "max": 2
+        },
+        {
+          "id": 13754,
+          "max": 2
+        },
+        {
+          "id": 1310711,
+          "max": 1
+        },
+        {
+          "id": 13715,
+          "max": 5
+        },
+        {
+          "id": 13877,
+          "max": 1
+        },
+        {
+          "id": 13960,
+          "max": 5
+        },
+        {
+          "id": 30919,
+          "max": 2
+        },
+        {
+          "id": 18427,
+          "max": 3
+        },
+        {
+          "id": 13750,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 13975,
+          "max": 5
+        },
+        {
+          "id": 13958,
+          "max": 3
+        },
+        {
+          "id": 14057,
+          "max": 2
+        },
+        {
+          "id": 13983,
+          "max": 3
+        },
+        {
+          "id": 13981,
+          "max": 2
+        },
+        {
+          "id": 1224782,
+          "max": 2
+        },
+        {
+          "id": 14079,
+          "max": 3
+        },
+        {
+          "id": 13976,
+          "max": 3
+        },
+        {
+          "id": 14278,
+          "max": 1
+        },
+        {
+          "id": 14084,
+          "max": 2
+        },
+        {
+          "id": 30894,
+          "max": 2
+        },
+        {
+          "id": 14183,
+          "max": 1
+        },
+        {
+          "id": 14171,
+          "max": 3
+        },
+        {
+          "id": 14082,
+          "max": 2
+        },
+        {
+          "id": 14185,
+          "max": 1
+        },
+        {
+          "id": 16511,
+          "max": 1
+        },
+        {
+          "id": 1310728,
+          "max": 5
+        },
+        {
+          "id": 462708,
+          "max": 5
+        },
+        {
+          "id": 1310721,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "SinisterStrike": [
+        {
+          "id": 1752,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 1757,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 1758,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 1759,
+          "level": 22,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 1760,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 8621,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11293,
+          "level": 46,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11294,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 5
+        }
+      ],
+      "Eviscerate": [
+        {
+          "id": 2098,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 6760,
+          "level": 8,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 6761,
+          "level": 16,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 6762,
+          "level": 24,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 8623,
+          "level": 32,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 8624,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11299,
+          "level": 48,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 11300,
+          "level": 56,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 31016,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 5
+        }
+      ]
+    },
+    "triggerParents": {}
+  },
+  "HUNTER": {
+    "talents": [
+      [
+        {
+          "id": 19552,
+          "max": 5
+        },
+        {
+          "id": 19583,
+          "max": 5
+        },
+        {
+          "id": 1223755,
+          "max": 2
+        },
+        {
+          "id": 19549,
+          "max": 3
+        },
+        {
+          "id": 24443,
+          "max": 2
+        },
+        {
+          "id": 19559,
+          "max": 2
+        },
+        {
+          "id": 19596,
+          "max": 1
+        },
+        {
+          "id": 19616,
+          "max": 5
+        },
+        {
+          "id": 19572,
+          "max": 2
+        },
+        {
+          "id": 19598,
+          "max": 5
+        },
+        {
+          "id": 1293241,
+          "max": 1
+        },
+        {
+          "id": 19578,
+          "max": 2
+        },
+        {
+          "id": 19577,
+          "max": 1
+        },
+        {
+          "id": 19590,
+          "max": 2
+        },
+        {
+          "id": 19621,
+          "max": 5
+        },
+        {
+          "id": 19574,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 19498,
+          "max": 3
+        },
+        {
+          "id": 19407,
+          "max": 5
+        },
+        {
+          "id": 19426,
+          "max": 5
+        },
+        {
+          "id": 1310661,
+          "max": 3
+        },
+        {
+          "id": 19416,
+          "max": 5
+        },
+        {
+          "id": 1223984,
+          "max": 5
+        },
+        {
+          "id": 415405,
+          "max": 2
+        },
+        {
+          "id": 19454,
+          "max": 5
+        },
+        {
+          "id": 415370,
+          "max": 1
+        },
+        {
+          "id": 1299346,
+          "max": 1
+        },
+        {
+          "id": 19485,
+          "max": 5
+        },
+        {
+          "id": 1223987,
+          "max": 2
+        },
+        {
+          "id": 19461,
+          "max": 3
+        },
+        {
+          "id": 19503,
+          "max": 1
+        },
+        {
+          "id": 19507,
+          "max": 5
+        },
+        {
+          "id": 1310687,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 24293,
+          "max": 5
+        },
+        {
+          "id": 19295,
+          "max": 5
+        },
+        {
+          "id": 19184,
+          "max": 5
+        },
+        {
+          "id": 19159,
+          "max": 2
+        },
+        {
+          "id": 19255,
+          "max": 5
+        },
+        {
+          "id": 19228,
+          "max": 3
+        },
+        {
+          "id": 19239,
+          "max": 2
+        },
+        {
+          "id": 19290,
+          "max": 3
+        },
+        {
+          "id": 19263,
+          "max": 1
+        },
+        {
+          "id": 19376,
+          "max": 2
+        },
+        {
+          "id": 1310627,
+          "max": 5
+        },
+        {
+          "id": 19306,
+          "max": 1
+        },
+        {
+          "id": 440529,
+          "max": 2
+        },
+        {
+          "id": 1310532,
+          "max": 2
+        },
+        {
+          "id": 1310496,
+          "max": 2
+        },
+        {
+          "id": 1317257,
+          "max": 1
+        },
+        {
+          "id": 19168,
+          "max": 5
+        },
+        {
+          "id": 1310533,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "ArcaneShot": [
+        {
+          "id": 3044,
+          "level": 6,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 14281,
+          "level": 12,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 14282,
+          "level": 20,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 14283,
+          "level": 28,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 14284,
+          "level": 36,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 14285,
+          "level": 44,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 14286,
+          "level": 52,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 14287,
+          "level": 60,
+          "minRange": 8,
+          "maxRange": 35
+        }
+      ],
+      "MultiShot": [
+        {
+          "id": 2643,
+          "level": 18,
+          "minRange": 8,
+          "maxRange": 35
+        }
+      ],
+      "SerpentSting": [
+        {
+          "id": 1978,
+          "level": 4,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 13549,
+          "level": 10,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 13550,
+          "level": 18,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 13551,
+          "level": 26,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 13552,
+          "level": 34,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 13553,
+          "level": 42,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 13554,
+          "level": 50,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 13555,
+          "level": 58,
+          "minRange": 8,
+          "maxRange": 35
+        },
+        {
+          "id": 25295,
+          "level": 60,
+          "minRange": 8,
+          "maxRange": 35
+        }
+      ],
+      "HuntersMark": [
+        {
+          "id": 1130,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 100
+        },
+        {
+          "id": 14323,
+          "level": 22,
+          "minRange": 0,
+          "maxRange": 100
+        },
+        {
+          "id": 14324,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 100
+        },
+        {
+          "id": 14325,
+          "level": 58,
+          "minRange": 0,
+          "maxRange": 100
+        }
+      ],
+      "AspectOfTheHawk": [
+        {
+          "id": 13165,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 14318,
+          "level": 18,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 14319,
+          "level": 28,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 14320,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 14321,
+          "level": 48,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 14322,
+          "level": 58,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 25296,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 0
+        }
+      ],
+      "RapidFire": [
+        {
+          "id": 3045,
+          "level": 26,
+          "minRange": 0,
+          "maxRange": 0
+        }
+      ]
+    },
+    "triggerParents": {
+      "6150": 25296
+    }
+  },
+  "PALADIN": {
+    "talents": [
+      [
+        {
+          "id": 20205,
+          "max": 5
+        },
+        {
+          "id": 20262,
+          "max": 5
+        },
+        {
+          "id": 20237,
+          "max": 3
+        },
+        {
+          "id": 1310899,
+          "max": 2
+        },
+        {
+          "id": 20224,
+          "max": 5
+        },
+        {
+          "id": 429144,
+          "max": 2
+        },
+        {
+          "id": 20216,
+          "max": 1
+        },
+        {
+          "id": 20210,
+          "max": 5
+        },
+        {
+          "id": 1237268,
+          "max": 2
+        },
+        {
+          "id": 1310904,
+          "max": 2
+        },
+        {
+          "id": 426065,
+          "max": 2
+        },
+        {
+          "id": 1328548,
+          "max": 1
+        },
+        {
+          "id": 1310905,
+          "max": 2
+        },
+        {
+          "id": 1311606,
+          "max": 1
+        },
+        {
+          "id": 1328550,
+          "max": 2
+        },
+        {
+          "id": 5923,
+          "max": 5
+        },
+        {
+          "id": 1310911,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 20257,
+          "max": 5
+        },
+        {
+          "id": 20127,
+          "max": 5
+        },
+        {
+          "id": 20189,
+          "max": 3
+        },
+        {
+          "id": 20174,
+          "max": 2
+        },
+        {
+          "id": 1224697,
+          "max": 2
+        },
+        {
+          "id": 1311015,
+          "max": 1
+        },
+        {
+          "id": 20487,
+          "max": 3
+        },
+        {
+          "id": 20150,
+          "max": 2
+        },
+        {
+          "id": 20143,
+          "max": 5
+        },
+        {
+          "id": 1310994,
+          "max": 1
+        },
+        {
+          "id": 20468,
+          "max": 3
+        },
+        {
+          "id": 20096,
+          "max": 5
+        },
+        {
+          "id": 1328546,
+          "max": 2
+        },
+        {
+          "id": 20925,
+          "max": 1
+        },
+        {
+          "id": 20177,
+          "max": 5
+        },
+        {
+          "id": 1311034,
+          "max": 3
+        },
+        {
+          "id": 1328544,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 20060,
+          "max": 5
+        },
+        {
+          "id": 20101,
+          "max": 5
+        },
+        {
+          "id": 25956,
+          "max": 2
+        },
+        {
+          "id": 20117,
+          "max": 3
+        },
+        {
+          "id": 1311074,
+          "max": 3
+        },
+        {
+          "id": 9452,
+          "max": 3
+        },
+        {
+          "id": 9453,
+          "max": 2
+        },
+        {
+          "id": 20375,
+          "max": 1
+        },
+        {
+          "id": 26022,
+          "max": 2
+        },
+        {
+          "id": 9799,
+          "max": 2
+        },
+        {
+          "id": 1311087,
+          "max": 1
+        },
+        {
+          "id": 20111,
+          "max": 3
+        },
+        {
+          "id": 1328370,
+          "max": 2
+        },
+        {
+          "id": 20066,
+          "max": 1
+        },
+        {
+          "id": 20049,
+          "max": 3
+        },
+        {
+          "id": 1311084,
+          "max": 5
+        },
+        {
+          "id": 1310735,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "SealOfRighteousness": [
+        {
+          "id": 21084,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20287,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20288,
+          "level": 18,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20289,
+          "level": 26,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20290,
+          "level": 34,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20291,
+          "level": 42,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20292,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20293,
+          "level": 58,
+          "minRange": 0,
+          "maxRange": 0
+        }
+      ],
+      "Judgement": [
+        {
+          "id": 20271,
+          "level": 4,
+          "minRange": 0,
+          "maxRange": 10
+        }
+      ],
+      "HolyStrike": [
+        {
+          "id": 679,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 678,
+          "level": 12,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 1866,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 680,
+          "level": 28,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 2495,
+          "level": 36,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 5569,
+          "level": 44,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 10332,
+          "level": 52,
+          "minRange": 0,
+          "maxRange": 5
+        },
+        {
+          "id": 10333,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 5
+        }
+      ],
+      "Consecration": [
+        {
+          "id": 26573,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20116,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20922,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20923,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 0
+        },
+        {
+          "id": 20924,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 0
+        }
+      ]
+    },
+    "triggerParents": {
+      "20187": 20271,
+      "20280": 20271,
+      "20281": 20271,
+      "20282": 20271,
+      "20283": 20271,
+      "20284": 20271,
+      "20285": 20271,
+      "20286": 20271,
+      "25713": 20293,
+      "25735": 20292,
+      "25736": 20291,
+      "25737": 20290,
+      "25738": 20289,
+      "25739": 20288,
+      "25740": 20287,
+      "25742": 21084
+    }
+  },
+  "PRIEST": {
+    "talents": [
+      [
+        {
+          "id": 1309969,
+          "max": 5
+        },
+        {
+          "id": 14524,
+          "max": 2
+        },
+        {
+          "id": 1225132,
+          "max": 5
+        },
+        {
+          "id": 14523,
+          "max": 3
+        },
+        {
+          "id": 1309957,
+          "max": 3
+        },
+        {
+          "id": 18551,
+          "max": 5
+        },
+        {
+          "id": 14531,
+          "max": 2
+        },
+        {
+          "id": 14520,
+          "max": 3
+        },
+        {
+          "id": 14751,
+          "max": 1
+        },
+        {
+          "id": 14748,
+          "max": 3
+        },
+        {
+          "id": 14521,
+          "max": 3
+        },
+        {
+          "id": 14747,
+          "max": 3
+        },
+        {
+          "id": 14750,
+          "max": 2
+        },
+        {
+          "id": 402000,
+          "max": 1
+        },
+        {
+          "id": 402174,
+          "max": 1
+        },
+        {
+          "id": 425280,
+          "max": 5
+        },
+        {
+          "id": 431622,
+          "max": 3
+        },
+        {
+          "id": 10060,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 14913,
+          "max": 3
+        },
+        {
+          "id": 14908,
+          "max": 3
+        },
+        {
+          "id": 14889,
+          "max": 5
+        },
+        {
+          "id": 27900,
+          "max": 5
+        },
+        {
+          "id": 18530,
+          "max": 5
+        },
+        {
+          "id": 15237,
+          "max": 1
+        },
+        {
+          "id": 27811,
+          "max": 3
+        },
+        {
+          "id": 14892,
+          "max": 3
+        },
+        {
+          "id": 27789,
+          "max": 2
+        },
+        {
+          "id": 14912,
+          "max": 3
+        },
+        {
+          "id": 14909,
+          "max": 2
+        },
+        {
+          "id": 1328569,
+          "max": 1
+        },
+        {
+          "id": 1317006,
+          "max": 2
+        },
+        {
+          "id": 20711,
+          "max": 1
+        },
+        {
+          "id": 14901,
+          "max": 5
+        },
+        {
+          "id": 14898,
+          "max": 3
+        },
+        {
+          "id": 401859,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 15260,
+          "max": 5
+        },
+        {
+          "id": 15326,
+          "max": 5
+        },
+        {
+          "id": 15270,
+          "max": 5
+        },
+        {
+          "id": 15273,
+          "max": 5
+        },
+        {
+          "id": 15275,
+          "max": 2
+        },
+        {
+          "id": 17322,
+          "max": 2
+        },
+        {
+          "id": 15392,
+          "max": 2
+        },
+        {
+          "id": 15407,
+          "max": 1
+        },
+        {
+          "id": 1225139,
+          "max": 2
+        },
+        {
+          "id": 1326159,
+          "max": 5
+        },
+        {
+          "id": 15286,
+          "max": 1
+        },
+        {
+          "id": 15257,
+          "max": 3
+        },
+        {
+          "id": 15487,
+          "max": 1
+        },
+        {
+          "id": 1309950,
+          "max": 2
+        },
+        {
+          "id": 1310076,
+          "max": 2
+        },
+        {
+          "id": 15259,
+          "max": 5
+        },
+        {
+          "id": 15473,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "Smite": [
+        {
+          "id": 585,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 591,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 598,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 984,
+          "level": 22,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 1004,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 6060,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10933,
+          "level": 46,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10934,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "MindBlast": [
+        {
+          "id": 8092,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8102,
+          "level": 16,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8103,
+          "level": 22,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8104,
+          "level": 28,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8105,
+          "level": 34,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8106,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10945,
+          "level": 46,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10946,
+          "level": 52,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10947,
+          "level": 58,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "ShadowWordPain": [
+        {
+          "id": 589,
+          "level": 4,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 594,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 970,
+          "level": 18,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 992,
+          "level": 26,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 2767,
+          "level": 34,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10892,
+          "level": 42,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10893,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10894,
+          "level": 58,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ]
+    },
+    "triggerParents": {}
+  },
+  "SHAMAN": {
+    "talents": [
+      [
+        {
+          "id": 16039,
+          "max": 5
+        },
+        {
+          "id": 16035,
+          "max": 5
+        },
+        {
+          "id": 30160,
+          "max": 3
+        },
+        {
+          "id": 16040,
+          "max": 5
+        },
+        {
+          "id": 16578,
+          "max": 3
+        },
+        {
+          "id": 16038,
+          "max": 3
+        },
+        {
+          "id": 16164,
+          "max": 1
+        },
+        {
+          "id": 28996,
+          "max": 3
+        },
+        {
+          "id": 16086,
+          "max": 2
+        },
+        {
+          "id": 29062,
+          "max": 3
+        },
+        {
+          "id": 1222988,
+          "max": 1
+        },
+        {
+          "id": 28999,
+          "max": 2
+        },
+        {
+          "id": 408490,
+          "max": 1
+        },
+        {
+          "id": 408438,
+          "max": 3
+        },
+        {
+          "id": 16089,
+          "max": 5
+        },
+        {
+          "id": 16166,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 16043,
+          "max": 2
+        },
+        {
+          "id": 16255,
+          "max": 5
+        },
+        {
+          "id": 17485,
+          "max": 5
+        },
+        {
+          "id": 16258,
+          "max": 2
+        },
+        {
+          "id": 415140,
+          "max": 3
+        },
+        {
+          "id": 16262,
+          "max": 2
+        },
+        {
+          "id": 16261,
+          "max": 3
+        },
+        {
+          "id": 16266,
+          "max": 3
+        },
+        {
+          "id": 1223030,
+          "max": 1
+        },
+        {
+          "id": 16254,
+          "max": 3
+        },
+        {
+          "id": 16252,
+          "max": 5
+        },
+        {
+          "id": 16256,
+          "max": 5
+        },
+        {
+          "id": 17364,
+          "max": 1
+        },
+        {
+          "id": 16268,
+          "max": 1
+        },
+        {
+          "id": 30812,
+          "max": 2
+        },
+        {
+          "id": 1223031,
+          "max": 2
+        },
+        {
+          "id": 408498,
+          "max": 5
+        },
+        {
+          "id": 425336,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 16182,
+          "max": 5
+        },
+        {
+          "id": 16179,
+          "max": 5
+        },
+        {
+          "id": 1223033,
+          "max": 3
+        },
+        {
+          "id": 29187,
+          "max": 3
+        },
+        {
+          "id": 16173,
+          "max": 5
+        },
+        {
+          "id": 16184,
+          "max": 2
+        },
+        {
+          "id": 16176,
+          "max": 3
+        },
+        {
+          "id": 16181,
+          "max": 3
+        },
+        {
+          "id": 408510,
+          "max": 1
+        },
+        {
+          "id": 16194,
+          "max": 5
+        },
+        {
+          "id": 16187,
+          "max": 5
+        },
+        {
+          "id": 16190,
+          "max": 1
+        },
+        {
+          "id": 29206,
+          "max": 3
+        },
+        {
+          "id": 16188,
+          "max": 1
+        },
+        {
+          "id": 16178,
+          "max": 5
+        },
+        {
+          "id": 408521,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "LightningBolt": [
+        {
+          "id": 403,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 529,
+          "level": 8,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 548,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 915,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 943,
+          "level": 26,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 6041,
+          "level": 32,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10391,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10392,
+          "level": 44,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 15207,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 15208,
+          "level": 56,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "ChainLightning": [
+        {
+          "id": 421,
+          "level": 32,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 930,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 2860,
+          "level": 48,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 10605,
+          "level": 56,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "EarthShock": [
+        {
+          "id": 8042,
+          "level": 4,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 8044,
+          "level": 8,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 8045,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 8046,
+          "level": 24,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 10412,
+          "level": 36,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 10413,
+          "level": 48,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 10414,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 20
+        }
+      ],
+      "FlameShock": [
+        {
+          "id": 8050,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 8052,
+          "level": 18,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 8053,
+          "level": 28,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 10447,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 10448,
+          "level": 52,
+          "minRange": 0,
+          "maxRange": 20
+        },
+        {
+          "id": 29228,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 20
+        }
+      ]
+    },
+    "triggerParents": {}
+  },
+  "WARLOCK": {
+    "talents": [
+      [
+        {
+          "id": 18182,
+          "max": 2
+        },
+        {
+          "id": 18174,
+          "max": 5
+        },
+        {
+          "id": 17810,
+          "max": 5
+        },
+        {
+          "id": 18218,
+          "max": 2
+        },
+        {
+          "id": 437032,
+          "max": 2
+        },
+        {
+          "id": 403511,
+          "max": 3
+        },
+        {
+          "id": 18827,
+          "max": 2
+        },
+        {
+          "id": 17783,
+          "max": 3
+        },
+        {
+          "id": 18288,
+          "max": 1
+        },
+        {
+          "id": 427712,
+          "max": 3
+        },
+        {
+          "id": 1310949,
+          "max": 5
+        },
+        {
+          "id": 18094,
+          "max": 2
+        },
+        {
+          "id": 18223,
+          "max": 1
+        },
+        {
+          "id": 18265,
+          "max": 1
+        },
+        {
+          "id": 17804,
+          "max": 3
+        },
+        {
+          "id": 18271,
+          "max": 5
+        },
+        {
+          "id": 1316697,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 18703,
+          "max": 2
+        },
+        {
+          "id": 18694,
+          "max": 3
+        },
+        {
+          "id": 18697,
+          "max": 5
+        },
+        {
+          "id": 18769,
+          "max": 5
+        },
+        {
+          "id": 1235316,
+          "max": 2
+        },
+        {
+          "id": 18705,
+          "max": 3
+        },
+        {
+          "id": 18731,
+          "max": 3
+        },
+        {
+          "id": 1225214,
+          "max": 2
+        },
+        {
+          "id": 18754,
+          "max": 3
+        },
+        {
+          "id": 18788,
+          "max": 1
+        },
+        {
+          "id": 18709,
+          "max": 2
+        },
+        {
+          "id": 440870,
+          "max": 2
+        },
+        {
+          "id": 18708,
+          "max": 1
+        },
+        {
+          "id": 1293695,
+          "max": 3
+        },
+        {
+          "id": 1225217,
+          "max": 3
+        },
+        {
+          "id": 19028,
+          "max": 1
+        },
+        {
+          "id": 412732,
+          "max": 3
+        },
+        {
+          "id": 23785,
+          "max": 5
+        },
+        {
+          "id": 425464,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 17917,
+          "max": 2
+        },
+        {
+          "id": 17793,
+          "max": 5
+        },
+        {
+          "id": 17788,
+          "max": 5
+        },
+        {
+          "id": 1225220,
+          "max": 5
+        },
+        {
+          "id": 17778,
+          "max": 3
+        },
+        {
+          "id": 18119,
+          "max": 5
+        },
+        {
+          "id": 17959,
+          "max": 5
+        },
+        {
+          "id": 17877,
+          "max": 1
+        },
+        {
+          "id": 18135,
+          "max": 3
+        },
+        {
+          "id": 17927,
+          "max": 3
+        },
+        {
+          "id": 1293817,
+          "max": 1
+        },
+        {
+          "id": 18073,
+          "max": 2
+        },
+        {
+          "id": 1225228,
+          "max": 1
+        },
+        {
+          "id": 412751,
+          "max": 3
+        },
+        {
+          "id": 426316,
+          "max": 5
+        },
+        {
+          "id": 412758,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "ShadowBolt": [
+        {
+          "id": 686,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 695,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 705,
+          "level": 12,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 1088,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 1106,
+          "level": 28,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 7641,
+          "level": 36,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 11659,
+          "level": 44,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 11660,
+          "level": 52,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 11661,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 25307,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "Incinerate": [
+        {
+          "id": 412758,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 1293812,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 1293813,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "Immolate": [
+        {
+          "id": 348,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 707,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 1094,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 2941,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 11665,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 11667,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 11668,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 25309,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "Corruption": [
+        {
+          "id": 172,
+          "level": 4,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 6222,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 6223,
+          "level": 24,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 7648,
+          "level": 34,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 11671,
+          "level": 44,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 11672,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 25311,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ]
+    },
+    "triggerParents": {}
+  },
+  "DRUID": {
+    "talents": [
+      [
+        {
+          "id": 16814,
+          "max": 5
+        },
+        {
+          "id": 1223081,
+          "max": 5
+        },
+        {
+          "id": 16845,
+          "max": 3
+        },
+        {
+          "id": 16821,
+          "max": 2
+        },
+        {
+          "id": 1223082,
+          "max": 2
+        },
+        {
+          "id": 16819,
+          "max": 2
+        },
+        {
+          "id": 16918,
+          "max": 3
+        },
+        {
+          "id": 1223083,
+          "max": 1
+        },
+        {
+          "id": 5570,
+          "max": 1
+        },
+        {
+          "id": 16909,
+          "max": 5
+        },
+        {
+          "id": 16850,
+          "max": 5
+        },
+        {
+          "id": 17245,
+          "max": 2
+        },
+        {
+          "id": 16880,
+          "max": 1
+        },
+        {
+          "id": 408248,
+          "max": 3
+        },
+        {
+          "id": 16896,
+          "max": 5
+        },
+        {
+          "id": 24858,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 16934,
+          "max": 5
+        },
+        {
+          "id": 17056,
+          "max": 5
+        },
+        {
+          "id": 17002,
+          "max": 2
+        },
+        {
+          "id": 16947,
+          "max": 3
+        },
+        {
+          "id": 16940,
+          "max": 2
+        },
+        {
+          "id": 16929,
+          "max": 3
+        },
+        {
+          "id": 16966,
+          "max": 3
+        },
+        {
+          "id": 16998,
+          "max": 2
+        },
+        {
+          "id": 1238122,
+          "max": 1
+        },
+        {
+          "id": 16942,
+          "max": 2
+        },
+        {
+          "id": 16972,
+          "max": 3
+        },
+        {
+          "id": 1328617,
+          "max": 1
+        },
+        {
+          "id": 1328613,
+          "max": 1
+        },
+        {
+          "id": 16958,
+          "max": 2
+        },
+        {
+          "id": 17007,
+          "max": 1
+        },
+        {
+          "id": 1223242,
+          "max": 2
+        },
+        {
+          "id": 1223246,
+          "max": 5
+        },
+        {
+          "id": 417051,
+          "max": 5
+        },
+        {
+          "id": 407995,
+          "max": 1
+        },
+        {
+          "id": 1322605,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "id": 17063,
+          "max": 5
+        },
+        {
+          "id": 17003,
+          "max": 5
+        },
+        {
+          "id": 17069,
+          "max": 5
+        },
+        {
+          "id": 17106,
+          "max": 3
+        },
+        {
+          "id": 16833,
+          "max": 3
+        },
+        {
+          "id": 17118,
+          "max": 3
+        },
+        {
+          "id": 17104,
+          "max": 5
+        },
+        {
+          "id": 1328621,
+          "max": 1
+        },
+        {
+          "id": 24968,
+          "max": 5
+        },
+        {
+          "id": 17111,
+          "max": 3
+        },
+        {
+          "id": 18562,
+          "max": 1
+        },
+        {
+          "id": 17116,
+          "max": 1
+        },
+        {
+          "id": 1309631,
+          "max": 3
+        },
+        {
+          "id": 17123,
+          "max": 2
+        },
+        {
+          "id": 17074,
+          "max": 5
+        },
+        {
+          "id": 408120,
+          "max": 1
+        }
+      ]
+    ],
+    "ranks": {
+      "Wrath": [
+        {
+          "id": 5176,
+          "level": 1,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 5177,
+          "level": 6,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 5178,
+          "level": 14,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 5179,
+          "level": 22,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 5180,
+          "level": 30,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 6780,
+          "level": 38,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8905,
+          "level": 46,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 9912,
+          "level": 54,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "Starfire": [
+        {
+          "id": 2912,
+          "level": 20,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8949,
+          "level": 26,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8950,
+          "level": 34,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8951,
+          "level": 42,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 9875,
+          "level": 50,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 9876,
+          "level": 58,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 25298,
+          "level": 60,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ],
+      "Moonfire": [
+        {
+          "id": 8921,
+          "level": 4,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8924,
+          "level": 10,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8925,
+          "level": 16,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8926,
+          "level": 22,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8927,
+          "level": 28,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8928,
+          "level": 34,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 8929,
+          "level": 40,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 9833,
+          "level": 46,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 9834,
+          "level": 52,
+          "minRange": 0,
+          "maxRange": 30
+        },
+        {
+          "id": 9835,
+          "level": 58,
+          "minRange": 0,
+          "maxRange": 30
+        }
+      ]
+    },
+    "triggerParents": {}
+  }
+}

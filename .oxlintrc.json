@@ -13,12 +13,15 @@
     "builtin": true
   },
   "ignorePatterns": [
+    "**/.next/**",
+    "**/.vercel/**",
     "runtime/**",
     "dist/**",
     "**/.eve/**",
     "**/node_modules/**",
     "**/src-tauri/**",
-    "**/dist/**"
+    "**/dist/**",
+    "**/.output/**"
   ],
   "overrides": [
     {

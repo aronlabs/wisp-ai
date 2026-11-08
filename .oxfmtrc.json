@@ -3,6 +3,9 @@
   "singleQuote": true,
   "printWidth": 100,
   "ignorePatterns": [
+    "**/.next/**",
+    "**/next-env.d.ts",
+    "**/.vercel/**",
     "runtime/**",
     "dist/**",
     ".eve/**",
@@ -15,6 +18,7 @@
     "**/src-tauri/target/**",
     "**/src-tauri/resources/**",
     "**/src-tauri/gen/**",
-    "**/dist/**"
+    "**/dist/**",
+    "**/.output/**"
   ]
 }

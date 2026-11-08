@@ -1,6 +1,6 @@
 {
   "name": "@wisp/bridge",
-  "version": "0.2.2",
+  "version": "0.0.1",
   "private": true,
   "license": "GPL-3.0-only",
   "files": [

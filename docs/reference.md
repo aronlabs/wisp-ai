@@ -31,14 +31,40 @@ For manual source configuration, copy [mcp.example.json](../mcp.example.json) to
 
 ## Experimental local DPS simulations
 
-`simulate_dps` compares up to **three mage plans** using the pinned WoWSims Forever **levelsim** fork for levels **1–60**. It runs locally when requested, without changing the game. This is a scenario comparison, not a full rotation optimizer.
+`simulate_dps` compares up to **three damage plans**, using current equipment and up to **two alternative equipment sets**, against one stationary target. It runs the pinned WoWSims Forever **levelsim** engine locally on request with one fresh character snapshot. It never changes equipment in the game.
 
-- **Plans:** a once-only ordered opener, then a repeating priority list whose first castable action wins. Actions use verified learned ranks; mana/cooldown conditions, full channels and wand timing follow the engine.
-- **Actions:** Frostbolt, Fireball, Fire Blast, Arcane Missiles, Frost Nova, Arcane Explosion, Shoot and Orc Blood Fury. Shoot requires a wand; Nova/Explosion require a target within ten yards.
-- **Scenario:** one stationary target at a fixed distance, **10–180 seconds**, **100–2,000 iterations**. Plans share the same snapshot, scenario and seed.
-- **Inputs:** fresh character, applied talents, spellbook and equipment readings. Missing data, unknown items/talents, pending talent changes, unlearned engine-selected ranks or a mismatched binary make the simulation unavailable rather than producing a number.
-- **Assumptions:** automatic level-scaled Arcane Intellect; no other external buffs, consumables or temporary enchants. No movement, incoming attacks or latency. Wand use assumes maximum skill for the level, not measured current skill.
+| Class   | Validated action families                                                             | Initial coverage                                        |
+| ------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Mage    | Frostbolt, Fireball, Fire Blast, Arcane Missiles, Frost Nova, Arcane Explosion        | Caster damage, complete channels, optional wand         |
+| Warrior | Heroic Strike, Rend, Slam, Thunder Clap, Bloodrage                                    | Melee, Battle Stance, zero starting rage                |
+| Rogue   | Sinister Strike, Eviscerate                                                           | Melee, energy and combo-point conditions, no poisons    |
+| Hunter  | Arcane Shot, Multi-Shot, Serpent Sting, Hunter's Mark, Aspect of the Hawk, Rapid Fire | Ranged auto attacks; no pet, ammunition or quiver bonus |
+| Paladin | Seal of Righteousness, Judgement, Holy Strike, Consecration                           | Melee; seals must be explicit actions                   |
+| Priest  | Smite, Mind Blast, Shadow Word: Pain                                                  | Caster damage, optional wand                            |
+| Shaman  | Lightning Bolt, Chain Lightning, Earth Shock, Flame Shock                             | Caster damage, no totems or imbues                      |
+| Warlock | Shadow Bolt, Incinerate, Immolate, Corruption                                         | Caster damage, optional wand; no demon or sacrifice     |
+| Druid   | Wrath, Starfire, Moonfire                                                             | Caster damage; Moonkin Form follows applied talents     |
 
-Results include mean/variation, spell breakdown, engine source and assumptions. They estimate only the compared scenarios, not survival or a globally optimal rotation/build. The tool must not run automatically in the background.
+This is damage coverage for all nine classes, not every specialization or ability. A family is available only when its engine-selected rank is confirmed learned. Orc Blood Fury is an explicit action. Talents and rank ladders are generated from the pinned engine source; no level-60 preset replaces live data. Native regression tests exercise each class at levels 11, 30 and 60.
+
+- **Plans:** a once-only ordered opener, then repeating priorities whose first castable action wins. Conditions support mana percentages, rage, energy, combo points and DoT refresh time. Use a seal in the paladin opener before Judgement; put rogue finishers before builders with a combo-point threshold. Spells must be available in the selected adapter.
+- **Equipment:** current equipment is always the baseline. Each alternative has a label and explicit `replacements: [{ slot, itemId }]`, with native inventory slots (for example, rings 11/12, main hand 16, off hand 17, ranged 18). `itemId: 0` removes a slot. Replacements use unenchanted base catalog items without random suffixes; unchanged slots retain their live enchants and suffixes. Item IDs must first be verified with inspection tools. The bridge validates catalog presence, level, class, faction, slot, armor/weapon type, unique restrictions and weapon combinations. Profession-specific candidates are unavailable because the snapshot cannot verify their requirements. Replacing a main hand with a two-handed weapon requires explicitly removing the off hand. Weapon training and actual skill are not read; results assume trained types and engine weapon skills.
+- **Scenario:** **10–180 seconds**, **100–2,000 iterations**, target level offset **−2 to +3**. Melee adapters default to and require 5 yards; other adapters default to 20. Spell range checks apply. All combinations share duration, target, snapshot, iterations and seed. A comparison has at most nine runs within one 45-second execution budget; failure returns unavailable, without partial rankings.
+- **Results:** mean DPS, standard deviation and standard error, spell/auto-attack breakdown, cast counts, unused actions, zero-damage actions, mana exhaustion where relevant, engine provenance and class assumptions. `equipmentDeltaDps` and `equipmentDeltaPercent` compare each set to current equipment **with the same plan**. `relativeToFirstPercent` compares to the first plan with current equipment and can include rotation differences. Small differences must be interpreted with sampling variation; a shared seed alone is not a reported paired confidence interval.
+- **Inputs:** fresh character, applied talents, spellbook and equipment readings. Missing data, unknown items/talents, duplicate talents/slots, pending talent changes, unlearned engine-selected ranks or a mismatched binary make the simulation unavailable.
+- **Limits:** no healing/tanking estimates, pets, movement, incoming attacks, kiting, survival or latency. Mage Arcane Intellect is applied automatically by the engine. No external buffs, consumables or temporary enchants. This is a bounded scenario comparison, not measured questing DPS or a globally optimal rotation/build. It must never run automatically in the background.
+
+Example equipment comparison (the agent resolves learned spell and candidate item IDs first):
+
+```json
+{
+  "plans": [{ "label": "Current rotation", "priority": [{ "spellId": 205 }] }],
+  "equipmentSets": [
+    { "label": "Minor Channeling Ring", "replacements": [{ "slot": 11, "itemId": 1449 }] }
+  ],
+  "durationSeconds": 30,
+  "iterations": 500
+}
+```
 
 Build prerequisites are in [development](development.md#build-and-run-on-windows); packaged Windows apps include the binary, so players do not need Go/protoc. See the [pinned manifest](../simulator/manifest.json), [adapter](../apps/bridge/src/simulation.ts), [attribution](../NOTICE) and [MIT license](../simulator/LICENSE-WoWSims.txt).

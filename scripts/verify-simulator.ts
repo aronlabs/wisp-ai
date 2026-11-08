@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { adapters } from '../apps/bridge/src/simulation/adapters/index.ts';
 
 export async function verifySimulator(root: string) {
   const directory = path.join(root, 'simulator');
@@ -13,9 +14,19 @@ export async function verifySimulator(root: string) {
   ) {
     throw Error('Simulator binary does not match its pinned manifest.');
   }
-  for (const file of ['item-ids.json', 'mage-talents.json']) {
-    if (!Array.isArray(JSON.parse(await readFile(path.join(directory, file), 'utf8')))) {
-      throw Error('Invalid simulator metadata: ' + file);
+  if (!Array.isArray(JSON.parse(await readFile(path.join(directory, 'items.json'), 'utf8')))) {
+    throw Error('Invalid simulator metadata: items.json');
+  }
+  const classes = JSON.parse(await readFile(path.join(directory, 'classes.json'), 'utf8'));
+  for (const adapter of Object.values(adapters)) {
+    const metadata = classes[adapter.token];
+    if (
+      !manifest.supportedClasses?.includes(adapter.token) ||
+      !Array.isArray(metadata?.talents) ||
+      metadata.talents.length !== 3 ||
+      adapter.families.some((f) => !metadata.ranks?.[f]?.length)
+    ) {
+      throw Error('Invalid simulator class metadata: ' + adapter.token);
     }
   }
 }

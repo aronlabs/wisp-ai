@@ -21,7 +21,7 @@ test('valid native info preserves an unconfigured installation', async () => {
     wow: null,
     dataDirectory: 'test',
     platform: 'windows',
-    version: '0.2.2',
+    version: '0.0.1',
     addonOutdated: null,
   };
   vi.mocked(invoke).mockResolvedValue(info);

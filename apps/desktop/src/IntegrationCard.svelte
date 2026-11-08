@@ -1,14 +1,17 @@
 <script lang="ts">
+  import Toggle from "./Toggle.svelte";
   import type { CapabilityView } from "@wisp/protocol/capabilities";
   let {
     entry,
     tools,
     locked,
+    busy = "",
     set,
   }: {
     entry: CapabilityView;
     tools: CapabilityView[];
     locked: boolean;
+    busy?: string;
     set: (id: string, enabled: boolean) => void;
   } = $props();
 </script>
@@ -19,15 +22,16 @@
       <h2>{entry.name}</h2>
       <p>{entry.description}</p>
     </div>
-    <label class="integration-switch"
-      ><input
-        type="checkbox"
-        aria-label={`Enable ${entry.name}`}
+    <div class="row-controls">
+      {#if busy}<span class="action-progress" role="status"
+          ><span class="spinner"></span>{busy}…</span
+        >{/if}<Toggle
+        label={`Enable ${entry.name}`}
         checked={entry.enabled}
         disabled={locked}
-        onchange={(event) => set(entry.id, event.currentTarget.checked)}
-      />Enabled</label
-    >
+        onchange={(checked) => set(entry.id, checked)}
+      />
+    </div>
   </div>
   <div class="integration-meta">
     <span class="badge" class:good={entry.available}>{entry.status}</span><span
@@ -63,17 +67,12 @@
 </section>
 
 <style>
-  .integration-switch {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-    font-size: 13px;
-  }
   input {
-    accent-color: #bbd9a5;
+    accent-color: var(--accent);
     width: 16px;
     height: 16px;
+    min-height: 0;
+    padding: 0;
     flex-shrink: 0;
   }
   .integration-reason {
@@ -88,7 +87,7 @@
   summary {
     cursor: pointer;
     font-size: 13px;
-    color: #b6c7af;
+    color: var(--muted);
   }
   .integration-tool {
     display: flex;
@@ -112,7 +111,7 @@
   }
   code {
     font-size: 11px;
-    color: #a3b999;
+    color: var(--muted);
     overflow-wrap: anywhere;
   }
   small {

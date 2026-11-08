@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DesktopController } from "../desktop-controller.svelte";
+  import ActionProgress from "../ActionProgress.svelte";
   import Icon from "../Icon.svelte";
   import { desktop } from "../api";
   let { app }: { app: DesktopController } = $props();
@@ -12,6 +13,7 @@
       <p>Logs stay on your computer. Review them before sharing.</p>
     </div>
     <div class="actions">
+      <ActionProgress {app} />
       <button onclick={app.showLogs} disabled={!!app.busy}
         ><Icon name="refresh" size={16} />Refresh</button
       ><button
