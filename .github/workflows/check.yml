@@ -10,7 +10,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.event.workflow_run.id || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.workflow_run.id || github.ref }}
   cancel-in-progress: true
 jobs:
   format:
