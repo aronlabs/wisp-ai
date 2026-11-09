@@ -1,7 +1,10 @@
 import type { SessionState } from './session-state.ts';
 export function projectChats(state: SessionState, now = Date.now()) {
+  let ordinaryCount = 0;
+  let otherCount = 0;
   return {
     chats: state.chats
+      .filter((c) => !(c.routineId && c.proactive && c.tipSkipped && c.status === 'done'))
       .filter(
         (c) =>
           !!c.routineId ||
@@ -16,7 +19,14 @@ export function projectChats(state: SessionState, now = Date.now()) {
           Number(b.id === state.activeChat) - Number(a.id === state.activeChat) ||
           (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0),
       )
-      .slice(0, 40)
+      .filter((c) => {
+        if (c.id === state.activeChat || c.id === state.inlineChat || c.status === 'working') {
+          return true;
+        }
+        return !c.routineId && !c.inline && !c.proactive
+          ? ++ordinaryCount <= 40
+          : ++otherCount <= 40;
+      })
       .map((c) => ({
         id: c.id,
         title: c.title,

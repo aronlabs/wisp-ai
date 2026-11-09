@@ -454,7 +454,7 @@ function C.Refresh()
         if C.sidebarRoutine then
             for index = #(C.routineRuns or {}), 1, -1 do
                 local run = C.routineRuns[index]
-                if run.routineId == C.sidebarRoutine then
+                if run.routineId == C.sidebarRoutine and run.status ~= "no_tip" then
                     local stamp = date and date("%d/%m %H:%M", run.startedAt / 1000) or run.event
                     ordered[#ordered + 1] = {
                         id = run.id,

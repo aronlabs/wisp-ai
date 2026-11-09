@@ -451,7 +451,7 @@ export async function startBridge(options: BridgeOptions = {}) {
           character: characterLabel(p.characterKey, ' - '),
         })),
         routines: routineStore.routines,
-        routineRuns: routineStore.runs.slice(-200),
+        routineRuns: routineStore.runs.filter((r) => r.status !== 'no_tip').slice(-200),
       };
     }
     const desktopServer = await startDesktopServer(
@@ -548,7 +548,7 @@ export async function startBridge(options: BridgeOptions = {}) {
           : [],
         routineRuns: state.currentCharacterKey
           ? routineStore.runs
-              .filter((r) => r.characterKey === state.currentCharacterKey)
+              .filter((r) => r.characterKey === state.currentCharacterKey && r.status !== 'no_tip')
               .slice(-50)
               .map(({ summary: _summary, ...r }) => r)
           : [],

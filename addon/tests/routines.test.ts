@@ -100,7 +100,6 @@ assert(result and result:IsShown())
 result.scripts.OnClick(result)
 assert(C.active == "run-one" and UI_TEST.sent.type == "select")
 local quiet = row("quiet")
-quiet.scripts.OnClick(quiet)
-assert(C.active == "run-one", "a silent run has history but no empty conversation")
+assert(not quiet, "silent runs must not appear in routine history")
 `);
 });

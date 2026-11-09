@@ -45,3 +45,23 @@ test('ordinary chats retain their initial user message', () => {
   state.activeChat = chat.id;
   expect(projectChats(state).chats[0].messages?.[0].text).toBe('Help me with my rotation.');
 });
+
+test('routine traffic cannot displace ordinary chats and silent runs stay hidden', () => {
+  const state = createSessionState();
+  const ordinary = newChat('ordinary', 'session', 1);
+  state.chats.push(ordinary);
+  for (let i = 0; i < 60; i++) {
+    const run = newChat('run-' + i, 'session', 100 + i);
+    run.routineId = 'review';
+    run.proactive = true;
+    run.status = 'done';
+    state.chats.push(run);
+    const quiet = { ...run, id: 'quiet-' + i, tipSkipped: true };
+    state.chats.push(quiet);
+  }
+  const chats = projectChats(state).chats;
+  expect(chats.some((c) => c.id === ordinary.id)).toBe(true);
+  expect(chats.filter((c) => c.routineId)).toHaveLength(40);
+  expect(chats.some((c) => c.id.startsWith('quiet-'))).toBe(false);
+  expect(state.chats).toHaveLength(121);
+});
