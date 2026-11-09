@@ -98,3 +98,16 @@ test('quoted tool output cannot load groups and non-interactive compaction retai
   delete options.tools;
   expect(compactModelContext(options)).toBe(options);
 });
+
+test('WoW chat reads are discoverable and load only on demand', () => {
+  expect(searchToolGroups('chat mensajes guild party susurros').enabledGroups).toContain('chat');
+  const options = fixture();
+  options.tools!.push({
+    type: 'function',
+    name: 'wow__read_chat',
+    inputSchema: { type: 'object' },
+  });
+  expect(compactModelContext(options).tools!.map((t) => t.name)).not.toContain('wow__read_chat');
+  options.prompt.push(result('wisp__load_tools', { enabledGroups: ['chat'] }));
+  expect(compactModelContext(options).tools!.map((t) => t.name)).toContain('wow__read_chat');
+});

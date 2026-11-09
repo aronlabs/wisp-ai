@@ -744,6 +744,9 @@ function inspectors.macros(args)
         characterLimit = characterLimit,
     }
 end
+inspectors.chat = function(args)
+    return C.ReadChatHistory(args)
+end
 function C.Inspect(inspection)
     if inspection and C.InspectIntegration then
         local result = C.InspectIntegration(inspection)

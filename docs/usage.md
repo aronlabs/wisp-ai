@@ -114,3 +114,9 @@ piggyback on the existing hello/heartbeat; unchanged reports do not publish new
 snapshots. Reports expire after three minutes and reset on reload. Availability is
 kept separate from saved choices. A compact `integrations_context` block tells the
 agent what is unavailable or disabled for the current turn.
+
+### Reading WoW chat
+
+In the in-game Wisp Settings, open **WoW chat history** to choose channels or clear the buffer. Say, yell, party, raid, instance and guild are enabled initially; whispers (incoming and outgoing), officer and public/custom channels are optional. Public/custom channels have individual checkboxes showing their current number and name (for example /1 General and /3 LookingForGroup). Select only the channels Wisp should capture. Selections follow names when numbers change, and new channels start disabled. The previous all-public-channels switch is replaced by these individual selections; reselect public channels after upgrading. Disabling a channel also removes its buffered messages.
+
+Wisp keeps up to 200 messages for 30 minutes in addon memory, starting at login or reload; the buffer is not saved across sessions. Ask “What did the party leader say?” or “Is anyone looking for a healer?” The agent can consult `wow__read_chat` on demand, filtering by channel type, public channel name, sender, text or recent time. Each read returns up to 50 matches. Messages are shared with the chat’s selected AI provider when consulted, rather than attached to every question. Clearing the buffer does not remove results already returned in a Wisp conversation. The tool can also be disabled under Integrations.

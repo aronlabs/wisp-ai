@@ -13,6 +13,7 @@ TransportMetrics.lua
 Downlink.lua
 Transport.lua
 Integrations.lua
+ChatHistory.lua
 Character.lua
 Locations.lua
 AddonAdapters.lua

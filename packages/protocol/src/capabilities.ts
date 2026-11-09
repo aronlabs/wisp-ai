@@ -120,6 +120,10 @@ export const toolDescriptions: Record<string, [string, string]> = {
     'Read active and completed quests, and your reputations.',
   ],
   inspect_target: ['Inspect target', 'Read the selected NPC or enemy.'],
+  read_chat: [
+    'Read WoW chat',
+    'Read recent messages from the game chat channels enabled in Wisp settings.',
+  ],
   inspect_trainer: ['Inspect trainer', 'Read offers from the trainer window currently open.'],
   compare_items: ['Compare equipment', 'Compare item stats with current equipment.'],
   query_resources: ['Read resources', 'Read money, bag contents, free space and skill ranks.'],

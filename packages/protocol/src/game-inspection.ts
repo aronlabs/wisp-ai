@@ -84,7 +84,32 @@ export const auctionInput = z.object({
   itemId: z.number().int().positive().optional(),
   limit: z.number().int().min(1).max(50).default(20),
 });
+export const chatHistoryInput = z.strictObject({
+  channels: z
+    .array(
+      z.enum([
+        'say',
+        'yell',
+        'party',
+        'raid',
+        'instance',
+        'guild',
+        'officer',
+        'whisper',
+        'channel',
+      ]),
+    )
+    .max(9)
+    .default([]),
+  limit: z.number().int().min(1).max(50).default(30),
+  lastSeconds: z.number().int().min(1).max(1800).default(1800),
+  sender: z.string().trim().min(1).max(120).optional(),
+  query: z.string().trim().min(1).max(200).optional(),
+  channelName: z.string().trim().min(1).max(120).optional(),
+  channelIndex: z.number().int().min(1).max(99).optional(),
+});
 export const inspectionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('chat'), args: chatHistoryInput }),
   z.object({ kind: z.literal('questie_quest'), args: questInput }),
   z.object({ kind: z.literal('questie_chain'), args: questChainInput }),
   z.object({ kind: z.literal('object_locations'), args: objectLocationsInput }),

@@ -14,6 +14,7 @@ export const toolGroupNames = [
   'locations',
   'inventory',
   'training',
+  'chat',
   'knowledge',
   'memory',
 ] as const;
@@ -40,6 +41,7 @@ const groupTools: Record<(typeof toolGroupNames)[number], string[]> = {
     'auctionator__get_item_prices',
   ],
   training: ['wow__inspect_trainer'],
+  chat: ['wow__read_chat'],
   knowledge: [
     'thewowdb__search_database',
     'thewowdb__get_database_entity',
@@ -69,6 +71,7 @@ const groupDescriptions: Record<(typeof toolGroupNames)[number], string> = {
     'map npc trainer coordinates city service waypoint transmog transmogrifier location travel mapa ubicacion ciudad coordenadas entrenador',
   inventory:
     'inventory items gear equipment bags bank auction prices resources money skills crafting inventario objetos equipo bolsas banco subasta precios dinero profesiones',
+  chat: 'chat messages said say yell party raid guild officer whisper public channel historial mensajes dijo dijeron grupo hermandad susurros',
   training: 'trainer training offers entrenador aprender entrenamiento',
   knowledge:
     'database catalog search knowledge web fetch url page read scrape wowhead everloot source spell item npc guide buscar leer pagina enlace base datos fuente guia hechizo',

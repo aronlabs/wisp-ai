@@ -1048,10 +1048,113 @@ function C.BuildUI()
     bindHint:SetPoint("TOPLEFT", 20, -190)
     bindHint:SetPoint("RIGHT", -20, 0)
     bindHint:SetWordWrap(true)
+    local chatSettings =
+        CreateFrame("Frame", "WispAIChatHistorySettings", settings, "BackdropTemplate")
+    chatSettings:SetAllPoints(settings)
+    chatSettings:SetFrameLevel(settings:GetFrameLevel() + 5)
+    box(chatSettings, { 0.10, 0.085, 0.065, 1 }, 12)
+    chatSettings:Hide()
+    local chatTitle = label(chatSettings, "WoW chat history", GOLD)
+    chatTitle:SetPoint("TOPLEFT", 20, -20)
+    local chatHint = label(
+        chatSettings,
+        "Up to 200 messages / 30 minutes, until logout or reload.\nEnabled channels are shared with your AI provider when consulted.",
+        MUTED
+    )
+    chatHint:SetPoint("TOPLEFT", 20, -50)
+    chatHint:SetPoint("RIGHT", -20, 0)
+    chatHint:SetWordWrap(true)
+    local chatScroll = CreateFrame("ScrollFrame", nil, chatSettings, "UIPanelScrollFrameTemplate")
+    chatScroll:SetPoint("TOPLEFT", 17, -100)
+    chatScroll:SetPoint("BOTTOMRIGHT", -35, 60)
+    local chatContent = CreateFrame("Frame", nil, chatScroll)
+    chatContent:SetSize(340, 325)
+    chatScroll:SetScrollChild(chatContent)
+    for index, channel in ipairs(C.ChatChannels or {}) do
+        local id = channel.id
+        local check = CreateFrame(
+            "CheckButton",
+            "WispAIChatChannel_" .. id,
+            chatContent,
+            "UICheckButtonTemplate"
+        )
+        check:SetPoint("TOPLEFT", 0, -(index - 1) * 35)
+        check:SetChecked(C.ChatChannelEnabled(id))
+        check:SetScript("OnClick", function(self)
+            C.SetChatChannel(id, self:GetChecked())
+        end)
+        local text = label(chatContent, channel.label)
+        text:SetPoint("LEFT", check, "RIGHT", 4, 0)
+    end
+    local publicTitle = label(chatContent, "Public / custom channels", GOLD)
+    local publicTop = #(C.ChatChannels or {}) * 35 + 10
+    publicTitle:SetPoint("TOPLEFT", 3, -publicTop)
+    local publicHint =
+        label(chatContent, "Choose individual channels. Selections follow the channel name.", MUTED)
+    publicHint:SetPoint("TOPLEFT", 3, -publicTop - 25)
+    publicHint:SetWidth(310)
+    publicHint:SetWordWrap(true)
+    local publicRows = {}
+    local publicEmpty = label(chatContent, "No public channels joined.", MUTED)
+    publicEmpty:SetPoint("TOPLEFT", 3, -publicTop - 70)
+    function C.RefreshChatChannelSettings()
+        local channels = C.PublicChatChannels and C.PublicChatChannels() or {}
+        for _, row in ipairs(publicRows) do
+            row.check:Hide()
+            row.text:Hide()
+        end
+        for index, channel in ipairs(channels) do
+            local row = publicRows[index]
+            if not row then
+                local check = CreateFrame(
+                    "CheckButton",
+                    "WispAIPublicChatChannel_" .. index,
+                    chatContent,
+                    "UICheckButtonTemplate"
+                )
+                local text = label(chatContent, "")
+                text:SetPoint("LEFT", check, "RIGHT", 4, 0)
+                text:SetWidth(285)
+                row = { check = check, text = text }
+                publicRows[index] = row
+                check:SetScript("OnClick", function(self)
+                    C.SetPublicChatChannel(self.channelName, self:GetChecked())
+                end)
+            end
+            row.check.channelName = channel.name
+            row.check:SetPoint("TOPLEFT", 0, -publicTop - 65 - (index - 1) * 35)
+            row.check:SetChecked(C.PublicChatChannelEnabled(channel.name))
+            row.text:SetText(
+                "/"
+                    .. channel.id
+                    .. " "
+                    .. channel.name
+                    .. (channel.disabled and " (unavailable here)" or "")
+            )
+            row.check:Show()
+            row.text:Show()
+        end
+        publicEmpty:SetShown(#channels == 0)
+        chatContent:SetHeight(publicTop + 75 + math.max(1, #channels) * 35)
+    end
+    chatSettings:SetScript("OnShow", C.RefreshChatChannelSettings)
+    C.RefreshChatChannelSettings()
+    local clearChat = button(chatSettings, "Clear history", 125, function()
+        C.ClearChatHistory()
+    end)
+    clearChat:SetPoint("BOTTOMLEFT", 20, 20)
+    local chatBack = button(chatSettings, "Back", 90, function()
+        chatSettings:Hide()
+    end)
+    chatBack:SetPoint("LEFT", clearChat, "RIGHT", 10, 0)
+    local chatButton = button(settings, "WoW chat history", 155, function()
+        chatSettings:Show()
+    end)
+    chatButton:SetPoint("TOPLEFT", 20, -230)
     local back = button(settings, "Back", 90, function()
         settings:Hide()
     end)
-    back:SetPoint("TOPLEFT", 20, -230)
+    back:SetPoint("LEFT", chatButton, "RIGHT", 10, 0)
     capabilityPanel = CreateFrame("Frame", "WispAICapabilitiesPanel", settings, "BackdropTemplate")
     capabilityPanel:SetAllPoints(settings)
     capabilityPanel:SetFrameLevel(settings:GetFrameLevel() + 5)
