@@ -552,6 +552,15 @@ assert(calls == 1 and SENT.type == "state_result" and SENT.data.status == "compl
 SNAPSHOT.rev = 2
 WispAI_Receive("")
 assert(calls == 1, "transport replay must never repeat a mutation")
+C.PerformAction = function()calls=calls+1;error('provider failed')end
+SNAPSHOT.rev=3
+SNAPSHOT.requests[1].id='action-2'
+WispAI_Receive("")
+assert(calls==2 and SENT.requestId=='action-2')
+assert(SENT.data.status=='unavailable' and SENT.data.error:find('provider failed',1,true))
+SNAPSHOT.rev=4
+WispAI_Receive("")
+assert(calls==2, 'failed actions must report errors without executing again')
 `,
   );
 });

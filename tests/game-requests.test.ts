@@ -44,3 +44,31 @@ test('timeout removes a request before a late game response can settle it', asyn
     vi.useRealTimers();
   }
 });
+
+test('lost reads recover with fresh IDs within the original deadline; actions never retry', async () => {
+  vi.useFakeTimers();
+  try {
+    const changed = vi.fn();
+    const requests = new GameRequests(changed);
+    const result = requests.request({ chat: 'chat', session: 'one', sections: ['character'] });
+    const [{ id: first }] = requests.snapshot();
+    await vi.advanceTimersByTimeAsync(10_000);
+    const [{ id: second }] = requests.snapshot();
+    expect(second).not.toBe(first);
+    expect(requests.receive(first, 'one', 'other', {})).toBe(false);
+    expect(requests.receive(first, 'one', 'chat', { xp: 100 })).toBe(true);
+    expect(requests.receive(second, 'one', 'chat', {})).toBe(false);
+    expect(await result).toEqual({ xp: 100 });
+    expect(vi.getTimerCount()).toBe(0);
+    const action = requests.request({ chat: 'chat', session: 'one', action: { kind: 'test' } });
+    const [{ id }] = requests.snapshot();
+    const rejected = expect(action).rejects.toThrow('did not respond');
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(requests.snapshot()[0].id).toBe(id);
+    await vi.advanceTimersByTimeAsync(1000);
+    await rejected;
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});

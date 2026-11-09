@@ -67,6 +67,38 @@ assert(failed.questRevision==nil and failed.sections.quests==nil, 'never reuse s
 `);
 });
 
+test('quest reward XP survives live reads and synchronized snapshots, including zero and unavailable values', () => {
+  vm().run(`
+local xp = 850
+C_QuestLog = {
+    GetNumQuestLogEntries=function()return 1 end,
+    GetInfo=function()return {questID=1492,title='Delivery',level=12}end,
+    IsComplete=function()return false end,
+    GetQuestObjectives=function()return {}end,
+}
+GetQuestLogRewardXP=function(id)assert(id==1492); return xp end
+C_EncodingUtil={SerializeJSON=function(data)return tostring(data.quests[1].rewardXP)end}
+assert(C.Capture({'quests'}).sections.quests.data.quests[1].rewardXP==850)
+local first=C.CaptureTurn()
+assert(first.sections.quests.data.quests[1].rewardXP==850)
+C.questAcknowledged=first.questRevision
+assert(C.CaptureTurn().sections.quests==nil)
+xp=0
+local changed=C.CaptureTurn()
+assert(changed.questRevision>first.questRevision)
+assert(changed.sections.quests.data.quests[1].rewardXP==0)
+for _, invalid in ipairs({-1, '850', math.huge, 0/0}) do
+    xp=invalid
+    assert(C.Capture({'quests'}).sections.quests.data.quests[1].rewardXP==nil)
+end
+GetQuestLogRewardXP=function()error('not ready')end
+assert(C.Capture({'quests'}).sections.quests.data.quests[1].rewardXP==nil)
+assert(C.CaptureTurn().sections.quests.data.quests[1].rewardXP==nil)
+GetQuestLogRewardXP=nil
+assert(C.Capture({'quests'}).sections.quests.data.quests[1].rewardXP==nil)
+`);
+});
+
 test('turn context sends only changed character identity and excludes unrelated live fields', () => {
   vm().run(`
 local level=13

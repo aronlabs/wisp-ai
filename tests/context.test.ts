@@ -48,7 +48,7 @@ test('quest revisions reuse only a validated summary for the same character and 
   const summary = {
     status: 'available',
     data: {
-      quests: [{ id: 1492, title: 'Ratchet', complete: true, objectives: [] }],
+      quests: [{ id: 1492, title: 'Ratchet', rewardXP: 850, complete: true, objectives: [] }],
       count: 1,
       truncated: false,
     },

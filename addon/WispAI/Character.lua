@@ -183,6 +183,16 @@ function collectors.talents()
             ),
     }
 end
+local function questRewardXP(id)
+    if not GetQuestLogRewardXP then
+        return nil
+    end
+    local ok, xp = pcall(GetQuestLogRewardXP, id)
+    if ok and type(xp) == "number" and xp >= 0 and xp < math.huge then
+        return xp
+    end
+end
+
 function collectors.quests()
     local out = {}
     for index = 1, C_QuestLog.GetNumQuestLogEntries() do
@@ -192,6 +202,7 @@ function collectors.quests()
                 id = info.questID,
                 title = info.title,
                 level = info.level,
+                rewardXP = questRewardXP(info.questID),
                 complete = C_QuestLog.IsComplete(info.questID),
                 objectives = C_QuestLog.GetQuestObjectives(info.questID) or {},
             })
@@ -307,6 +318,7 @@ function C.CaptureTurn()
             id = quest.id,
             title = quest.title,
             level = quest.level,
+            rewardXP = quest.rewardXP,
             complete = quest.complete,
             objectives = objectives,
         }
@@ -418,6 +430,7 @@ function inspectors.reference(args)
         title = title,
         status = title and "available" or "loading",
         inLog = index and index > 0 or false,
+        rewardXP = index and index > 0 and questRewardXP(args.id) or nil,
         logInfo = index and index > 0 and C_QuestLog.GetInfo(index) or nil,
         objectives = C_QuestLog.GetQuestObjectives and C_QuestLog.GetQuestObjectives(args.id),
         completed = C_QuestLog.IsQuestFlaggedCompleted

@@ -15,6 +15,7 @@ interface PendingRequest extends GameRequest {
 
 export class GameRequests {
   private pending = new Map<string, PendingRequest>();
+  private recoveryIds = new Map<string, string>();
   private changed: () => void;
   constructor(changed: () => void) {
     this.changed = changed;
@@ -24,15 +25,40 @@ export class GameRequests {
     if (signal?.aborted) {
       return Promise.reject(new Error('Game request cancelled'));
     }
-    const id = randomUUID();
+    let id = randomUUID();
+    const previousIds: string[] = [];
     return new Promise((resolve, reject) => {
       const finish = (operation: () => void) => {
+        for (const previous of previousIds) {
+          this.recoveryIds.delete(previous);
+        }
         this.pending.get(id)?.dispose();
         this.pending.delete(id);
         this.changed();
         operation();
       };
       const abort = () => finish(() => reject(new Error('Game request cancelled')));
+      // A lost read can be repeated safely. A fresh ID lets the addon's
+      // deduplication distinguish recovery from a retransmitted action.
+      let retries = 0;
+      const retry =
+        !input.action && (input.sections || input.inspection)
+          ? setInterval(() => {
+              const request = this.pending.get(id);
+              if (!request || retries >= 2) {
+                return;
+              }
+              this.pending.delete(id);
+              previousIds.push(id);
+              id = randomUUID();
+              for (const previous of previousIds) {
+                this.recoveryIds.set(previous, id);
+              }
+              retries++;
+              this.pending.set(id, request);
+              this.changed();
+            }, timeout / 3)
+          : undefined;
       const timer = setTimeout(
         () =>
           finish(() => reject(new Error('WoW did not respond in time. Open Wisp and try again.'))),
@@ -45,6 +71,7 @@ export class GameRequests {
         reject: (error) => finish(() => reject(error)),
         dispose: () => {
           clearTimeout(timer);
+          clearInterval(retry);
           signal?.removeEventListener('abort', abort);
         },
       });
@@ -52,7 +79,7 @@ export class GameRequests {
     });
   }
   receive(requestId: string, session: string, chat: string | undefined, value: unknown) {
-    const request = this.pending.get(requestId);
+    const request = this.pending.get(this.recoveryIds.get(requestId) || requestId);
     if (request?.session === session && request.chat === chat) {
       request.resolve(value);
       return true;

@@ -389,13 +389,17 @@ function C.ReceiveSnapshot(data)
     for _, request in ipairs(data.requests or {}) do
         if not C.requestsDone[request.id] then
             C.requestsDone[request.id] = true
-            local result
-            if request.action then
-                result = C.PerformAction and C.PerformAction(request.action)
-                    or { status = "unavailable", error = "Reload Wisp to enable actions" }
-            else
-                result = request.inspection and C.Inspect(request.inspection)
+            local ok, result = pcall(function()
+                if request.action then
+                    return C.PerformAction and C.PerformAction(request.action)
+                        or { status = "unavailable", error = "Reload Wisp to enable actions" }
+                end
+                return request.inspection and C.Inspect(request.inspection)
                     or C.Capture(request.sections)
+            end)
+            if not ok then
+                result =
+                    { status = "unavailable", error = "Game request failed: " .. tostring(result) }
             end
             C.Send({
                 type = "state_result",

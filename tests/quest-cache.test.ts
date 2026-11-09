@@ -12,7 +12,9 @@ test('state RPC serves quests locally, fetches only missing sections, and respec
       quests: {
         status: 'available',
         data: {
-          quests: [{ id: 1492, title: 'Cached delivery', objectives: [], complete: true }],
+          quests: [
+            { id: 1492, title: 'Cached delivery', rewardXP: 850, objectives: [], complete: true },
+          ],
           count: 1,
           truncated: false,
         },
@@ -54,11 +56,15 @@ test('state RPC serves quests locally, fetches only missing sections, and respec
   try {
     const quests = await read(['quests']);
     expect(quests.status).toBe(200);
-    expect(JSON.stringify(await quests.json())).toContain('Cached delivery');
+    expect((await quests.json()).sections.quests.data.quests[0]).toMatchObject({
+      title: 'Cached delivery',
+      rewardXP: 850,
+    });
     expect(request).not.toHaveBeenCalled();
     const mixed = await read(['quests', 'talents']);
     const result = await mixed.json();
     expect(result.sections.quests.data.quests[0].title).toBe('Cached delivery');
+    expect(result.sections.quests.data.quests[0].rewardXP).toBe(850);
     expect(result.sections.talents.data.unspentPoints).toBe(1);
     expect(request).toHaveBeenLastCalledWith(
       { chat: 'chat', session: 'addon', sections: ['talents'] },

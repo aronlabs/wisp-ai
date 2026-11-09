@@ -12,6 +12,7 @@ const questSummary = z.object({
           id: z.number().int().positive(),
           title: z.string().max(500),
           level: z.number().finite().optional(),
+          rewardXP: z.number().finite().nonnegative().optional(),
           complete: z.boolean().optional(),
           objectives: z
             .array(
