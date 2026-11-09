@@ -19,6 +19,8 @@ AddonAdapters.lua
 Settings.lua
 RichUI.lua
 Widgets.lua
+EmojiData.lua
+Emoji.lua
 MessageFormat.lua
 ModelControls.lua
 MessageRows.lua

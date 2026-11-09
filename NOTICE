@@ -7,6 +7,11 @@ Eve and its dependencies retain their own licenses. Packaged Windows builds
 include EVE-LICENSE.txt and EVE-NOTICE.txt; dependency licenses remain embedded
 with their packages in wisp-engine.exe (node_modules in development builds).
 
+Emoji artwork: Twemoji 17.0.3, copyright Twitter, Inc. and other contributors.
+https://github.com/jdecked/twemoji/tree/v17.0.3
+Graphics licensed under CC BY 4.0. Wisp resizes and packs the artwork into
+TGA atlases. See addon/WispAI/Textures/Emoji/LICENSE-GRAPHICS.txt.
+
 The local simulation engine is WoWSims Forever, using StewBagger's levelsim branch.
 Original project: https://github.com/wowsims/forever
 Level support: https://github.com/StewBagger/forever-levelsim/tree/levelsim

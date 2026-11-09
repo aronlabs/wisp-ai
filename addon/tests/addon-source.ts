@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs';
 export function addonSource(file: string): string {
   const dependencies =
     file === 'UI.lua'
-      ? ['Widgets.lua', 'MessageFormat.lua', 'ModelControls.lua', 'MessageRows.lua']
+      ? [
+          'Widgets.lua',
+          'EmojiData.lua',
+          'Emoji.lua',
+          'MessageFormat.lua',
+          'ModelControls.lua',
+          'MessageRows.lua',
+        ]
       : [];
   return (
     dependencies
