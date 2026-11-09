@@ -38,6 +38,7 @@
     "./snapshots": "./src/snapshots.ts",
     "./thewowdb": "./src/thewowdb.ts",
     "./transport": "./src/transport.ts",
+    "./public-web-search": "./src/public-web-search.ts",
     "./wowhead-search": "./src/wowhead-search.ts",
     "./runtime": "./src/runtime.ts",
     "./agent-server": "./src/agent-server.ts",

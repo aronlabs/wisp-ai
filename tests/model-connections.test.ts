@@ -245,7 +245,7 @@ test.each(providerDefinitions)(
           { type: 'function', name: 'check', inputSchema: { type: 'object', properties: {} } },
           {
             type: 'function',
-            name: 'wowhead__web_search',
+            name: 'web__web_search',
             inputSchema: { type: 'object', properties: {} },
           },
         ],
@@ -254,7 +254,7 @@ test.each(providerDefinitions)(
     ).rejects.toThrow('fixture stop');
     expect(upstream).toBeDefined();
     expect(JSON.stringify(upstream!.body)).toContain('roundtrip-marker');
-    expect(JSON.stringify(upstream!.body)).toContain('wowhead__web_search');
+    expect(JSON.stringify(upstream!.body)).toContain('web__web_search');
     const keyHeader = ['anthropic', 'minimax'].includes(definition.id)
       ? 'x-api-key'
       : definition.id === 'google'

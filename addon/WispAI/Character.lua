@@ -476,6 +476,9 @@ inspectionEvents:SetScript("OnEvent", function(_, event)
         auctionOpen = false
     end
 end)
+function inspectors.training(args)
+    return C.QueryTraining(args)
+end
 function inspectors.trainer()
     assert(
         trainerOpen or (ClassTrainerFrame and ClassTrainerFrame:IsShown()),
@@ -781,7 +784,8 @@ function C.Inspect(inspection)
     return {
         capturedAt = time(),
         character = UnitName("player"),
-        source = "WoW addon live API",
+        source = inspection.kind == "training" and "Bundled What's Training? Forever catalog"
+            or "WoW addon live API",
         status = ok and "available" or "unavailable",
         data = ok and data or nil,
         error = not ok and tostring(data) or nil,

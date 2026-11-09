@@ -395,6 +395,7 @@ export function createAgentHandler(deps: AgentDependencies) {
                 progression: 'query_progression',
                 target: 'inspect_target',
                 trainer: 'inspect_trainer',
+                training: 'query_training',
                 chat: 'read_chat',
                 resources: 'query_resources',
                 compare_items: 'compare_items',

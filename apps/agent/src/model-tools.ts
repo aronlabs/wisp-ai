@@ -40,12 +40,12 @@ const groupTools: Record<(typeof toolGroupNames)[number], string[]> = {
     'syndicator__find_item',
     'auctionator__get_item_prices',
   ],
-  training: ['wow__inspect_trainer'],
+  training: ['wow__query_training', 'wow__inspect_trainer'],
   chat: ['wow__read_chat'],
   knowledge: [
     'thewowdb__search_database',
     'thewowdb__get_database_entity',
-    'wowhead__web_search',
+    'web__web_search',
     'web_fetch',
     'eve__search',
     'eve__tool',
@@ -72,7 +72,8 @@ const groupDescriptions: Record<(typeof toolGroupNames)[number], string> = {
   inventory:
     'inventory items gear equipment bags bank auction prices resources money skills crafting inventario objetos equipo bolsas banco subasta precios dinero profesiones',
   chat: 'chat messages said say yell party raid guild officer whisper public channel historial mensajes dijo dijeron grupo hermandad susurros',
-  training: 'trainer training offers entrenador aprender entrenamiento',
+  training:
+    'trainer training offers skills abilities spells level catalog entrenador aprender entrenamiento habilidades hechizos nivel catalogo',
   knowledge:
     'database catalog search knowledge web fetch url page read scrape wowhead everloot source spell item npc guide buscar leer pagina enlace base datos fuente guia hechizo',
   memory: 'memory remember forget preference guide plan memoria recordar olvidar preferencias',
@@ -217,6 +218,7 @@ export function filterWebSearch(options: CallOptions, enabled: boolean): CallOpt
   const blocked = (options.tools || []).filter(
     (tool) =>
       tool.name === 'web_search' ||
+      tool.name === 'web__web_search' ||
       tool.name === 'wowhead__web_search' ||
       (tool.type !== 'function' && tool.id.startsWith('openai.web_search')),
   );

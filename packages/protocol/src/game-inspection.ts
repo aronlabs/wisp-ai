@@ -108,7 +108,31 @@ export const chatHistoryInput = z.strictObject({
   channelName: z.string().trim().min(1).max(120).optional(),
   channelIndex: z.number().int().min(1).max(99).optional(),
 });
+export const trainingInput = z
+  .object({
+    class: z
+      .enum([
+        'DRUID',
+        'HUNTER',
+        'MAGE',
+        'PALADIN',
+        'PRIEST',
+        'ROGUE',
+        'SHAMAN',
+        'WARLOCK',
+        'WARRIOR',
+      ])
+      .optional(),
+    query: z.string().trim().min(1).max(80).optional(),
+    spellId: z.number().int().positive().optional(),
+    minLevel: z.number().int().min(0).max(60).default(0),
+    maxLevel: z.number().int().min(0).max(60).default(60),
+    offset: z.number().int().min(0).max(5000).default(0),
+    limit: z.number().int().min(1).max(100).default(30),
+  })
+  .refine((input) => input.minLevel <= input.maxLevel, 'Invalid level range');
 export const inspectionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('training'), args: trainingInput }),
   z.object({ kind: z.literal('chat'), args: chatHistoryInput }),
   z.object({ kind: z.literal('questie_quest'), args: questInput }),
   z.object({ kind: z.literal('questie_chain'), args: questChainInput }),

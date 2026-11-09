@@ -104,10 +104,9 @@ test.each(['json', 'sse'])(
         params: {
           name: 'web_search_advanced_exa',
           arguments: {
-            query: 'World of Warcraft Forever: Frost Nova',
+            query: 'Frost Nova',
             type: 'auto',
             numResults: 5,
-            includeDomains: ['www.wowhead.com/forever/', 'wowhead.com/forever/'],
             textMaxCharacters: 4000,
           },
         },
@@ -141,7 +140,10 @@ test.each(['json', 'sse'])(
     expect(await f.search.search('Frost Nova', apiModel)).toMatchObject({
       status: 'available',
       provider: 'Exa',
-      sources: [{ url, excerpt: 'Public Forever excerpt' }],
+      sources: [
+        { url, excerpt: 'Public Forever excerpt' },
+        { url: 'https://www.wowhead.com/classic/spell=122', excerpt: 'Wrong version' },
+      ],
     });
     expect(f.auth.authorized).not.toHaveBeenCalled();
     await f.search.save({ provider: 'exa' });
@@ -170,7 +172,7 @@ test.each([
   expect(JSON.stringify(result)).not.toMatch(/secret upstream|Wrong response/);
 });
 
-test('Exa sends a bounded Forever-only request, rejects mixed-version URLs, and returns only attributable excerpts', async () => {
+test('Exa searches globally, retains version comparisons and bounds attributable excerpts', async () => {
   let request: Record<string, any> = {};
   const fetcher = vi.fn(async (endpoint: string | URL | Request, init?: RequestInit) => {
     expect(endpoint).toBe('https://api.exa.ai/search');
@@ -205,20 +207,18 @@ test('Exa sends a bounded Forever-only request, rejects mixed-version URLs, and 
   await f.search.save({ provider: 'auto', apiKey: 'exa-secret' });
   const result = await f.search.search('Frost Nova', apiModel);
   expect(request).toMatchObject({
-    query: 'World of Warcraft Forever: Frost Nova',
+    query: 'Frost Nova',
     type: 'auto',
     numResults: 5,
-    includeDomains: ['www.wowhead.com/forever/', 'wowhead.com/forever/'],
     contents: { text: { maxCharacters: 4000 } },
   });
   expect(request).not.toHaveProperty('summary');
-  expect(result).toMatchObject({ status: 'available', provider: 'Exa', version: 'forever' });
-  expect(result.sources).toHaveLength(2);
-  expect(result.sources[0]?.url).toBe(url);
-  expect(result.sources[0]?.excerpt?.length).toBe(4000);
-  expect(JSON.stringify(result)).not.toMatch(
-    /Wrong game version|External instructions|Generated summary|Mixed unverified|exa-secret/,
-  );
+  expect(result).toMatchObject({ status: 'available', provider: 'Exa', version: 'unspecified' });
+  expect(request).not.toHaveProperty('includeDomains');
+  expect(result.sources).toHaveLength(4);
+  expect(result.sources[1]?.url).toBe(url);
+  expect(result.sources[1]?.excerpt?.length).toBe(4000);
+  expect(JSON.stringify(result)).not.toMatch(/Generated summary|Mixed unverified|exa-secret/);
   expect(f.auth.authorized).not.toHaveBeenCalled();
 });
 
@@ -244,7 +244,7 @@ test('Auto preserves ChatGPT search, explicit Exa works for ChatGPT, and disable
 
 test.each([
   { results: [] },
-  { results: [{ url: 'https://www.wowhead.com/spell=122', text: 'Retail' }] },
+  { results: [{ url: 'http://localhost/private', text: 'Private source' }] },
   { results: [{ url, text: '' }] },
 ])(
   'empty, out-of-scope or unreadable results never become a factual answer',
@@ -345,13 +345,13 @@ test.each([true, false])(
             tools: [
               {
                 type: 'function',
-                name: 'wowhead__web_search',
+                name: 'web__web_search',
                 inputSchema: { type: 'object', properties: {} },
               },
             ],
           }),
         ).rejects.toThrow('Captured search tool');
-        expect(body.includes('wowhead__web_search')).toBe(available && enabled);
+        expect(body.includes('web__web_search')).toBe(available && enabled);
       }
     }
   },

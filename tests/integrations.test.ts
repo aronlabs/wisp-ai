@@ -96,7 +96,11 @@ test('every local tool belongs to core or one optional integration and exposes a
   const tools = catalog.filter((entry) => entry.id.startsWith('tool:'));
   assert.equal(new Set(tools.map((entry) => entry.toolName)).size, tools.length);
   for (const tool of tools) {
-    assert.match(tool.toolName!, /^[a-z]+__[a-z_]+$/);
+    if (tool.id === 'tool:web_fetch') {
+      assert.equal(tool.toolName, 'web_fetch');
+    } else {
+      assert.match(tool.toolName!, /^[a-z]+__[a-z_]+$/);
+    }
     assert.ok(catalog.some((entry) => entry.id === tool.parent && !entry.parent));
   }
 });

@@ -26,7 +26,9 @@
   <div class="section-title">
     <div>
       <h2>Web search</h2>
-      <p>Search Wowhead Forever independently of your chat model.</p>
+      <p>
+        Search globally across the public web, independently of your chat model.
+      </p>
     </div>
     <span class="badge" class:good={app.status?.search?.hasExaKey}
       >{app.status?.search?.hasExaKey
@@ -67,9 +69,9 @@
     />
     <p class="field-hint">
       Exa works without a key through its public MCP service, with free rate
-      limits. Only Forever source URLs and their excerpts are returned. An
-      optional key uses your Exa account and stays protected by the operating
-      system.
+      limits. Searches cover the public web and return source links and
+      excerpts. An optional key uses your Exa account and stays protected by the
+      operating system.
     </p>
     <p class="field-hint">
       A saved key uses your account credits and may incur Exa charges. Testing

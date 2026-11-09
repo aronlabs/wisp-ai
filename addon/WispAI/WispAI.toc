@@ -14,6 +14,8 @@ Downlink.lua
 Transport.lua
 Integrations.lua
 ChatHistory.lua
+TrainingData.lua
+Training.lua
 Character.lua
 Locations.lua
 AddonAdapters.lua

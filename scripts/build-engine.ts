@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, writeFile, rm, realpath } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -83,7 +83,9 @@ export async function buildEngine() {
       path.join(root, 'dist/wisp-engine.exe'),
     ],
     {
-      cwd: directory,
+      // pkg embeds absolute asset paths; use the physical directory when dist
+      // is a Windows junction so the entry point and assets share one root.
+      cwd: await realpath(directory),
       windowsHide: true,
       stdio: 'inherit',
     },

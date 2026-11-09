@@ -124,6 +124,10 @@ export const toolDescriptions: Record<string, [string, string]> = {
     'Read WoW chat',
     'Read recent messages from the game chat channels enabled in Wisp settings.',
   ],
+  query_training: [
+    'Ability catalog',
+    'Look up Forever class abilities, levels, base prices and requirements without visiting a trainer.',
+  ],
   inspect_trainer: ['Inspect trainer', 'Read offers from the trainer window currently open.'],
   compare_items: ['Compare equipment', 'Compare item stats with current equipment.'],
   query_resources: ['Read resources', 'Read money, bag contents, free space and skill ranks.'],
@@ -142,7 +146,10 @@ export const toolDescriptions: Record<string, [string, string]> = {
   ],
   clear_map_waypoint: ['Undo map marker', 'Remove Wisp’s marker and restore the prior pin.'],
   create_macro: ['Create macros', 'Create new macros outside combat. Existing macros are kept.'],
-  web_search: ['Wowhead Forever search', 'Search Wowhead Forever guides and reference pages.'],
+  web_search: [
+    'Web search',
+    'Search globally across the public web for guides, addon sources and reference information.',
+  ],
   web_fetch: ['Read web pages', 'Open a public HTTPS URL and read its content without a browser.'],
   set_conversation_title: ['Conversation titles', 'Name conversations based on what you discuss.'],
 };
@@ -167,10 +174,10 @@ export const coreCapabilities: Capability[] = [
 export const integrations: Capability[] = [
   {
     id: 'integration:web',
-    name: 'Web pages',
+    name: 'Web search and pages',
     group: 'integrations',
     kind: 'source',
-    description: 'Read public web pages by URL. No account or browser required.',
+    description: 'Search globally across the public web and read pages by URL.',
   },
   {
     id: 'integration:syndicator',
@@ -201,13 +208,6 @@ export const integrations: Capability[] = [
     description: 'Look up Forever items, spells, quests, NPCs and zones.',
   },
   {
-    id: 'integration:wowhead',
-    name: 'Wowhead',
-    group: 'integrations',
-    kind: 'source',
-    description: 'Search Wowhead guides and reference pages for Forever.',
-  },
-  {
     id: 'integration:wowsims',
     name: 'WoWSims Forever',
     group: 'integrations',
@@ -235,7 +235,7 @@ export function toolIntegration(name: string): string {
     return 'thewowdb';
   }
   if (name === 'web_search') {
-    return 'wowhead';
+    return 'web';
   }
   if (name === 'simulate_dps') {
     return 'wowsims';

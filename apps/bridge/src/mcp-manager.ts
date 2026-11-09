@@ -22,6 +22,7 @@ const name = z
         'questie',
         'thewowdb',
         'wowhead',
+        'web',
         'wowsims',
         'wisp',
         'constructor',

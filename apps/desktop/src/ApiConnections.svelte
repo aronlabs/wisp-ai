@@ -308,7 +308,7 @@
   {/if}
   <p class="privacy-note">
     API keys are protected by your operating system. Configure Exa under Web
-    search to use Wowhead with API models. Game tools and other enabled
+    search to use web search with API models. Game tools and other enabled
     databases work independently of the search service.
   </p>
 </section>
