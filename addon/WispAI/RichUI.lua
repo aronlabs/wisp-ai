@@ -316,12 +316,43 @@ function C.RenderRichUI(host, chat, message, width)
         return height
     end
     local y = 0
-    for _, node in ipairs(children._root or {}) do
+    host.prose = host.prose or {}
+    local proseCount = 0
+    local function root(node)
         local h = build(node, host, width, 0)
         local w = widgets[node.id]
         w:ClearAllPoints()
         w:SetPoint("TOPLEFT", 0, -y)
         y = y + h + 8
+    end
+    if message.parts and #message.parts > 0 and message.ui and #message.ui > 0 then
+        for _, part in ipairs(message.parts) do
+            if part.type == "ui" then
+                local node = nodes[part.id]
+                if node and not node.parent then
+                    root(node)
+                end
+            elseif part.type == "text" and part.text ~= "" then
+                proseCount = proseCount + 1
+                local f = host.prose[proseCount] or font(host)
+                host.prose[proseCount] = f
+                f:ClearAllPoints()
+                f:SetPoint("TOPLEFT", 0, -y)
+                f:SetWidth(width)
+                text(f, C.FormatText and C.FormatText(part.text, message.references) or part.text)
+                f:Show()
+                y = y + f:GetStringHeight() + 8
+            end
+        end
+    else
+        for _, node in ipairs(children._root or {}) do
+            root(node)
+        end
+    end
+    for index, f in ipairs(host.prose) do
+        if index > proseCount then
+            f:Hide()
+        end
     end
     for id, w in pairs(widgets) do
         if not used[id] and w:IsShown() then

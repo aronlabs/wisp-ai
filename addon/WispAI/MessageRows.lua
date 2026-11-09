@@ -269,7 +269,7 @@ function C.ChatSignature(chat)
         parts[#parts + 1] = (message.id or "")
             .. (message.text or "")
             .. (message.tool and message.tool.status or "")
-            .. (C.RichSignature and C.RichSignature(message.ui) or "")
+            .. (C.RichSignature and C.RichSignature({ message.ui, message.parts }) or "")
     end
     return table.concat(parts, "\31")
 end
@@ -303,7 +303,7 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
         .. "\31"
         .. referenceSignature(message.references)
         .. "\31"
-        .. (C.RichSignature and C.RichSignature(message.ui) or "")
+        .. (C.RichSignature and C.RichSignature({ message.ui, message.parts }) or "")
         .. "\31"
         .. (chat.status or "")
         .. "\31"
@@ -321,6 +321,7 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
         row.bubble:SetShown(message.role == "user")
         row.groupKey = message.groupKey
         row.disclosure:SetShown(message.groupKey ~= nil)
+        row.text:Show()
         row.text:ClearAllPoints()
         local top = message.role == "user" and padding or (showAuthor and 20 or 0)
         row.author:ClearAllPoints()
@@ -371,15 +372,24 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
                     row.text:SetWidth(width - padding * 2)
                 end
             end
+            local interleaved = message.parts
+                and #message.parts > 0
+                and message.ui
+                and #message.ui > 0
+            row.text:SetShown(not interleaved)
             row.height = top
-                + math.max(1, message.text ~= "" and row.text:GetStringHeight() or 0)
+                + math.max(
+                    1,
+                    not interleaved and message.text ~= "" and row.text:GetStringHeight() or 0
+                )
                 + (message.role == "user" and padding or 10)
             if C.RenderRichUI then
                 row.rich = row.rich or CreateFrame("Frame", nil, row)
                 row.rich:Show()
                 row.rich:ClearAllPoints()
-                row.rich:SetPoint("TOPLEFT", 0, -row.height)
-                row.height = row.height + C.RenderRichUI(row.rich, chat, message, width)
+                row.rich:SetPoint("TOPLEFT", padding, -(interleaved and top or row.height))
+                row.height = row.height
+                    + C.RenderRichUI(row.rich, chat, message, width - padding * 2)
             end
             if message.role ~= "user" then
                 row.height = row.height + 8

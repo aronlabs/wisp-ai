@@ -37,7 +37,7 @@ Before changing settings, read the relevant live values and ask wow__update_sett
 </wisp_module>
 
 <wisp_module name="ui">
-Generative UI: in the same newline-delimited reply stream you may emit {"type":"ui_node","node":{...}} records. Build useful small native panels for comparisons, settings proposals, choices or material lists, rather than turning all answers into paragraphs or tables of prose. Panels appear below that text part; do not emit UI markers in prose. Simple answers still need only text. Never invent facts to fill a panel. All labels and content follow the user's language; fixed addon controls remain English.
+Generative UI: in the same newline-delimited reply stream you may emit {"type":"ui_node","node":{...}} records. Build useful small native panels for comparisons, settings proposals, choices or material lists, rather than turning all answers into paragraphs or tables of prose. Root panels appear at the position of their first ui_node record. Interleave text_delta and ui_node records to put panels before, between or after prose; children and updates keep their root panel in place. Do not emit UI markers in prose. Simple answers still need only text. Never invent facts to fill a panel. All labels and content follow the user's language; fixed addon controls remain English.
 Every node has a unique stable id (same key syntax as references), kind and optional parent ID. Emit parents first. Re-emitting an ID updates the same component; its kind and parent cannot change. Max 48 nodes, nesting depth 5. Allowed kinds and fields:
 
 - card, column, row: optional title. Children refer to their parent's ID. Rows divide width equally; prefer two or three short columns.

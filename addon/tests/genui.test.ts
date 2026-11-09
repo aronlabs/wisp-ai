@@ -6,6 +6,57 @@ import { ReplyStream } from '@wisp/bridge/reply-stream';
 import { selectionValues } from '@wisp/protocol/ui-schema';
 const require = createRequire(import.meta.url);
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
+test('reply preserves text and UI order, including updates and pending prose', () => {
+  const r = new ReplyStream();
+  const emit = (event: unknown) => r.feed(JSON.stringify(event) + '\n');
+  emit({ type: 'ui_node', node: { id: 'first', kind: 'card' } });
+  emit({ type: 'text_delta', text: 'Between' });
+  emit({ type: 'ui_node', node: { id: 'second', kind: 'card' } });
+  emit({ type: 'ui_node', node: { id: 'child', parent: 'first', kind: 'text', text: 'Child' } });
+  emit({ type: 'ui_node', node: { id: 'first', kind: 'card', title: 'Updated' } });
+  r.feed('{"type":"text_delta","text":"After');
+  assert.deepEqual(r.view().parts, [
+    { type: 'ui', id: 'first' },
+    { type: 'text', text: 'Between' },
+    { type: 'ui', id: 'second' },
+    { type: 'text', text: 'After' },
+  ]);
+  r.feed('"}\n');
+  r.finish();
+  assert.equal(r.view().parts.length, 4);
+  assert.equal(r.view().text, 'BetweenAfter');
+});
+
+test('native layout places prose on both sides of a panel', () => {
+  const L = lauxlib.luaL_newstate();
+  lualib.luaL_openlibs(L);
+  const run = (source: string) => {
+    if (lauxlib.luaL_dostring(L, to_luastring(source)) !== lua.LUA_OK)
+      throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
+  };
+  run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
+  run('C = {}; host = CreateFrame("Frame")');
+  run(
+    `assert(load(${JSON.stringify(readFileSync('addon/WispAI/RichUI.lua', 'utf8'))}))('WispAI',C)`,
+  );
+  run(`
+local message = {
+    ui = { { id = "panel", kind = "card", title = "Panel" } },
+    parts = {
+        { type = "text", text = "Before" },
+        { type = "ui", id = "panel" },
+        { type = "text", text = "After" },
+    },
+}
+C.RenderRichUI(host, {}, message, 300)
+assert(host.prose[1].point[5] > host.widgets.panel.point[5])
+assert(host.widgets.panel.point[5] > host.prose[2].point[5])
+message.parts = nil
+C.RenderRichUI(host, {}, message, 300)
+assert(not host.prose[1]:IsShown() and not host.prose[2]:IsShown())
+assert(host.widgets.panel.point[5] == 0)
+`);
+});
 test('UI stream upserts stable components and rejects cycles, invalid inputs and executable actions', () => {
   const r = new ReplyStream();
   const node = (value: unknown) => r.feed(JSON.stringify({ type: 'ui_node', node: value }) + '\n');

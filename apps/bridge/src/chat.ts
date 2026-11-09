@@ -31,6 +31,14 @@ export const chatSchema = z.object({
       phase: z.string().optional(),
       references: z.record(z.string(), referenceSchema).optional(),
       ui: z.array(uiNode).optional(),
+      parts: z
+        .array(
+          z.discriminatedUnion('type', [
+            z.object({ type: z.literal('text'), text: z.string() }),
+            z.object({ type: z.literal('ui'), id: z.string() }),
+          ]),
+        )
+        .optional(),
       streaming: z.boolean().optional(),
     }),
   ),

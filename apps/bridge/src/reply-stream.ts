@@ -20,6 +20,7 @@ export class ReplyStream {
   text = '';
   references: ReferenceCatalog = Object.create(null);
   ui: UINode[] = [];
+  parts: ({ type: 'text'; text: string } | { type: 'ui'; id: string })[] = [];
   errors: string[] = [];
   finished = false;
   records = 0;
@@ -79,7 +80,11 @@ export class ReplyStream {
         typeof data.text === 'string' &&
         data.text.length <= 20000
       ) {
-        this.text = (this.text + data.text).slice(0, 20000);
+        const delta = data.text.slice(0, 20000 - this.text.length);
+        this.text += delta;
+        const last = this.parts.at(-1);
+        if (last?.type === 'text') last.text += delta;
+        else if (delta) this.parts.push({ type: 'text', text: delta });
         this.records++;
       } else if (data.type === 'reference') {
         const key = keySchema.parse(data.key),
@@ -125,6 +130,7 @@ export class ReplyStream {
         }
         if (index < 0) {
           this.ui.push(node);
+          if (!node.parent) this.parts.push({ type: 'ui', id: node.id });
         } else {
           this.ui[index] = node;
         }
@@ -201,22 +207,33 @@ export class ReplyStream {
     }
   }
   view() {
-    const text = outsideCode((this.text + this.pendingText()).slice(0, 20000), (prose) => {
-      let visible = prose.replace(/\[\[ref:([a-zA-Z][a-zA-Z0-9_-]{0,63})\]\]/g, (token, key) =>
-        this.references[key] ? token : this.finished ? '(reference unavailable)' : '...',
-      );
-      const start = visible.lastIndexOf('[[');
-      if (
-        start >= 0 &&
-        !visible.slice(start).includes(']]') &&
-        ('[[ref:'.startsWith(visible.slice(start)) || visible.slice(start).startsWith('[[ref:'))
-      ) {
-        visible = visible.slice(0, start);
-      }
-      return visible;
-    });
+    const renderText = (value: string) =>
+      outsideCode(value, (prose) => {
+        let visible = prose.replace(/\[\[ref:([a-zA-Z][a-zA-Z0-9_-]{0,63})\]\]/g, (token, key) =>
+          this.references[key] ? token : this.finished ? '(reference unavailable)' : '...',
+        );
+        const start = visible.lastIndexOf('[[');
+        if (
+          start >= 0 &&
+          !visible.slice(start).includes(']]') &&
+          ('[[ref:'.startsWith(visible.slice(start)) || visible.slice(start).startsWith('[[ref:'))
+        ) {
+          visible = visible.slice(0, start);
+        }
+        return visible;
+      });
+    const pending = this.pendingText().slice(0, 20000 - this.text.length);
+    const parts = this.parts.map((part) => ({ ...part }));
+    if (pending) {
+      const last = parts.at(-1);
+      if (last?.type === 'text') last.text += pending;
+      else parts.push({ type: 'text', text: pending });
+    }
     return {
-      text,
+      text: renderText(this.text + pending),
+      parts: parts.map((part) =>
+        part.type === 'text' ? { ...part, text: renderText(part.text) } : part,
+      ),
       references: { ...this.references },
       ui: this.ui.map((node) => ({ ...node })),
       streaming: !this.finished,
