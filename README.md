@@ -19,7 +19,7 @@ These are example prompts, not recorded results:
 
 ## Get started on Windows
 
-Download the [Windows x64 installer](https://github.com/fedeya/wisp-ai/releases/download/v0.0.2/WispAI-0.0.2-windows-x64-setup.exe) from [Releases](https://github.com/fedeya/wisp-ai/releases), or [build from source](docs/development.md#build-and-run-on-windows).
+Download the [Windows x64 installer](https://github.com/fedeya/wisp-ai/releases/download/v0.0.4/WispAI-0.0.4-windows-x64-setup.exe) from [Releases](https://github.com/fedeya/wisp-ai/releases), or [build from source](docs/development.md#build-and-run-on-windows).
 
 Once the desktop app is running:
 

@@ -185,11 +185,24 @@ test('the assembled runtime serves validated status, receives packets, persists 
     bridge.receive(
       packetSchema.parse({ type: 'new', session: 'test', chat: 'chat', seq: 2, at: 2 }),
     );
+    bridge.state.chats
+      .find((chat) => chat.id === 'chat')!
+      .messages.push({
+        role: 'user',
+        text: 'Hello',
+      });
+    bridge.receive(
+      packetSchema.parse({ type: 'new', session: 'test', chat: 'draft', seq: 3, at: 3 }),
+    );
     await bridge.stop();
     const saved = JSON.parse(
       await readFile(path.join(f.dataDirectory, 'runtime/chats.json'), 'utf8'),
     );
     expect(saved.map((chat: { id: string }) => chat.id)).toContain('chat');
+    expect(saved.find((chat: { id: string }) => chat.id === 'chat').messages).toEqual([
+      { role: 'user', text: 'Hello' },
+    ]);
+    expect(saved.map((chat: { id: string }) => chat.id)).not.toContain('draft');
     await vi.waitFor(() => expect(f.child()?.exitCode).not.toBeNull());
     await bridge.stop();
   } finally {
