@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { uiNode, validateNode, type UINode } from '@wisp/protocol/ui-schema';
 import { referenceSchema, type ReferenceCatalog } from '@wisp/protocol/rich-reference';
+import { conversationTitle } from './context.ts';
 const keySchema = z
   .string()
   .regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/)
@@ -23,6 +24,7 @@ export class ReplyStream {
   finished = false;
   records = 0;
   noTip = false;
+  title?: string;
   private error(reason: string) {
     if (this.errors.length < 8) {
       this.errors.push(reason);
@@ -92,6 +94,13 @@ export class ReplyStream {
           throw new Error('Reference key changed meaning');
         }
         this.references[key] = reference;
+        this.records++;
+      } else if (data.type === 'conversation_title') {
+        const title = conversationTitle(data.title);
+        if (!title) {
+          throw new Error('Invalid title');
+        }
+        this.title = title;
         this.records++;
       } else if (data.type === 'no_tip') {
         this.noTip = true;
@@ -231,6 +240,10 @@ export class ReplyProjection {
   }
   flush(
     chat: {
+      title?: string;
+      titleGenerated?: boolean;
+      proactive?: boolean;
+      inline?: boolean;
       messages: {
         id?: string;
         role: string;
@@ -247,10 +260,13 @@ export class ReplyProjection {
     let changed = false;
     for (const [partId, state] of this.streams) {
       const view = state.reply.view();
+      if (state.reply.title && !view.text && !view.ui.length && !state.reply.errors.length) {
+        continue;
+      }
       if (!view.text && !view.ui.length && !state.reply.finished) {
         continue;
       }
-      if (!force && !state.reply.finished && (state.updates >= 8 || now - state.lastAt < 1800)) {
+      if (!force && !state.reply.finished && (state.updates >= 8 || now - state.lastAt < 600)) {
         continue;
       }
       const signature = JSON.stringify(view);

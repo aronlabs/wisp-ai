@@ -51,7 +51,14 @@ const envelope = z.object({
 });
 export const packetSchema = z.discriminatedUnion('type', [
   envelope.extend({
-    type: z.enum(['hello', 'poll', 'model_catalog', 'capabilities_list', 'memory_list']),
+    type: z.enum([
+      'hello',
+      'poll',
+      'quest_sync',
+      'model_catalog',
+      'capabilities_list',
+      'memory_list',
+    ]),
   }),
   envelope.extend({
     type: z.enum(['new', 'select', 'delete', 'cancel', 'retry', 'dismiss_tip', 'promote_inline']),

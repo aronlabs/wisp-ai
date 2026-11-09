@@ -4,6 +4,7 @@ import { pipeline } from 'node:stream/promises';
 import { readCompletedResponse } from './response-stream.ts';
 import type { ChatGPTAuth } from './chatgpt-auth.ts';
 import type { ModelConnections } from './model-connections.ts';
+import { modelTiming } from './model-timing.ts';
 
 export async function proxyConnectionModel(
   req: IncomingMessage,
@@ -54,7 +55,12 @@ export async function proxyConnectionModel(
   }
   await pipeline(Readable.fromWeb(response.body as never), res);
 }
-export async function proxyModel(req: IncomingMessage, res: ServerResponse, auth: ChatGPTAuth) {
+export async function proxyModel(
+  req: IncomingMessage,
+  res: ServerResponse,
+  auth: ChatGPTAuth,
+  log?: (message: string) => void,
+) {
   const abort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
@@ -79,6 +85,7 @@ export async function proxyModel(req: IncomingMessage, res: ServerResponse, auth
   const streaming = body.stream === true;
   body.store = false;
   body.stream = true;
+  const started = performance.now();
   const response = await auth.authorized('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -100,5 +107,9 @@ export async function proxyModel(req: IncomingMessage, res: ServerResponse, auth
     res.end();
     return;
   }
-  await pipeline(Readable.fromWeb(response.body as never), res);
+  if (log) {
+    await pipeline(Readable.fromWeb(response.body as never), modelTiming(body, started, log), res);
+  } else {
+    await pipeline(Readable.fromWeb(response.body as never), res);
+  }
 }

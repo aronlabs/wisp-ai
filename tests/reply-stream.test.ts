@@ -113,6 +113,23 @@ test('hundreds of text deltas spend at most eight partial updates, recover compl
   assert.equal(c.messages[0].streaming, false);
   assert.ok(!JSON.stringify(c).includes('private'));
 });
+
+test('legacy reply title metadata stays invisible and cannot rename a conversation', () => {
+  const c = chat(),
+    projection = new ReplyProjection();
+  const stream = projection.stream('answer').reply;
+  stream.feed(record({ type: 'conversation_title', title: 'Next quest in Ratchet' }));
+  projection.flush(c, 0);
+  assert.notEqual(c.title, 'Next quest in Ratchet');
+  assert.notEqual(c.titleGenerated, true);
+  assert.equal(c.messages.length, 0);
+  stream.feed(text('Turn in your completed quest.'));
+  projection.flush(c, 1);
+  assert.equal(c.messages[0].text, 'Turn in your completed quest.');
+  stream.feed(record({ type: 'conversation_title', title: 'Do not overwrite' }));
+  projection.flush(c, 2000);
+  assert.notEqual(c.title, 'Next quest in Ratchet');
+});
 test('migration preserves user links and tools, converts verified references, and is idempotent', () => {
   const c = chat();
   c.messages = [

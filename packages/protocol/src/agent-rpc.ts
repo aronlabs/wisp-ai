@@ -34,7 +34,7 @@ export const memoryRequest = z.discriminatedUnion('operation', [
   }),
 ]);
 export const rpcRequests = {
-  state: z.object({ ...session, sections: characterSections }),
+  state: z.object({ ...session, sections: characterSections, refresh: z.boolean().optional() }),
   identity: z.object(session),
   title: z.object({ ...session, title: z.string().min(1).max(500) }),
   memory: memoryRequest,

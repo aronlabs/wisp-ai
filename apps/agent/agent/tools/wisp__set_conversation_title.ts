@@ -6,7 +6,7 @@ export default enabledTool(
   'set_conversation_title',
   defineTool({
     description:
-      "Sets a short, descriptive conversation title in the user's language. Call once when conversation_context.needsTitle is true. This updates sidebar metadata, not the chat reply.",
+      'Renames the conversation when the user explicitly asks for a new title. Initial titles are assigned by the app; do not call this for automatic naming.',
     inputSchema: z.object({
       title: z
         .string()

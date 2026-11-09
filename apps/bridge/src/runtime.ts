@@ -260,6 +260,11 @@ export async function startBridge(options: BridgeOptions = {}) {
       isStopping: () => shutdownRequested,
       accountBusy: () => accountBusy,
       isCurrent: (chat) => state.chats.includes(chat),
+      flushFirstText: () =>
+        queueMicrotask(() => {
+          dirty = true;
+          publishSnapshot();
+        }),
     });
     resources.defer(async () => {
       state.chats.forEach(run.interrupt);
@@ -291,6 +296,11 @@ export async function startBridge(options: BridgeOptions = {}) {
       setCapability,
       memorySnapshot,
       run,
+      flushAcknowledgment: () =>
+        queueMicrotask(() => {
+          dirty = true;
+          publishSnapshot();
+        }),
       interrupt: run.interrupt,
       runtime,
       changed,
@@ -302,6 +312,7 @@ export async function startBridge(options: BridgeOptions = {}) {
     resources.defer(() => transport.stop());
     const server = createServer(
       createAgentHandler({
+        log,
         token,
         auth,
         connections,
@@ -501,7 +512,7 @@ export async function startBridge(options: BridgeOptions = {}) {
       }
     }, 30000);
     resources.defer(() => clearInterval(integrationHealth));
-    const publish = setInterval(() => {
+    function publishSnapshot() {
       if (!dirty || !state.activeTransport) {
         return;
       }
@@ -523,6 +534,8 @@ export async function startBridge(options: BridgeOptions = {}) {
           error: state.modelCatalogError,
         },
         acks: state.acknowledgments,
+        questRevision: state.questRevision || 0,
+        characterRevision: state.characterRevision || 0,
         activeChat: state.activeChat,
         ...projectChats(state),
         panels: state.currentCharacterKey ? panelStore.list(state.currentCharacterKey) : [],
@@ -574,7 +587,8 @@ export async function startBridge(options: BridgeOptions = {}) {
           log('Failed to publish reply: ' + error.message);
         });
       }
-    }, 400);
+    }
+    const publish = setInterval(publishSnapshot, 400);
     log('Wisp started. WoW: ' + config.wow);
     resources.defer(() => clearInterval(publish));
     function stop() {

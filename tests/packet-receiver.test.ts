@@ -26,6 +26,7 @@ function fixture() {
   const interrupt = vi.fn();
   const run = vi.fn(async (..._args: unknown[]) => {});
   const models = vi.fn(async (): Promise<AccountModel[]> => []);
+  const flushAcknowledgment = vi.fn();
   const receive = createPacketReceiver({
     state,
     pending,
@@ -47,10 +48,79 @@ function fixture() {
     interrupt,
     runtime: 'unused',
     changed: () => {},
+    flushAcknowledgment,
     log: () => {},
   });
-  return { state, pending, receive, cancel, end, interrupt, run, models };
+  return { state, pending, receive, cancel, end, interrupt, run, models, flushAcknowledgment };
 }
+
+test('interactive receipt requests an immediate acknowledgement publish, including duplicate retries', () => {
+  const f = fixture();
+  const packet = packetSchema.parse({
+    type: 'say',
+    chat: 'old',
+    session: 'one',
+    seq: 11,
+    at: 1,
+    text: 'Hello',
+    messageId: 'message',
+  });
+  f.receive(packet);
+  f.receive(packet);
+  expect(f.flushAcknowledgment).toHaveBeenCalledTimes(2);
+  expect(f.state.acknowledgments).toContain(11);
+  expect(f.run).toHaveBeenCalledTimes(1);
+});
+
+test('quest sync primes turn context but a new addon session cannot reuse its revision', () => {
+  const f = fixture();
+  f.state.chats[0]!.status = 'done';
+  const character = { status: 'available', data: { name: 'Mage', realm: 'Realm' } };
+  const quests = {
+    status: 'available',
+    data: {
+      quests: [{ id: 1492, title: 'Delivery', objectives: [], complete: true }],
+      count: 1,
+      truncated: false,
+    },
+  };
+  f.receive(
+    packetSchema.parse({
+      type: 'quest_sync',
+      session: 'one',
+      seq: 10,
+      at: 1,
+      context: { questRevision: 1, sections: { character, quests } },
+    }),
+  );
+  f.receive(
+    packetSchema.parse({
+      type: 'say',
+      session: 'one',
+      seq: 11,
+      at: 2,
+      chat: 'old',
+      text: 'What next?',
+      context: { questRevision: 1, sections: { character } },
+    }),
+  );
+  expect(f.run.mock.calls.at(-1)?.[3]).toMatchObject({ sections: { quests } });
+  f.receive(packetSchema.parse({ type: 'hello', session: 'two', seq: 1, at: 3 }));
+  f.receive(
+    packetSchema.parse({
+      type: 'say',
+      session: 'two',
+      seq: 2,
+      at: 4,
+      chat: 'fresh',
+      text: 'What next?',
+      context: { questRevision: 1, sections: { character } },
+    }),
+  );
+  expect(f.run.mock.calls.at(-1)?.[3]).toMatchObject({ sections: { character } });
+  const context = f.run.mock.calls.at(-1)?.[3] as { sections: { quests?: unknown } } | undefined;
+  expect(context?.sections.quests).toBeUndefined();
+});
 
 test('changing native models resets provider history while preserving the visible chat', async () => {
   const f = fixture();

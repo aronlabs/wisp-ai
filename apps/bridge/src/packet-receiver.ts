@@ -5,6 +5,7 @@ import { selectionValues } from '@wisp/protocol/ui-schema';
 import { routineInput, routineEvent } from '@wisp/protocol/routines';
 import { safeErrorMessage } from '@wisp/protocol/model-errors';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { SessionState } from './session-state.ts';
@@ -18,7 +19,7 @@ import type { RoutineStore } from './routines.ts';
 import type { PanelStore } from './panels.ts';
 import type { MemoryStore } from './memory-store.ts';
 import type { MemoryView } from './agent-server.ts';
-import { characterIdentity } from './context.ts';
+import { characterIdentity, TurnContextCache } from './context.ts';
 import { chooseChatModel } from './chat-model.ts';
 import { parseConnectionModel } from '@wisp/protocol/providers';
 import { resumeChat } from './sessions.ts';
@@ -42,6 +43,7 @@ interface ReceiverDependencies {
   interrupt: (chat: Chat) => void;
   runtime: string;
   changed: () => void;
+  flushAcknowledgment?: () => void;
   log: (message: string) => void;
 }
 export function createPacketReceiver(deps: ReceiverDependencies) {
@@ -66,6 +68,8 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
     log,
   } = deps;
   const chatFor = (id: string | undefined) => state.chats.find((chat) => chat.id === id);
+  let contextCache = new TurnContextCache();
+  let lastDelivery = '';
   const createChat = (id: string) => {
     const chat = newChat(id, state.activeTransport);
     state.chats.push(chat);
@@ -80,6 +84,8 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
     const beforeIntegrations = JSON.stringify(capabilitySettings.snapshot());
     const newTransport = establishesSession && state.activeTransport !== packet.session;
     if (newTransport) {
+      contextCache = new TurnContextCache();
+      lastDelivery = '';
       pending.cancelAll('The addon reloaded or the character changed. Query again.');
       for (const chat of state.chats.filter(
         (chat) => chat.owner === state.activeTransport && isWorking(chat),
@@ -108,6 +114,9 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
       transport().resetSession();
       void refreshModelCatalog();
     }
+    packet.context = contextCache.resolve(packet.context);
+    state.questRevision = contextCache.revision;
+    state.characterRevision = contextCache.characterRevision;
     if (
       packet.type !== 'poll' &&
       !packet.heartbeat &&
@@ -115,6 +124,9 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
     ) {
       state.acknowledgments.push(packet.seq);
       state.acknowledgments = state.acknowledgments.slice(-32);
+    }
+    if (packet.messageId) {
+      deps.flushAcknowledgment?.();
     }
     if (
       Number.isSafeInteger(packet.nextSlot) &&
@@ -141,6 +153,11 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
       return;
     }
     state.handled.add(packetKey);
+    const delivery = packet.transport?.delivery;
+    if (delivery && delivery.messageId !== lastDelivery) {
+      lastDelivery = delivery.messageId;
+      log('Message delivery: ' + JSON.stringify(delivery));
+    }
     if (packet.type === 'model_catalog') {
       void refreshModelCatalog();
       return;
@@ -203,6 +220,21 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
     }
     if (packet.type === 'inline_status') {
       const data = packet.data;
+      if (data?.event === 'first_text') {
+        const timing = z
+          .object({
+            event: z.literal('first_text'),
+            messageId: z.string().min(1).max(200),
+            totalMs: z.number().finite().nonnegative(),
+            afterSendingMs: z.number().finite().nonnegative().optional(),
+          })
+          .safeParse(data);
+        if (timing.success) {
+          log('First text in WoW: ' + JSON.stringify({ ...timing.data, chat: packet.chat }));
+        }
+        changed();
+        return;
+      }
       const status = {
         at: Date.now(),
         event: String(data?.event ?? '').slice(0, 40),

@@ -2,6 +2,7 @@ import { test, expect, vi } from 'vitest';
 import type { Client } from 'eve/client';
 import { createTurnRunner } from '@wisp/bridge/turn-runner';
 import { newChat } from '@wisp/bridge/chat-lifecycle';
+import { queryCharacterSections } from '@wisp/bridge/context';
 
 function fixture() {
   const chat = newChat('chat', 'one');
@@ -22,6 +23,7 @@ function fixture() {
   } as unknown as Pick<Client, 'sessions'>;
   const models = vi.fn(async () => [{ slug: 'model', displayName: 'Model', efforts: ['medium'] }]);
   const log = vi.fn();
+  const flushFirstText = vi.fn();
   const run = createTurnRunner({
     client,
     models: { models, prepare: async () => {} },
@@ -35,6 +37,7 @@ function fixture() {
     isCurrent: () => current,
     changed: () => {},
     log,
+    flushFirstText,
   });
   return {
     chat,
@@ -43,6 +46,7 @@ function fixture() {
     client,
     models,
     log,
+    flushFirstText,
     changeCharacter: () => {
       transport = 'two';
     },
@@ -63,7 +67,67 @@ test('a complete turn projects streamed content and settles once', async () => {
       .join(''),
   ).toBe('Hello');
   expect(f.send).toHaveBeenCalledTimes(1);
+  expect(f.flushFirstText).toHaveBeenCalledTimes(1);
+  const timing = JSON.parse(
+    String(f.log.mock.calls.find(([line]) => line.startsWith('Turn timing: '))?.[0]).slice(
+      'Turn timing: '.length,
+    ),
+  );
+  expect(timing.firstTextMs).toBeGreaterThanOrEqual(0);
   await f.run.drain();
+});
+
+test('old assistant messages cannot count as the first text of a new turn', async () => {
+  const f = fixture();
+  f.chat.messages.push({ role: 'assistant', text: 'Previous answer' });
+  f.send.mockImplementationOnce(async () => ({
+    stream: async function* () {
+      yield {
+        type: 'call.requested',
+        data: {
+          callId: 'call',
+          capability: { name: 'wow__query_character', kind: 'tool', label: 'Reading quests' },
+        },
+      };
+      yield { type: 'call.settled', data: { callId: 'call', outcome: 'completed' } };
+    },
+    result: async () => ({ status: 'completed', sessionEnded: false }),
+  }));
+  await f.run(f.chat, 'Next question');
+  const timing = JSON.parse(
+    String(f.log.mock.calls.find(([line]) => line.startsWith('Turn timing: '))?.[0]).slice(
+      'Turn timing: '.length,
+    ),
+  );
+  expect(timing).not.toHaveProperty('firstTextMs');
+});
+
+test('a turn keeps its quest reading available to tools without inserting it into model input', async () => {
+  const f = fixture();
+  const context = {
+    capturedAt: 123,
+    sections: {
+      character: { status: 'available', data: { name: 'Mage', realm: 'Realm' } },
+      quests: {
+        status: 'available',
+        data: {
+          quests: [{ id: 1492, title: 'Private delivery', objectives: [], complete: true }],
+          count: 1,
+          truncated: false,
+        },
+      },
+    },
+  };
+  await f.run(f.chat, 'What next?', 'message', context);
+  expect(f.send.mock.calls[0]?.[0]).not.toContain('Private delivery');
+  const live = vi.fn(async () => ({ sections: {} }));
+  expect(JSON.stringify(await queryCharacterSections(f.chat, ['quests'], live))).toContain(
+    'Private delivery',
+  );
+  expect(live).not.toHaveBeenCalled();
+  await f.run(f.chat, 'Another question', 'message2', undefined);
+  await queryCharacterSections(f.chat, ['quests'], live);
+  expect(live).toHaveBeenCalledTimes(1);
 });
 
 test.each(['character', 'delete'] as const)(
@@ -137,4 +201,26 @@ test('a follow-up after failure includes the failed question in restored history
   await f.run(f.chat, 'Explain that quest', 'failed');
   await f.run(f.chat, 'Try that again', 'follow-up');
   expect(f.send.mock.calls.at(-1)![0]).toContain('Explain that quest');
+});
+
+test('names the chat immediately before model preparation and keeps explicit names', async () => {
+  const f = fixture();
+  const pending = f.run(f.chat, '  Ruta\n por Durotar  ');
+  expect(f.chat.title).toBe('Ruta por Durotar');
+  expect(f.chat.titleGenerated).toBe(true);
+  expect(f.send).not.toHaveBeenCalled();
+  await pending;
+  expect(f.send.mock.calls[0][0]).not.toContain('needsTitle');
+  f.chat.title = 'Mi ruta';
+  await f.run(f.chat, 'Otra pregunta');
+  expect(f.chat.title).toBe('Mi ruta');
+});
+
+test('does not automatically name inline or proactive conversations', async () => {
+  for (const kind of ['inline', 'proactive'] as const) {
+    const f = fixture();
+    f.chat[kind] = true;
+    await f.run(f.chat, 'A different title');
+    expect(f.chat.title).toBe('New conversation');
+  }
 });

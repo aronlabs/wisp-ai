@@ -76,6 +76,26 @@ function C.ReadQuestieQuest(args)
                     out[key] = copy(child, depth + 1)
                 end
             end
+            -- Questie tuples can omit positional groups (for example an item
+            -- objective at index 3 without creature/object groups). WoW JSON
+            -- rejects sparse/mixed tables. Keep dense arrays as arrays, and
+            -- preserve sparse positions as explicit JSON object keys.
+            local size, highest, array = 0, 0, true
+            for key in pairs(out) do
+                size = size + 1
+                if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then
+                    array = false
+                else
+                    highest = math.max(highest, key)
+                end
+            end
+            if not array or highest ~= size then
+                local object = {}
+                for key, child in pairs(out) do
+                    object[tostring(key)] = child
+                end
+                return object
+            end
             return out
         elseif value ~= nil then
             truncated = true

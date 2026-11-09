@@ -10,11 +10,12 @@ import { defaultCapabilities } from '@wisp/protocol/capabilities';
 import { newChat } from '@wisp/bridge/chat-lifecycle';
 import { applyEvent } from '@wisp/bridge/events';
 import { ReplyProjection } from '@wisp/bridge/reply-stream';
+import { turnInput } from '@wisp/bridge/context';
 
-test.each([false, true])(
-  'the real Eve agent completes an offline streamed turn (tool call: %s)',
-  { timeout: 60_000 },
-  async (toolCall) => {
+test(
+  'the real Eve agent and AI SDK middleware complete an offline streamed turn',
+  { timeout: 100_000 },
+  async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'wisp-agent-integration-'));
     const engine = path.join(root, 'engine');
     const flags = path.join(root, 'capabilities.json');
@@ -32,19 +33,18 @@ test.each([false, true])(
     await writeFile(
       flags,
       JSON.stringify({
-        enabled: Object.fromEntries(
-          defaultCapabilities().map((capability) => [
-            capability.id,
-            toolCall && capability.id === 'tool:manage_panel',
-          ]),
-        ),
+        enabled: {
+          ...Object.fromEntries(defaultCapabilities().map((capability) => [capability.id, false])),
+          'tool:get_settings': true,
+        },
       }),
     );
     await writeFile(path.join(root, 'mcp.json'), '{"servers":{}}');
     const requests: Record<string, unknown>[] = [];
     const toolCalls: unknown[] = [];
     const trace: unknown[] = [];
-    const text = '{"type":"text_delta","text":"Offline integration passed."}\n';
+    const text =
+      '{"type":"text_delta","text":"Offline integration passed."}\n{"type":"conversation_title","title":"Quest in Ratchet"}\n';
     const model = createServer(async (req, res) => {
       if (req.url?.startsWith('/session-model?')) {
         res.writeHead(200, { 'content-type': 'application/json' }).end(
@@ -72,45 +72,41 @@ test.each([false, true])(
         return;
       }
       requests.push(JSON.parse(body));
-      if (toolCall && requests.length === 1) {
-        const tools = requests[0].tools as { name?: string }[];
-        const name = tools.find((tool) => tool.name?.includes('manage_panel'))?.name;
-        if (!name) {
-          res.writeHead(500).end(JSON.stringify({ error: 'Missing panel tool', tools }));
-          return;
-        }
-        const args = JSON.stringify({ operation: 'list' });
+      if (requests.length === 2) {
         const item = {
+          id: 'search-item',
           type: 'function_call',
-          id: 'offline-tool',
-          call_id: 'offline-call',
-          name,
-          arguments: args,
-          status: 'completed',
+          call_id: 'search-call',
+          name: 'wisp__search_tools',
+          arguments: JSON.stringify({ query: 'graphics settings' }),
         };
         const events = [
           {
             type: 'response.created',
-            response: { id: 'offline-response', model: 'offline-test', created_at: 1 },
+            response: { id: 'search-response', model: 'offline-test', created_at: 1 },
           },
           { type: 'response.output_item.added', output_index: 0, item: { ...item, arguments: '' } },
           {
             type: 'response.function_call_arguments.delta',
             item_id: item.id,
             output_index: 0,
-            delta: args,
+            delta: item.arguments,
           },
           {
             type: 'response.function_call_arguments.done',
             item_id: item.id,
             output_index: 0,
-            arguments: args,
+            arguments: item.arguments,
           },
-          { type: 'response.output_item.done', output_index: 0, item },
+          {
+            type: 'response.output_item.done',
+            output_index: 0,
+            item: { ...item, status: 'completed' },
+          },
           {
             type: 'response.completed',
             response: {
-              id: 'offline-response',
+              id: 'search-response',
               model: 'offline-test',
               created_at: 1,
               output: [item],
@@ -120,7 +116,7 @@ test.each([false, true])(
         ];
         res
           .writeHead(200, { 'content-type': 'text/event-stream' })
-          .end(events.map((event) => 'data: ' + JSON.stringify(event) + '\n\n').join(''));
+          .end(events.map((e) => 'data: ' + JSON.stringify(e) + '\n\n').join(''));
         return;
       }
       const events = [
@@ -211,18 +207,34 @@ test.each([false, true])(
       auth: { bearer: () => 'offline-token' },
     });
     try {
-      await vi.waitFor(() => client.health(), { timeout: 40_000, interval: 200 });
-      expect(JSON.stringify(await client.info())).toContain('manage_panel');
+      await vi.waitFor(() => client.health(), { timeout: 75_000, interval: 200 });
       if (executable) {
         await expect(
           new Client({ baseUrl: 'http://127.0.0.1:' + port }).info(),
         ).rejects.toMatchObject({ status: 401 });
       }
       const session = (await client.sessions.create()).session;
-      const delivery = await session.send('Reply with the supplied offline text.', {
+      const chat = newChat('offline', 'test');
+      const input = turnInput(
+        'What quest should I do next?',
+        {
+          capturedAt: 100,
+          sections: {
+            quests: {
+              status: 'available',
+              data: {
+                quests: [{ id: 1492, title: 'Ratchet delivery', complete: true, objectives: [] }],
+                count: 1,
+                truncated: false,
+              },
+            },
+          },
+        },
+        chat,
+      );
+      const delivery = await session.send(input, {
         signal: AbortSignal.timeout(15000),
       });
-      const chat = newChat('offline', 'test');
       const projection = new ReplyProjection();
       for await (const event of delivery.stream({ signal: AbortSignal.timeout(15000) })) {
         if (event.type.startsWith('content.')) {
@@ -233,15 +245,30 @@ test.each([false, true])(
       projection.flush(chat, Date.now(), true);
       expect((await delivery.result()).status).toBe('completed');
       expect(chat.messages.map((message) => message.text)).toContain('Offline integration passed.');
-      expect(requests.length).toBeGreaterThan(0);
-      if (toolCall) {
-        expect(toolCalls).toHaveLength(1);
-        expect(toolCalls[0]).toMatchObject({ input: { operation: 'list' } });
-        expect(requests.length).toBeGreaterThan(1);
-      }
+      expect(requests.length).toBe(1);
+      expect(chat.title).toBe('New conversation');
+      expect(chat.titleGenerated).not.toBe(true);
+      expect(JSON.stringify(requests[0])).not.toContain('Ratchet delivery');
+      expect(JSON.stringify(requests[0])).not.toContain('<wisp_module');
+      expect(JSON.stringify(requests[0])).not.toContain('Allowed kinds and fields');
       expect(
         requests.every((request) => request.store === false && !('safety_identifier' in request)),
       ).toBe(true);
+      const next = await session.send(
+        turnInput('Search settings tools', undefined, { ...chat, titleGenerated: true }),
+        { signal: AbortSignal.timeout(15000) },
+      );
+      for await (const _event of next.stream({ signal: AbortSignal.timeout(15000) })) {
+        /* Drain the real tool loop. */
+      }
+      expect((await next.result()).status).toBe('completed');
+      expect(requests).toHaveLength(3);
+      const names = (i: number) =>
+        (requests[i]!.tools as { name: string }[]).map((tool) => tool.name);
+      expect(names(1)).not.toContain('wow__get_settings');
+      expect(names(2)).toContain('wow__get_settings');
+      expect(names(2)).not.toContain('wow__update_settings');
+      expect(JSON.stringify(requests[2])).toContain('Settings capabilities:');
       if (executable) {
         await stopEveProcess(child);
         child = start();

@@ -3,7 +3,7 @@ import { applyEvent, type Chat } from './events.ts';
 import { ReplyProjection } from './reply-stream.ts';
 import { sendChatTurn } from './agent-session.ts';
 import { beginTurn, settleTurn } from './chat-lifecycle.ts';
-import { turnInput, characterIdentity } from './context.ts';
+import { turnInput, characterIdentity, rememberTurnQuests, conversationTitle } from './context.ts';
 import { chooseChatModel } from './chat-model.ts';
 import { safeErrorMessage } from '@wisp/protocol/model-errors';
 import type { CapabilitySettings } from './capabilities.ts';
@@ -22,6 +22,7 @@ interface TurnDependencies {
   isCurrent: (chat: Chat) => boolean;
   changed: () => void;
   log: (message: string) => void;
+  flushFirstText?: () => void;
 }
 export function createTurnRunner(deps: TurnDependencies) {
   const {
@@ -46,12 +47,30 @@ export function createTurnRunner(deps: TurnDependencies) {
       return;
     }
     const controller = new AbortController();
+    const started = performance.now();
+    let preparedMs: number | undefined;
+    let admittedMs: number | undefined;
+    let firstTextMs: number | undefined;
     controllers.set(chat, controller);
     const generation = Symbol();
     generations.set(chat, generation);
     const ownsTurn = () => generations.get(chat) === generation;
     const owner = currentTransport();
     beginTurn(chat, owner, characterIdentity(context), text, messageId);
+    if (
+      !chat.titleGenerated &&
+      !chat.proactive &&
+      !chat.inline &&
+      capabilitySettings.enabled('tool:set_conversation_title')
+    ) {
+      // Name the chat before any model preparation or network request.
+      const title = conversationTitle(text);
+      if (title) {
+        chat.title = title;
+        chat.titleGenerated = true;
+      }
+    }
+    rememberTurnQuests(chat, context);
     const assertCurrent = () => {
       controller.signal.throwIfAborted();
       if (!ownsTurn() || !isCurrent(chat) || currentTransport() !== owner) {
@@ -89,29 +108,26 @@ export function createTurnRunner(deps: TurnDependencies) {
         chat.modelSettings?.effort,
       );
       assertCurrent();
+      preparedMs = Math.round(performance.now() - started);
       const response = await sendChatTurn(
         client,
         chat,
-        turnInput(
-          text,
-          context,
-          {
-            ...chat,
-            titleGenerated:
-              chat.proactive ||
-              chat.inline ||
-              chat.titleGenerated ||
-              !capabilitySettings.enabled('tool:set_conversation_title'),
-          },
-          capabilitySettings.snapshot(),
-        ),
+        turnInput(text, context, chat, capabilitySettings.snapshot()),
         controller.signal,
       );
       assertCurrent();
+      admittedMs = Math.round(performance.now() - started);
       changed();
       for await (const event of response.stream({ signal: controller.signal })) {
         assertCurrent();
         if (applyEvent(chat, event, parts) && !chat.proactive) {
+          if (
+            firstTextMs === undefined &&
+            [...parts.streams.values()].some((state) => state.reply.view().text)
+          ) {
+            firstTextMs = Math.round(performance.now() - started);
+            deps.flushFirstText?.();
+          }
           chat.lastActivityAt = Date.now();
           changed();
         }
@@ -164,6 +180,17 @@ export function createTurnRunner(deps: TurnDependencies) {
           safeErrorMessage(error instanceof Error ? error.message : String(error)),
       );
     } finally {
+      log(
+        'Turn timing: ' +
+          JSON.stringify({
+            chat: chat.id,
+            messageId,
+            preparedMs,
+            admittedMs,
+            firstTextMs,
+            totalMs: Math.round(performance.now() - started),
+          }),
+      );
       clearInterval(streaming);
       if (ownsTurn()) {
         chat.lastActivityAt = Date.now();

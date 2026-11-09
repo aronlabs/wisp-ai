@@ -204,7 +204,7 @@ local function refreshProgress()
             or string.format("%dm %02ds", math.floor(seconds / 60), seconds % 60)
         local sending = false
         for _, pending in pairs(C.pendingMessages or {}) do
-            if pending.chat == chat.id then
+            if pending.chat == chat.id and not pending.acknowledged then
                 sending = true
                 break
             end
@@ -336,6 +336,9 @@ local function renderTranscript(chat)
             C.PositionMessageRow(row, content, y, width)
             if not row:IsShown() then
                 row:Show()
+            end
+            if C.RecordFirstText then
+                C.RecordFirstText(chat, message, row)
             end
             y = y + row.height
         end
