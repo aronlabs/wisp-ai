@@ -14,6 +14,27 @@ const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
 
 // Both session rejection and bulk-read outcome reporting come from production
 // Core; the checked control, native bit mapping and startup gates use Transport.
+test('switching away or starting another chat discards unused conversations', () => {
+  const { run } = reloadHarness();
+  run(`
+    C.Send=function()end;C.Refresh=function()end
+    C.chats={{id='saved',title='Saved',messages={{role='user',text='Hello'}},status='done'}}
+    C.active='saved'
+    C.NewChat()
+    local draft=C.active
+    assert(#C.chats==2)
+    C.Select('saved')
+    assert(#C.chats==1 and C.chats[1].id=='saved')
+    assert(C.pendingChats[draft]==nil)
+    C.NewChat()
+    C.NewChat()
+    assert(#C.chats==2)
+    C.Current().messages={{role='user',text='Keep me'}}
+    C.Select('saved')
+    assert(#C.chats==2)
+  `);
+});
+
 function reloadHarness() {
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);

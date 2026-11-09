@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { chatSchema, type Chat } from './chat.ts';
-import { isAutomaticEmptyChat } from './sessions.ts';
+import { isAutomaticEmptyChat, isEmptyDraft } from './sessions.ts';
 import { readJson, writeJson } from './json-file.ts';
 
 export class ChatStore {
@@ -22,7 +22,7 @@ export class ChatStore {
     }
     this.writable = true;
     return chats
-      .filter((chat) => !isAutomaticEmptyChat(chat))
+      .filter((chat) => !isEmptyDraft(chat))
       .map((chat) => ({
         ...chat,
         lastActivityAt: chat.lastActivityAt ?? chat.lastUsedAt ?? 0,
@@ -47,7 +47,7 @@ export class ChatStore {
     }
     clearTimeout(this.timer);
     this.timer = undefined;
-    const content = JSON.stringify(chats);
+    const content = JSON.stringify(chats.filter((chat) => !isEmptyDraft(chat)));
     const work = this.queue
       .catch(() => {})
       .then(async () => {

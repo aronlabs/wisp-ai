@@ -84,7 +84,23 @@ local function activityTime()
     end
     return latest
 end
+local function discardEmptyDraft()
+    local chat = C.Current()
+    if
+        chat
+        and chat.title == "New conversation"
+        and chat.status == "idle"
+        and #(chat.messages or {}) == 0
+        and #(chat.activity or {}) == 0
+        and not chat.routineId
+        and not chat.inline
+        and not chat.proactive
+    then
+        C.DeleteChat(chat.id)
+    end
+end
 function C.NewChat()
+    discardEmptyDraft()
     C.chatCounter = (C.chatCounter or 0) + 1
     C.active = C.session .. "-chat-" .. C.chatCounter
     C.db.activeChat = C.active
@@ -113,6 +129,9 @@ end
 function C.Select(id)
     if C.draft and C.active then
         C.db.drafts[C.active] = C.draft:GetText()
+    end
+    if id ~= C.active then
+        discardEmptyDraft()
     end
     C.active = id
     for _, chat in ipairs(C.chats) do

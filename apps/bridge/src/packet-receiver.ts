@@ -22,7 +22,7 @@ import type { MemoryView } from './agent-server.ts';
 import { characterIdentity, TurnContextCache } from './context.ts';
 import { chooseChatModel } from './chat-model.ts';
 import { parseConnectionModel } from '@wisp/protocol/providers';
-import { resumeChat } from './sessions.ts';
+import { resumeChat, isEmptyDraft } from './sessions.ts';
 import { newChat, openChat, promoteChat, isWorking, settleTurn } from './chat-lifecycle.ts';
 import { errorMessage } from './errors.ts';
 interface ReceiverDependencies {
@@ -551,6 +551,7 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
     if (packet.type === 'hello') {
       state.activeChat = resumeChat(state.chats, packet.chat)?.id || '';
     } else if (packet.chat && ['new', 'say', 'select'].includes(packet.type)) {
+      state.chats = state.chats.filter((chat) => chat.id === packet.chat || !isEmptyDraft(chat));
       state.activeChat = packet.chat;
     }
     if (['new', 'say'].includes(packet.type) && packet.chat && !chatFor(packet.chat)) {

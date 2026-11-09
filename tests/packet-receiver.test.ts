@@ -54,6 +54,18 @@ function fixture() {
   return { state, pending, receive, cancel, end, interrupt, run, models, flushAcknowledgment };
 }
 
+test('leaving a new empty conversation discards it while keeping conversations with activity', () => {
+  const f = fixture();
+  f.receive(packetSchema.parse({ type: 'new', chat: 'draft', session: 'one', seq: 20, at: 1 }));
+  expect(f.state.chats.some((chat) => chat.id === 'draft')).toBe(true);
+  f.receive(packetSchema.parse({ type: 'select', chat: 'old', session: 'one', seq: 21, at: 2 }));
+  expect(f.state.chats.map((chat) => chat.id)).toEqual(['old']);
+  f.receive(packetSchema.parse({ type: 'new', chat: 'used', session: 'one', seq: 22, at: 3 }));
+  f.state.chats.find((chat) => chat.id === 'used')!.messages.push({ role: 'user', text: 'Hi' });
+  f.receive(packetSchema.parse({ type: 'new', chat: 'next', session: 'one', seq: 23, at: 4 }));
+  expect(f.state.chats.map((chat) => chat.id)).toEqual(['old', 'used', 'next']);
+});
+
 test('interactive receipt requests an immediate acknowledgement publish, including duplicate retries', () => {
   const f = fixture();
   const packet = packetSchema.parse({

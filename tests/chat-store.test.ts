@@ -5,6 +5,25 @@ import path from 'node:path';
 import { ChatStore } from '@wisp/bridge/chat-store';
 import { newChat } from '@wisp/bridge/chat-lifecycle';
 
+test('empty drafts are neither saved nor restored', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wisp-chats-'));
+  const file = path.join(root, 'chats.json');
+  try {
+    const draft = newChat('draft', 'game');
+    const used = newChat('used', 'game');
+    used.messages.push({ role: 'user', text: 'Hello' });
+    await writeFile(file, JSON.stringify([draft, used]));
+    const store = new ChatStore(file, () => {});
+    expect((await store.load()).map((chat) => chat.id)).toEqual(['used']);
+    await store.flush([draft, used]);
+    expect(JSON.parse(await readFile(file, 'utf8')).map((chat: { id: string }) => chat.id)).toEqual(
+      ['used'],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('invalid JSON and invalid nested messages preserve the entire conversation file', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'wisp-chats-'));
   const file = path.join(root, 'chats.json');
