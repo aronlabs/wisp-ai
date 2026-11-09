@@ -20,7 +20,7 @@ const { ChatGPTAuth } = await load('src/chatgpt-auth.ts'),
   { NativeVault } = await load('src/secret-vault.ts'),
   { proxyModel } = await load('src/model-proxy.ts'),
   { TheWoWDB } = await load('src/thewowdb.ts'),
-  { searchWowhead } = await load('src/wowhead-search.ts'),
+  { searchPublicWeb } = await load('src/public-web-search.ts'),
   { applyEvent } = await load('src/events.ts'),
   { ReplyProjection } = await load('src/reply-stream.ts'),
   { turnInput } = await load('src/context.ts');
@@ -34,6 +34,7 @@ const addonFixtures =
 const simulationSnapshot = process.env.WISP_SMOKE_CHARACTER
   ? JSON.parse(await readFile(process.env.WISP_SMOKE_CHARACTER, 'utf8'))
   : undefined;
+const researchMode = process.env.WISP_SMOKE_RESEARCH === '1';
 const simulator = new Simulator(root);
 const dataRoot = process.env.WISP_DATA_DIR || root;
 const config = JSON.parse(await readFile(path.join(dataRoot, 'config.local.json'), 'utf8')),
@@ -70,6 +71,18 @@ await capabilities.load();
 await capabilities.set('integration:questie', false);
 if (!simulationSnapshot) {
   capabilities.availability.set('core:wow', { available: false, status: 'waiting' });
+}
+if (researchMode) {
+  capabilities.availability.set('core:wow', { available: true, status: 'fixture' });
+  for (const entry of capabilities.snapshot()) {
+    if (entry.toolName?.startsWith('wow__') && entry.id !== 'tool:query_training') {
+      capabilities.availability.set(entry.id, {
+        available: false,
+        status: 'unavailable',
+        reason: 'No live game in this smoke test.',
+      });
+    }
+  }
 }
 if (addonFixtures) {
   const { IntegrationState } = await load('src/integration-state.ts');
@@ -122,7 +135,23 @@ const server = createServer(async (req, res) => {
     let value;
     const call = { endpoint: req.url, operation: data.operation };
     rpc.push(call);
-    if (req.url === '/inspect' && addonFixtures) {
+    if (req.url === '/inspect' && researchMode && data.inspection?.kind === 'training') {
+      // Deliberately reproduce the catalog-miss boundary. No names, levels or
+      // facts about the real character are fabricated; web and model are live.
+      value = {
+        status: 'available',
+        source: 'Synthetic catalog-miss fixture',
+        data: {
+          class: 'MAGE',
+          spells: [],
+          total: 0,
+          unresolvedNames: 0,
+          version: 'forever',
+          note: 'Synthetic empty catalog result for this regression. Missing coverage is not proof of absence; investigate acquisition and availability with external sources.',
+        },
+      };
+      call.kind = 'training';
+    } else if (req.url === '/inspect' && addonFixtures) {
       const { inspectionSchema } = await import('../packages/protocol/dist/game-inspection.js');
       const inspection = inspectionSchema.parse(data.inspection);
       if (inspection.kind === 'questie_quest' || inspection.kind === 'questie_chain') {
@@ -150,7 +179,10 @@ const server = createServer(async (req, res) => {
     } else if (req.url === '/state' && simulationSnapshot) {
       value = simulationSnapshot;
     } else if (req.url === '/wowhead') {
-      value = await searchWowhead(args.query, scopedAuth, model);
+      call.query = args.query;
+      value = await searchPublicWeb(args.query, scopedAuth, model);
+      call.sources = value.sources?.map((source) => source.url);
+      call.research = value.research;
     } else if (req.url === '/memory' && data.operation === 'list') {
       value = { entries: [] };
     } else if (req.url === '/identity') {
@@ -184,6 +216,7 @@ const child = spawn(
     env: {
       ...process.env,
       WOW_BRIDGE_TOKEN: token,
+      WOW_BRIDGE_URL: 'http://127.0.0.1:43197',
       WOW_MODEL: model,
       WOW_MCP_CONFIG: '',
       WOW_CAPABILITIES_FILE: capabilities.agentFile,
@@ -223,6 +256,7 @@ try {
         { id: 'smoke', title: 'Diagnostic', titleGenerated: true },
         capabilities.snapshot(),
       ),
+      { signal: AbortSignal.timeout(300_000) },
     );
     let calls = [];
     const failures = [];
@@ -247,6 +281,7 @@ try {
       reply: chat.messages.filter((m) => m.role === 'assistant').at(-1)?.text,
     };
     report.tests.push(row);
+    await writeFile(path.join(dir, 'report.json'), JSON.stringify({ ...report, rpc }, null, 2));
     if (process.env.WISP_SMOKE_WEB_FETCH === '1') {
       await writeFile(path.join(dir, 'web-fetch-trace.json'), JSON.stringify(modelTools, null, 2));
     }
@@ -255,7 +290,23 @@ try {
     assert.deepEqual(failures, [], 'real tool calls must succeed');
     return row;
   };
-  if (process.env.WISP_SMOKE_WEB_FETCH === '1') {
+  if (researchMode) {
+    const result = await run(
+      'availability research after a catalog miss',
+      '¿Cuándo aprendo invisibilidad con el mago?',
+    );
+    const catalog = result.calls.indexOf('wow__query_training');
+    const search = result.calls.indexOf('web__web_search');
+    assert.ok(
+      catalog >= 0 && search > catalog,
+      'agent must consult the catalog and then investigate the web',
+    );
+    assert.ok(result.calls.includes('web_fetch'), 'agent must inspect original source evidence');
+    report.scenario =
+      'Synthetic catalog miss; real model, production tools, live database and global web search. No WoW session or game state.';
+    // Save the answer and search dossiers for a human semantic review rather
+    // than passing an expected game answer into the agent or grading keywords.
+  } else if (process.env.WISP_SMOKE_WEB_FETCH === '1') {
     const result = await run(
       'Mobalytics full guide with continuation',
       'Abrí https://mobalytics.gg/wow-forever/classes/mage-leveling-guide con web_fetch y leé la guía completa. Si recibís nextCursor, volvé a llamar web_fetch usando ese cursor y la misma URL, hasta que no haya nextCursor y truncated sea false. No uses búsquedas ni otras fuentes, no guardes memoria. Al terminar dame un resumen breve en español, incluyendo algo del último fragmento, y confirmá cuántos fragmentos leíste y cuántos caracteres totales devolvió la herramienta.',
@@ -369,7 +420,7 @@ try {
       'Wowhead fallback',
       'Buscá con web_search una guía de leveleo de mago escarcha en Wowhead Forever. Usá esa herramienta de búsqueda aunque haya otras fuentes. Dame 2 consejos con enlaces de esa guía, no de Retail ni Classic.',
     );
-    assert.ok(result.calls.includes('wowhead__web_search'));
+    assert.ok(result.calls.includes('web__web_search'));
     console.log('START manual compaction');
     const compact = await session.compact();
     for await (const event of compact.stream()) {
@@ -386,7 +437,10 @@ try {
     for (const endpoint of ['/database', '/wowhead']) {
       assert.ok(
         rpc.some(
-          (r) => r.endpoint === endpoint && r.status === 'available' && r.version === 'forever',
+          (r) =>
+            r.endpoint === endpoint &&
+            r.status === 'available' &&
+            (endpoint === '/wowhead' || r.version === 'forever'),
         ),
         endpoint + ' must return verified live data',
       );
