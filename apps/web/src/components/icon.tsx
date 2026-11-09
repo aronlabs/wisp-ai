@@ -23,6 +23,7 @@ export function Icon({
     | 'bookmark'
     | 'globe'
     | 'connection'
+    | 'chat'
     | 'menu'
     | 'close'
     | 'pin'
@@ -31,6 +32,12 @@ export function Icon({
   style?: CSSProperties;
 }) {
   const paths = {
+    chat: (
+      <>
+        <path d="M21 11a8 8 0 0 1-8 8H7l-5 3 2-6a8 8 0 0 1-1-5 8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z" />
+        <path d="M7 9h10M7 13h6" />
+      </>
+    ),
     menu: <path d="M4 6h16M4 12h16M4 18h16" />,
     close: <path d="m6 6 12 12M18 6 6 18" />,
     connection: (

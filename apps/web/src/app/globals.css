@@ -2588,6 +2588,13 @@ em {
   width: 38px;
   height: 38px;
 }
+.reference-feature-heading .chat-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #d5bb75;
+  background: radial-gradient(circle at 35% 25%, #49412d, #171714 80%);
+}
 .reference-feature-heading h2 {
   font-size: 29px;
   line-height: 1.2;

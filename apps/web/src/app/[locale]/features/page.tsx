@@ -8,15 +8,6 @@ import { FeatureIndex } from '../../../components/feature-index';
 import { PageSchema } from '../../../components/page-schema';
 const baseFeatures = [
   {
-    id: 'wow-chat',
-    icon: 'book',
-    title: 'Read your WoW chat',
-    description:
-      'Ask Wisp what your party said or who is looking for a group. Choose which chats it can read, including individual public channels such as /1 and /3.',
-    example: 'Is anyone in /1 or /3 looking for a healer?',
-    note: 'Choose channels in Settings / WoW chat history. Public channels and whispers start disabled. Wisp keeps up to 200 messages for 30 minutes in memory, starting at login or reload, and consults them when needed. Retrieved messages are shared with your selected AI provider. You can clear the buffer at any time.',
-  },
-  {
     id: 'routines',
     icon: 'book',
     title: 'Routines',
@@ -81,6 +72,15 @@ const baseFeatures = [
       'Look up quest chains, rewards, NPCs and trainers. Turn a verified destination into a map marker and keep planning from there.',
     example: 'With the quests I have, which route should I take? Mark where to start on my map.',
     note: 'Location coverage depends on available Forever references and providers such as Questie. Requested pins use validated coordinates. Undo preserves pins you changed yourself; Wisp does not move your character.',
+  },
+  {
+    id: 'wow-chat',
+    icon: 'chat',
+    title: 'Read your WoW chat',
+    description:
+      'Ask Wisp what your party said or who is looking for a group. Choose which chats it can read, including individual public channels such as /1 and /3.',
+    example: 'Is anyone in /1 or /3 looking for a healer?',
+    note: 'Choose channels in Settings / WoW chat history. Public channels and whispers start disabled. Wisp keeps up to 200 messages for 30 minutes in memory, starting at login or reload, and consults them when needed. Retrieved messages are shared with your selected AI provider. You can clear the buffer at any time.',
   },
   {
     id: 'hover',
@@ -189,7 +189,13 @@ export default async function Features({ params }: LocalePageProps) {
               aria-labelledby={`${feature.id}-title`}
             >
               <div className="reference-feature-heading">
-                <Item icon={feature.icon} name={feature.title} />
+                {feature.icon === 'chat' ? (
+                  <span className="item-icon chat-feature-icon" aria-hidden="true">
+                    <Icon name="chat" size={26} />
+                  </span>
+                ) : (
+                  <Item icon={feature.icon} name={feature.title} />
+                )}
                 <h2 id={`${feature.id}-title`}>{feature.title}</h2>
                 {feature.status && <span className="beta-label">{feature.status}</span>}
               </div>
