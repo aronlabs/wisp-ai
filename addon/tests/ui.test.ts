@@ -247,6 +247,13 @@ assert(not row:IsShown(), "forgotten entries must disappear")
     `
 local fold = UI_TEST.frames.WispAISidebarToggle
 local gear = UI_TEST.frames.WispAISettingsButton
+local tabs = {}
+for _, widget in ipairs(UI_TEST.widgets) do
+    if widget.parent == fold.parent and (widget:GetText() == "Chats" or widget:GetText() == "Routines") then
+        tabs[#tabs + 1] = widget
+    end
+end
+assert(#tabs == 2 and tabs[1]:IsShown() and tabs[2]:IsShown())
 assert(fold.parent ~= gear.parent, "sidebar toggle must live in the sidebar")
 assert(gear:GetText() == "", "settings uses an icon instead of a text label")
 fold.scripts.OnClick()
@@ -254,8 +261,10 @@ assert(
     not C.db.sidebar and fold:GetText() == ">" and fold.parent:GetWidth() == 30,
     "collapsed sidebar must retain its own expand control"
 )
+assert(not tabs[1]:IsShown() and not tabs[2]:IsShown(), "collapsed sidebar must hide both tabs so they cannot overlap the conversation")
 fold.scripts.OnClick()
 assert(C.db.sidebar and fold:GetText() == "<")
+assert(tabs[1]:IsShown() and tabs[2]:IsShown(), "expanding the sidebar must restore both tabs")
 C.SetMinimized(true)
 assert(
     UI_TEST.frames.WispAIWindow:GetWidth() == 220 and not fold:IsShown() and not gear:IsShown(),

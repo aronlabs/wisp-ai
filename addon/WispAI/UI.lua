@@ -8,6 +8,7 @@ local replyGlow, newMessages
 local emptyState
 local progress
 local gear, fold, sessionsLabel, newSession, resize
+local chatsTab, routinesTab
 local memoryPanel, memoryContent, memoryStatus
 local memoryRows = {}
 local capabilityPanel, capabilityContent, capabilityStatus, capabilityScroll
@@ -278,6 +279,8 @@ local function layout()
     sessionsLabel:SetShown(C.db.sidebar)
     newSession:SetShown(C.db.sidebar)
     sessionScroll:SetShown(C.db.sidebar)
+    chatsTab:SetShown(C.db.sidebar)
+    routinesTab:SetShown(C.db.sidebar)
     local width = C.db.sidebar and 155 or 30
     sidebar:SetWidth(width)
     local arrow = C.db.sidebar and "<" or ">"
@@ -724,12 +727,12 @@ function C.BuildUI()
         GameTooltip:Hide()
     end)
     sessionScroll = CreateFrame("ScrollFrame", nil, sidebar)
-    local chatsTab = button(sidebar, "Chats", 64, function()
+    chatsTab = button(sidebar, "Chats", 64, function()
         C.sidebarTab = "chats"
         C.Refresh()
     end)
     chatsTab:SetPoint("TOPLEFT", 6, -35)
-    local routinesTab = button(sidebar, "Routines", 75, function()
+    routinesTab = button(sidebar, "Routines", 75, function()
         C.sidebarTab, C.sidebarRoutine = "routines", nil
         C.Refresh()
     end)
