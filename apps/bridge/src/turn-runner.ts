@@ -3,7 +3,7 @@ import { applyEvent, type Chat } from './events.ts';
 import { ReplyProjection } from './reply-stream.ts';
 import { sendChatTurn } from './agent-session.ts';
 import { beginTurn, settleTurn } from './chat-lifecycle.ts';
-import { turnInput, characterIdentity, rememberTurnQuests, conversationTitle } from './context.ts';
+import { turnInput, characterIdentity, rememberTurnQuests } from './context.ts';
 import { chooseChatModel } from './chat-model.ts';
 import { safeErrorMessage } from '@wisp/protocol/model-errors';
 import type { CapabilitySettings } from './capabilities.ts';
@@ -57,19 +57,6 @@ export function createTurnRunner(deps: TurnDependencies) {
     const ownsTurn = () => generations.get(chat) === generation;
     const owner = currentTransport();
     beginTurn(chat, owner, characterIdentity(context), text, messageId);
-    if (
-      !chat.titleGenerated &&
-      !chat.proactive &&
-      !chat.inline &&
-      capabilitySettings.enabled('tool:set_conversation_title')
-    ) {
-      // Name the chat before any model preparation or network request.
-      const title = conversationTitle(text);
-      if (title) {
-        chat.title = title;
-        chat.titleGenerated = true;
-      }
-    }
     rememberTurnQuests(chat, context);
     const assertCurrent = () => {
       controller.signal.throwIfAborted();
@@ -112,7 +99,16 @@ export function createTurnRunner(deps: TurnDependencies) {
       const response = await sendChatTurn(
         client,
         chat,
-        turnInput(text, context, chat, capabilitySettings.snapshot()),
+        turnInput(
+          text,
+          context,
+          chat,
+          capabilitySettings.snapshot(),
+          !chat.titleGenerated &&
+            !chat.proactive &&
+            !chat.inline &&
+            capabilitySettings.enabled('tool:set_conversation_title'),
+        ),
         controller.signal,
       );
       assertCurrent();

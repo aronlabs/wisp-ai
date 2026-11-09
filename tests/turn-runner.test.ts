@@ -4,7 +4,7 @@ import { createTurnRunner } from '@wisp/bridge/turn-runner';
 import { newChat } from '@wisp/bridge/chat-lifecycle';
 import { queryCharacterSections } from '@wisp/bridge/context';
 
-function fixture() {
+function fixture(titlesEnabled = true) {
   const chat = newChat('chat', 'one');
   let transport = 'one';
   let current = true;
@@ -27,7 +27,11 @@ function fixture() {
   const run = createTurnRunner({
     client,
     models: { models, prepare: async () => {} },
-    capabilitySettings: { publish: async () => {}, enabled: () => true, snapshot: () => [] },
+    capabilitySettings: {
+      publish: async () => {},
+      enabled: () => titlesEnabled,
+      snapshot: () => [],
+    },
     currentTransport: () => transport,
     activeChat: () => 'chat',
     defaultModel: () => 'model',
@@ -203,17 +207,19 @@ test('a follow-up after failure includes the failed question in restored history
   expect(f.send.mock.calls.at(-1)![0]).toContain('Explain that quest');
 });
 
-test('names the chat immediately before model preparation and keeps explicit names', async () => {
+test('requests an AI title without copying the first message and keeps explicit names', async () => {
   const f = fixture();
   const pending = f.run(f.chat, '  Ruta\n por Durotar  ');
-  expect(f.chat.title).toBe('Ruta por Durotar');
-  expect(f.chat.titleGenerated).toBe(true);
+  expect(f.chat.title).toBe('New conversation');
+  expect(f.chat.titleGenerated).not.toBe(true);
   expect(f.send).not.toHaveBeenCalled();
   await pending;
-  expect(f.send.mock.calls[0][0]).not.toContain('needsTitle');
+  expect(f.send.mock.calls[0][0]).toContain('"needsTitle":true');
   f.chat.title = 'Mi ruta';
+  f.chat.titleGenerated = true;
   await f.run(f.chat, 'Otra pregunta');
   expect(f.chat.title).toBe('Mi ruta');
+  expect(f.send.mock.calls.at(-1)[0]).not.toContain('needsTitle');
 });
 
 test('does not automatically name inline or proactive conversations', async () => {
@@ -222,5 +228,20 @@ test('does not automatically name inline or proactive conversations', async () =
     f.chat[kind] = true;
     await f.run(f.chat, 'A different title');
     expect(f.chat.title).toBe('New conversation');
+    expect(f.send.mock.calls[0][0]).not.toContain('needsTitle');
   }
+});
+
+test('disabled titles do not request automatic naming', async () => {
+  const f = fixture(false);
+  await f.run(f.chat, 'Help me choose talents');
+  expect(f.chat.titleGenerated).not.toBe(true);
+  expect(f.send.mock.calls[0][0]).not.toContain('needsTitle');
+});
+
+test('an unnamed greeting can receive a title on a later turn', async () => {
+  const f = fixture();
+  await f.run(f.chat, 'Hola');
+  await f.run(f.chat, 'Quiero una build de mago');
+  expect(f.send.mock.calls.at(-1)[0]).toContain('"needsTitle":true');
 });
