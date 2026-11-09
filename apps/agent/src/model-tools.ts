@@ -44,6 +44,7 @@ const groupTools: Record<(typeof toolGroupNames)[number], string[]> = {
     'thewowdb__search_database',
     'thewowdb__get_database_entity',
     'wowhead__web_search',
+    'web_fetch',
     'eve__search',
     'eve__tool',
     'web_search',
@@ -70,7 +71,7 @@ const groupDescriptions: Record<(typeof toolGroupNames)[number], string> = {
     'inventory items gear equipment bags bank auction prices resources money skills crafting inventario objetos equipo bolsas banco subasta precios dinero profesiones',
   training: 'trainer training offers entrenador aprender entrenamiento',
   knowledge:
-    'database catalog search knowledge web wowhead everloot source spell item npc guide buscar base datos fuente guia hechizo',
+    'database catalog search knowledge web fetch url page read scrape wowhead everloot source spell item npc guide buscar leer pagina enlace base datos fuente guia hechizo',
   memory: 'memory remember forget preference guide plan memoria recordar olvidar preferencias',
 };
 export function searchToolGroups(query: string) {

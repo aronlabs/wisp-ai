@@ -50,11 +50,16 @@
     "@wisp/protocol": "workspace:*",
     "ai": "7.0.164",
     "eve": "1.0.0-rc.6",
+    "impit": "0.14.8",
+    "ipaddr.js": "2.5.0",
     "just-bash": "3.6.0",
+    "linkedom": "0.18.15",
+    "turndown": "7.2.5",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
+    "@types/turndown": "5.0.6",
     "typescript": "5.9.3"
   }
 }

@@ -139,6 +139,7 @@ export const toolDescriptions: Record<string, [string, string]> = {
   clear_map_waypoint: ['Undo map marker', 'Remove Wisp’s marker and restore the prior pin.'],
   create_macro: ['Create macros', 'Create new macros outside combat. Existing macros are kept.'],
   web_search: ['Wowhead Forever search', 'Search Wowhead Forever guides and reference pages.'],
+  web_fetch: ['Read web pages', 'Open a public HTTPS URL and read its content without a browser.'],
   set_conversation_title: ['Conversation titles', 'Name conversations based on what you discuss.'],
 };
 
@@ -160,6 +161,13 @@ export const coreCapabilities: Capability[] = [
 ];
 
 export const integrations: Capability[] = [
+  {
+    id: 'integration:web',
+    name: 'Web pages',
+    group: 'integrations',
+    kind: 'source',
+    description: 'Read public web pages by URL. No account or browser required.',
+  },
   {
     id: 'integration:syndicator',
     name: 'Syndicator',
@@ -205,6 +213,9 @@ export const integrations: Capability[] = [
   },
 ];
 export function toolIntegration(name: string): string {
+  if (name === 'web_fetch') {
+    return 'web';
+  }
   if (
     ['find_npc_locations', 'get_quest', 'get_quest_chain', 'find_object_locations'].includes(name)
   ) {
@@ -231,6 +242,9 @@ export function toolIntegration(name: string): string {
   return 'wow';
 }
 export function publicToolName(name: string): string {
+  if (name === 'web_fetch') {
+    return name;
+  }
   return toolIntegration(name) + '__' + name;
 }
 export const capabilityViewSchema = capabilitySchema.extend({

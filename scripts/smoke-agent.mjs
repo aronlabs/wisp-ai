@@ -82,6 +82,7 @@ await capabilities.publish();
 const token = randomBytes(32).toString('hex'),
   database = new TheWoWDB(),
   rpc = [];
+const modelTools = [];
 const server = createServer(async (req, res) => {
   try {
     if (req.headers.authorization !== 'Bearer ' + token) {
@@ -95,6 +96,20 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.url === '/model/responses') {
+      if (process.env.WISP_SMOKE_WEB_FETCH === '1') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          const request = JSON.parse(body);
+          for (const item of request.input ?? []) {
+            if (['function_call', 'function_call_output'].includes(item.type)) {
+              modelTools.push(item);
+            }
+          }
+        });
+      }
       await proxyModel(req, res, scopedAuth);
       return;
     }
@@ -232,12 +247,51 @@ try {
       reply: chat.messages.filter((m) => m.role === 'assistant').at(-1)?.text,
     };
     report.tests.push(row);
+    if (process.env.WISP_SMOKE_WEB_FETCH === '1') {
+      await writeFile(path.join(dir, 'web-fetch-trace.json'), JSON.stringify(modelTools, null, 2));
+    }
     console.log(JSON.stringify(row));
     assert.equal(r.status, 'completed');
     assert.deepEqual(failures, [], 'real tool calls must succeed');
     return row;
   };
-  if (addonFixtures) {
+  if (process.env.WISP_SMOKE_WEB_FETCH === '1') {
+    const result = await run(
+      'Mobalytics full guide with continuation',
+      'Abrí https://mobalytics.gg/wow-forever/classes/mage-leveling-guide con web_fetch y leé la guía completa. Si recibís nextCursor, volvé a llamar web_fetch usando ese cursor y la misma URL, hasta que no haya nextCursor y truncated sea false. No uses búsquedas ni otras fuentes, no guardes memoria. Al terminar dame un resumen breve en español, incluyendo algo del último fragmento, y confirmá cuántos fragmentos leíste y cuántos caracteres totales devolvió la herramienta.',
+    );
+    assert.ok(
+      result.calls.filter((name) => name === 'web_fetch').length >= 2,
+      'model must actually continue reading',
+    );
+    const items = [
+      ...new Map(modelTools.map((item) => [item.type + ':' + item.call_id, item])).values(),
+    ];
+    const calls = items.filter(
+      (item) => item.type === 'function_call' && item.name === 'web_fetch',
+    );
+    const fragments = calls.map((call) => {
+      const args = JSON.parse(call.arguments);
+      const output = items.find(
+        (item) => item.type === 'function_call_output' && item.call_id === call.call_id,
+      );
+      assert.ok(output, 'model received tool output');
+      const page = typeof output.output === 'string' ? JSON.parse(output.output) : output.output;
+      return { args, ...page, content: undefined };
+    });
+    assert.ok(fragments.length >= 2);
+    assert.equal(fragments[0].startOffset, 0);
+    for (let i = 1; i < fragments.length; i++) {
+      assert.equal(fragments[i].args.cursor, fragments[i - 1].nextCursor);
+      assert.equal(fragments[i].startOffset, fragments[i - 1].endOffset);
+    }
+    const last = fragments.at(-1);
+    assert.equal(last.truncated, false);
+    assert.equal(last.nextCursor, undefined);
+    assert.equal(last.endOffset, last.totalCharacters);
+    report.fragments = fragments;
+    console.log('FRAGMENTS ' + JSON.stringify(fragments));
+  } else if (addonFixtures) {
     let result = await run(
       'Questie Lua adapter fixtures',
       'Prueba con datos sintéticos, no mi personaje: usá questie__get_quest y questie__get_quest_chain para questId=600001, y questie__find_object_locations para objectId=99,mapId=1454. Resumí requisitos, cadena y posición sin inferir elegibilidad real. No uses otras fuentes.',

@@ -37,5 +37,7 @@ export default defineAgent({
     };
   }),
   defaultTools: false,
+  // Native TLS client must be traced and shipped, rather than bundled as JS.
+  build: { externalDependencies: ['impit'] },
   compaction: { threshold: COMPACTION_THRESHOLD },
 });
