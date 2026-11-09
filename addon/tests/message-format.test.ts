@@ -29,15 +29,32 @@ test('emoji images preserve complete sequences, formatting, localized text and n
     for _, emoji in ipairs({'😄', '😎', '👍🏽', '✅️', '⚠️', '🧙‍♀️', '👨‍👩‍👧‍👦', '🇦🇷', '1️⃣', '#️⃣', '🏳️‍🌈', '👩🏽‍💻', '🫩'}) do image(emoji) end
     assert(C.Emoji.render('❤') == C.Emoji.render('❤️'))
     assert(C.FormatText('te pueden pegar a vos 😄') == 'te pueden pegar a vos ' .. image('😄'))
-    local localized = 'maná, pingüino, ¿qué? — 你好 Привет 123 # * ©'
+    local localized = 'maná, pingüino, ¿qué? 你好 Привет 123 # * ©'
     assert(C.FormatText(localized) == localized)
+    assert(C.FormatText('Explosión → Misiles → repetir') == 'Explosión -> Misiles -> repetir')
+    assert(C.FormatText('20–30 DPS • daño × 2 ≠ vida ≤ 50 ≥ 10 ± 2') == '20-30 DPS * daño x 2 != vida <= 50 >= 10 +/- 2')
+    assert(C.FormatText('“maná”… x² + H₂O ∞ √9') == '"maná"... x^2 + H_2O infinity sqrt9')
+    assert(C.FormatText('A B C​D﻿E') == 'A B CDE', 'spaces and invisible separators')
+    assert(C.FormatText('ＡＢＣ１２３') == 'ABC123')
+    assert(C.FormatText('⧖') == '[U+29D6]', 'unmapped technical symbols need readable fallback')
+    local rotation = C.FormatText('[[ref:a]] → [[ref:b]]', {
+      a={kind='spell',id=2136,label='Explosión de Fuego'},
+      b={kind='spell',id=5143,label='Misiles Arcanos'}
+    })
+    assert(rotation:find('|Hspell:2136|h[Explosión de Fuego]|h', 1, true))
+    assert(rotation:find(' -> ', 1, true))
+    assert(rotation:find('|Hspell:5143|h[Misiles Arcanos]|h', 1, true))
+    for code = 0x2070, 0x2BFF do
+      local symbol = utf8.char(code)
+      assert(C.Emoji.render(symbol) ~= symbol, 'unhandled symbol U+' .. string.format('%04X', code))
+    end
     local link = '|Hitem:100|h[Espada]|h'
     assert(C.FormatText(link, nil, true) == link)
     local ref = C.FormatText('**[[ref:s]]**', {s={kind='spell',id=100,label='Fuego 🔥'}})
     assert(ref:find('|Hspell:100|h[Fuego ' .. image('🔥') .. ']|h', 1, true))
     local future = C.Emoji.render('😀‍😀')
     assert(future == '[emoji U+1F600]', 'unknown combinations must not split into partial images')
-    assert(C.Emoji.render('☀︎') == '☀', 'explicit text presentation must be respected')
+    assert(C.Emoji.render('☀︎') == '[U+2600]', 'explicit text presentation uses a font-safe fallback')
     local count = 0
     for emoji, index in pairs(C.EmojiData) do
       assert(index >= 0 and index < 4009)

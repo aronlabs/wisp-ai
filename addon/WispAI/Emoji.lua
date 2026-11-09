@@ -37,6 +37,130 @@ local function extension(code)
         or (code >= 0x1F3FB and code <= 0x1F3FF)
         or (code >= 0xE0020 and code <= 0xE007F)
 end
+-- Chat fonts vary by client/locale. Keep prose in its original language, but
+-- give technical Unicode symbols a readable representation independent of fonts.
+local symbols = {}
+local function aliases(chars, replacement)
+    for char in chars:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        symbols[char] = replacement
+    end
+end
+aliases("‐‑‒–—―−﹘﹣－", "-")
+aliases("‘’‚‛′‵＇", "'")
+aliases("“”„‟″‶＂", '"')
+aliases("…⋯", "...")
+aliases("•‣⁃∙⋅●○◦▪▫■□◆◇▶▷►▸", "*")
+aliases(
+    "→➔➜➝➞➟➠➢➣➤➥➦➧➨➩➪➫➬➭➮➯➱⟶⇒⟹↦↪⇢⇨",
+    "->"
+)
+aliases("←⟵⇐⟸↤↩⇠⇦", "<-")
+aliases("↔⟷⇔⟺⇄⇆⇋⇌", "<->")
+aliases("↑⇑⇧", "(up)")
+aliases("↓⇓⇩", "(down)")
+aliases("↗↖↘↙", "(diagonal)")
+aliases("×✕✖⨯", "x")
+aliases("÷∕⁄", "/")
+aliases("≤≦⩽", "<=")
+aliases("≥≧⩾", ">=")
+aliases("≠≢", "!=")
+aliases("≈≃≅≍∼", "~")
+aliases("±", "+/-")
+aliases("∓", "-/+")
+aliases("∞", "infinity")
+aliases("√", "sqrt")
+aliases("∛", "cbrt")
+aliases("∑", "sum")
+aliases("∏", "product")
+aliases("∫", "integral")
+aliases("∂", "d")
+aliases("∆∇", "delta")
+aliases("∈", " in ")
+aliases("∉", " not in ")
+aliases("⊂⊆", " subset of ")
+aliases("⊃⊇", " superset of ")
+aliases("∪", " union ")
+aliases("∩", " intersection ")
+aliases("∅", "(empty)")
+aliases("∧", " and ")
+aliases("∨", " or ")
+aliases("¬", "not ")
+aliases("∀", "for all ")
+aliases("∃", "exists ")
+aliases("∴", "therefore ")
+aliases("∵", "because ")
+aliases("∝", " proportional to ")
+aliases("∥", " parallel to ")
+aliases("⊥", " perpendicular to ")
+aliases("‖", "||")
+aliases("‰", " per mille")
+aliases("‱", " per ten thousand")
+aliases("⟨〈", "<")
+aliases("⟩〉", ">")
+aliases("【〔〖〘〚", "[")
+aliases("】〕〗〙〛", "]")
+aliases("✓✔", "[ok]")
+aliases("✗✘", "[x]")
+local superscripts = { "⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹" }
+local subscripts = { "₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉" }
+for i = 1, 10 do
+    symbols[superscripts[i]] = "^" .. (i - 1)
+    symbols[subscripts[i]] = "_" .. (i - 1)
+end
+aliases("⁺", "^+")
+aliases("⁻", "^-")
+aliases("⁼", "^=")
+aliases("⁽", "^(")
+aliases("⁾", "^)")
+aliases("₊", "_+")
+aliases("₋", "_-")
+aliases("₌", "_=")
+aliases("₍", "_(")
+aliases("₎", "_)")
+local function compatible(char, code)
+    if symbols[char] then
+        return symbols[char]
+    end
+    if
+        code == 0xA0
+        or code == 0x1680
+        or (code >= 0x2000 and code <= 0x200A)
+        or code == 0x202F
+        or code == 0x205F
+        or code == 0x3000
+    then
+        return " "
+    end
+    if code == 0x2028 or code == 0x2029 then
+        return "\n"
+    end
+    -- Formatting controls have no visible glyph; emoji joiners are consumed
+    -- before reaching here. Preserve language-specific shaping controls.
+    if
+        code == 0xAD
+        or code == 0x200B
+        or code == 0x2060
+        or code == 0xFEFF
+        or code == 0xFE0E
+        or code == 0xFE0F
+    then
+        return ""
+    end
+    if code >= 0xFF01 and code <= 0xFF5E then
+        local ascii = string.char(code - 0xFEE0)
+        return ascii == "|" and "||" or ascii
+    end
+    -- Unmapped symbols remain identifiable instead of becoming missing-glyph
+    -- boxes. Do not apply this to alphabets, accents or CJK text.
+    if
+        (code >= 0x2070 and code <= 0x2BFF)
+        or (code >= 0x1D000 and code <= 0x1D7FF)
+        or (code >= 0x1F000 and code <= 0x1FAFF)
+    then
+        return string.format("[U+%04X]", code)
+    end
+    return char
+end
 local function render(text)
     if not text:find("[\194-\244]") then
         return text
@@ -69,14 +193,14 @@ local function render(text)
         local index = C.EmojiData[normalized]
         if raw:find("\239\184\142", 1, true) then
             -- Explicit text presentation wins over emoji presentation.
-            result[#result + 1] = raw:gsub("\239\184\142", "")
+            result[#result + 1] = compatible(chars[i], codes[i])
         elseif index and (codes[i] > 255 or last > i) then
             result[#result + 1] = texture(index)
         elseif (codes[i] >= 0x1F000 and codes[i] <= 0x1FAFF) or (last > i and index == nil) then
             -- Future/unrecognized sequences stay one readable unit.
             result[#result + 1] = string.format("[emoji U+%X]", codes[i])
         else
-            result[#result + 1] = raw
+            result[#result + 1] = compatible(raw, codes[i])
         end
         i = last + 1
     end
