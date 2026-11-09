@@ -169,12 +169,21 @@ function C.SetCapability(id, enabled)
 end
 function WispAI_Receive(json)
     local ok, data = pcall(C_EncodingUtil.DeserializeJSON, json)
-    if not ok or type(data) ~= "table" or data.v ~= C.VERSION or data.session ~= C.session then
+    if ok then
+        C.ReceiveSnapshot(data)
+    end
+end
+function C.ReceiveSnapshot(data)
+    if type(data) ~= "table" or data.v ~= C.VERSION or data.session ~= C.session then
         return
     end
     C.Acknowledge(data.acks or {})
     if (data.rev or 0) <= C.rev then
         return
+    end
+    local applyStarted = C.BeginTransportApply and C.BeginTransportApply()
+    if C.reusableDownlink and C.RememberDownlink then
+        C.RememberDownlink(data)
     end
     local previous = C.Current()
     local previousState = previous and previous.status
@@ -326,6 +335,9 @@ function WispAI_Receive(json)
     end
     if C.Refresh then
         C.Refresh()
+    end
+    if C.RecordTransportSnapshot then
+        C.RecordTransportSnapshot(data, applyStarted)
     end
 end
 local events = CreateFrame("Frame")

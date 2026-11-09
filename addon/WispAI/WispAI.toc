@@ -9,6 +9,8 @@
 ## OptionalDeps: QuestieDB, Questie, Syndicator, Auctionator
 
 Core.lua
+TransportMetrics.lua
+Downlink.lua
 Transport.lua
 Integrations.lua
 Character.lua

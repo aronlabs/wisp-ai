@@ -22,7 +22,7 @@ book=inv_misc_book_09.
 
 Item stats and auction amounts in the landing are illustrative Forever examples,
 not live prices or a complete item database. Original chat examples remain the
-basis for the copy. No extracted game models or Thott assets are included.
+basis for the copy. No extracted game models are included.
 
 ## Current hero revision
 

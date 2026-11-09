@@ -125,7 +125,13 @@ Replace the example with the folder containing `Wow.exe`. Installation updates `
 
 The bridge owns accounts, persistence and tool execution. Eve runs on loopback **43186**; the separate RPC/model endpoint on **43187** uses an ephemeral agent token. Credential and data boundaries are documented under [privacy](usage.md#what-leaves-your-computer).
 
-Game transport uses addon enable states for outbound frames and preinstalled load-on-demand helpers for inbound snapshots. Sequence IDs, acknowledgements and revisions handle retries and stale packets. For framing, polling and reply contracts, use [transport.ts](../apps/bridge/src/transport.ts), [reply-stream.ts](../apps/bridge/src/reply-stream.ts) and the protocol source rather than treating documentation as a wire specification.
+Game transport uses Wisp v2 checked frames in addon enable states in both directions.
+Compressed snapshots and patches continue through the reusable lane after the
+optional load-on-demand bulk bank is exhausted. The unversioned transport and its
+decoder are removed; unsupported game APIs fail clearly rather than selecting
+another wire format. See [transport v2](transport-v2.md) and its
+[measured comparison](transport-optimization.md), plus [transport.ts](../apps/bridge/src/transport.ts)
+and the protocol source for the wire contract.
 
 ### Runtime boundaries
 
