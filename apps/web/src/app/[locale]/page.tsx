@@ -7,7 +7,9 @@ import { RoutineScene } from '../../components/routine-scene';
 import { GearVisual, BagsVisual, Item } from '../../components/game-ui';
 import { Icon } from '../../components/icon';
 import { site } from '../../site';
+import { getLatestRelease } from '../../release.server';
 import { PageSchema } from '../../components/page-schema';
+export const revalidate = 300;
 const baseFaqs = [
   [
     'What do I need to get started?',
@@ -58,6 +60,7 @@ export async function generateMetadata({ params }: LocalePageProps) {
 }
 export default async function Home({ params }: LocalePageProps) {
   const locale = await resolveLocale(params);
+  const release = await getLatestRelease();
   const t = getTranslator(locale);
   const faqs = translateData(baseFaqs, locale);
   const abilities = translateData(baseAbilities, locale);
@@ -69,6 +72,7 @@ export default async function Home({ params }: LocalePageProps) {
           description={site.description}
           path="/"
           software
+          softwareVersion={release?.version}
           locale={locale}
         />
         <section className="hero" aria-labelledby="hero-title">
@@ -88,10 +92,7 @@ export default async function Home({ params }: LocalePageProps) {
               <a className="release-badge" href={`${site.repository}/releases`}>
                 <i />
                 {t('FOR WOW: FOREVER ')}
-                <span>
-                  {t('v')}
-                  {site.version}
-                </span>
+                {release && <span>v{release.version}</span>}
               </a>
               <h1 id="hero-title">
                 {t('Your AI')}
@@ -360,8 +361,7 @@ export default async function Home({ params }: LocalePageProps) {
           </h2>
           <InstallLink locale={locale} />
           <p className="download-note">
-            {t('v')}
-            {site.version}
+            {release && `v${release.version}`}
             {t(' · Windows x64 · Open source')}
           </p>
         </section>

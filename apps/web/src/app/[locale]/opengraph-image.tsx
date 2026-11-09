@@ -2,14 +2,16 @@ import { ImageResponse } from 'next/og';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { resolveLocale, type LocalePageProps } from '../../i18n/server';
-import { site } from '../../site';
+import { getLatestRelease } from '../../release.server';
 
+export const revalidate = 300;
 export const alt = 'Wisp AI — Your AI companion inside WoW: Forever';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default async function OpenGraphImage({ params }: LocalePageProps) {
   const es = (await resolveLocale(params)) === 'es';
+  const release = await getLatestRelease();
   const asset = async (file: string, type = 'image/jpeg') =>
     `data:${type};base64,${(await readFile(join(process.cwd(), 'public', file))).toString('base64')}`;
   const [background, wisp, vest, staff, ring, serif, serifItalic, sans] = await Promise.all([
@@ -244,7 +246,7 @@ export default async function OpenGraphImage({ params }: LocalePageProps) {
       >
         <span
           style={{ color: '#aba697', fontSize: 15 }}
-        >{`Windows · Open source · v${site.version}`}</span>
+        >{`Windows · Open source${release ? ` · v${release.version}` : ''}`}</span>
         <span style={{ color: gold, fontSize: 18 }}>wisp.fedeya.sh</span>
       </div>
     </div>,

@@ -28,8 +28,9 @@ Open http://127.0.0.1:3000. Production check: `pnpm web:build`.
 4. Add `wisp.fedeya.sh` in the project's Domains settings and apply the DNS record
    Vercel provides.
 
-No environment variables are required. Optionally set `NEXT_PUBLIC_INSTALL_URL`
-to a public installer asset URL and redeploy for direct downloads.
+No environment variables are required. Download buttons use `/download`, which
+resolves the current stable Windows installer automatically. `NEXT_PUBLIC_INSTALL_URL`
+is an optional explicit override; leave it unset to follow new releases.
 
 For an isolated workspace export, run `pnpm exec turbo prune @wisp/web
 --out-dir=.vercel-workspace` from the repository root. Turbo generates the reduced
@@ -37,14 +38,18 @@ workspace and lockfile from the shared graph; do not maintain a second lockfile.
 
 ## Launch configuration
 
-`src/site.ts` controls the public URL, displayed launch version, repository and
-default download destination. The website, app and workspace packages all use **v0.0.2**.
-Download buttons link directly to the published Windows installer asset:
-`releases/download/v0.0.2/WispAI-0.0.2-windows-x64-setup.exe`.
-Publish the stable release containing that asset before deploying a new download
-URL; draft releases are not public downloads.
-For later releases, update the default asset URL/version together or override
-`NEXT_PUBLIC_INSTALL_URL` with another public installer URL and redeploy.
+`src/site.ts` controls the public URL, repository and download entry point.
+`src/release.server.ts` reads `releases/latest/download/latest.json`, the same
+manifest published for the desktop updater. The displayed version, structured
+data and social card use that manifest too. Release data and versioned pages
+revalidate every five minutes as requests arrive, without a new deployment.
+The first request after expiry can receive cached data while Next.js refreshes it.
+
+`/download` returns a temporary, non-cacheable redirect to the installer from the
+manifest. If the manifest is unavailable or invalid, it redirects to GitHub's
+latest release page; the landing stays available without a version label.
+Publish the stable release with its installer and `latest.json` to update the web.
+Drafts and prereleases do not change GitHub's latest stable release destination.
 
 The hero is a native React reconstruction of the chat interface. It loops through
 a macro, a gear conversation with an auction-price follow-up, and material advice.

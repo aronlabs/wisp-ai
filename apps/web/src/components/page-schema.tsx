@@ -6,12 +6,14 @@ export function PageSchema({
   description,
   path,
   software = false,
+  softwareVersion,
   locale = 'en',
 }: {
   title: string;
   description: string;
   path: string;
   software?: boolean;
+  softwareVersion?: string;
   locale?: Locale;
 }) {
   const url = `${site.url}${localizedPath(locale, path)}`;
@@ -43,8 +45,8 @@ export function PageSchema({
       description: descriptions[locale],
       applicationCategory: 'GameApplication',
       operatingSystem: 'Windows',
-      softwareVersion: site.version,
-      downloadUrl: site.download,
+      softwareVersion,
+      downloadUrl: new URL(site.download, site.url).href,
       license: `${site.repository}/blob/main/LICENSE`,
       image: `${site.url}${localizedPath(locale, '/opengraph-image')}`,
     });
