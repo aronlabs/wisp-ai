@@ -171,6 +171,53 @@ assert(x == 0.7 and y == 0.8, "user changes must remain untouched")
 `,
   );
 });
+test('Forever plain-coordinate waypoint readings preserve placement, metadata and undo', () => {
+  vm().run(`
+C_Map.GetBestMapForUnit = function() return 1 end
+C_Map.GetUserWaypoint = function()
+    if waypoint then
+        local x, y = waypoint.position:GetXY()
+        return { uiMapID = waypoint.uiMapID, position = { x = x, y = y } }
+    end
+end
+waypoint = point(1, 0.1, 0.2)
+local inspected = C.Inspect({ kind = "map", args = {} })
+assert(inspected.status == "available", inspected.error)
+assert(inspected.data.waypoint.x == 10 and inspected.data.waypoint.y == 20)
+local r = act("set_waypoint", {
+    mapId = 1, x = 52.4, y = 11.65, label = "Samo", source = "QuestieDB Forever",
+})
+assert(r.status == "completed", r.error)
+assert(r.data.applied and r.data.reference.x == 52.4 and r.data.reference.y == 11.65)
+assert(C.db.wispWaypoint.label == "Samo" and C.db.wispWaypoint.source == "QuestieDB Forever")
+assert(C.db.wispWaypoint.previous.x == 10 and C.db.wispWaypoint.previous.y == 20)
+r = act("set_waypoint", { mapId = 1, x = 60, y = 40, label = "Second", source = "user" })
+assert(r.status == "completed", r.error)
+r = act("clear_waypoint")
+assert(r.status == "completed" and r.data.restoredPrevious, r.error)
+local x, y = waypoint.position:GetXY()
+assert(x == 0.1 and y == 0.2)
+assert(C.db.wispWaypoint == nil)
+act("set_waypoint", { mapId = 1, x = 52.4, y = 11.65, label = "Samo", source = "user" })
+waypoint = point(1, 0.7, 0.8)
+assert(act("clear_waypoint").status == "blocked")
+x, y = waypoint.position:GetXY()
+assert(x == 0.7 and y == 0.8, "a player-edited plain-coordinate pin must stay untouched")
+`);
+});
+test('malformed native waypoint coordinates block placement without overwriting the pin', () => {
+  vm().run(`
+local sets = 0
+C_Map.SetUserWaypoint = function() sets = sets + 1 end
+C_Map.GetUserWaypoint = function()
+    return { uiMapID = 1, position = { x = "unknown", y = 0.2 } }
+end
+local r = act("set_waypoint", { mapId = 1, x = 52.4, y = 11.65, label = "Samo", source = "user" })
+assert(r.status == "blocked" and sets == 0)
+assert(r.error:find("waypoint coordinates", 1, true), r.error)
+assert(C.db.wispWaypoint == nil)
+`);
+});
 test('unsupported maps and character switches never apply actions', () => {
   vm().run(
     `

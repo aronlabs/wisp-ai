@@ -798,7 +798,21 @@ local function readWaypoint()
     if not point then
         return nil
     end
-    local x, y = point.position:GetXY()
+    local position = point.position
+    assert(
+        type(position) == "table" or type(position) == "userdata",
+        "The game returned invalid waypoint coordinates"
+    )
+    local x, y
+    if type(position.GetXY) == "function" then
+        x, y = position:GetXY()
+    else
+        x, y = position.x, position.y
+    end
+    assert(
+        type(x) == "number" and type(y) == "number" and x >= 0 and x <= 1 and y >= 0 and y <= 1,
+        "The game returned invalid waypoint coordinates"
+    )
     return { mapId = point.uiMapID, x = x * 100, y = y * 100 }
 end
 local function sameWaypoint(a, b)
