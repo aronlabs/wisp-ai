@@ -151,6 +151,8 @@ export function createTurnRunner(deps: TurnDependencies) {
           ? 'error'
           : 'interrupted',
       );
+      parts.flush(chat, Date.now(), true);
+      chat.eveId = undefined;
       chat.messages.push({
         role: 'system',
         text: error instanceof Error ? error.message : String(error),

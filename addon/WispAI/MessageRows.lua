@@ -175,6 +175,15 @@ local function makeRow(parent)
         end
     end)
     row.disclosure:Hide()
+    row.retry = C.Widgets.button(row, "Retry", 80, function(self)
+        self:Disable()
+        C.Send({
+            type = "retry",
+            chat = row.retryChat,
+            context = C.CaptureTurn and C.CaptureTurn() or C.Capture({ "character", "location" }),
+        })
+    end)
+    row.retry:Hide()
     return row
 end
 C.MakeMessageRow = makeRow
@@ -280,7 +289,9 @@ function C.MessageSpeaker(message)
 end
 function C.RenderMessageRow(row, chat, message, width, showAuthor)
     local tool = message.tool
-    local signature = (message.role or "")
+    local signature = chat.id
+        .. "\31"
+        .. (message.role or "")
         .. "\31"
         .. (message.text or "")
         .. "\31"
@@ -373,6 +384,17 @@ function C.RenderMessageRow(row, chat, message, width, showAuthor)
             if message.role ~= "user" then
                 row.height = row.height + 8
             end
+        end
+        local retry = chat.status == "error"
+            and message.role == "system"
+            and message == chat.messages[#chat.messages]
+        row.retry:SetShown(retry)
+        row.retryChat = chat.id
+        if retry then
+            row.retry:Enable()
+            row.retry:ClearAllPoints()
+            row.retry:SetPoint("TOPLEFT", 0, -row.height)
+            row.height = row.height + 30
         end
         row:SetHeight(row.height)
     end

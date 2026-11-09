@@ -24,7 +24,7 @@ function fixture() {
   const cancel = vi.fn(async () => {});
   const end = vi.fn(async () => {});
   const interrupt = vi.fn();
-  const run = vi.fn(async () => {});
+  const run = vi.fn(async (..._args: unknown[]) => {});
   const models = vi.fn(async (): Promise<AccountModel[]> => []);
   const receive = createPacketReceiver({
     state,
@@ -125,4 +125,16 @@ test('deleting an active conversation cancels its requests and prevents delayed 
   expect(f.state.chats).toEqual([]);
   expect(f.end).toHaveBeenCalledTimes(1);
   expect(f.run).not.toHaveBeenCalled();
+});
+
+test('retry reuses the failed question and ignores retries while working', () => {
+  const f = fixture();
+  const chat = f.state.chats[0]!;
+  chat.messages.push({ role: 'user', id: 'question', text: 'Which quest?' });
+  chat.status = 'error';
+  f.receive(packetSchema.parse({ type: 'retry', chat: 'old', session: 'one', seq: 11, at: 1 }));
+  expect(f.run).toHaveBeenCalledWith(chat, 'Which quest?', 'question', undefined);
+  chat.status = 'working';
+  f.receive(packetSchema.parse({ type: 'retry', chat: 'old', session: 'one', seq: 12, at: 1 }));
+  expect(f.run).toHaveBeenCalledTimes(1);
 });

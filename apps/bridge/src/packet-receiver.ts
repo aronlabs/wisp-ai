@@ -537,6 +537,13 @@ export function createPacketReceiver(deps: ReceiverDependencies) {
       }
       void run(chat, packet.text, packet.messageId, packet.context);
     }
+    if (packet.type === 'retry') {
+      const chat = chatFor(packet.chat);
+      const message = chat?.messages.findLast((entry) => entry.role === 'user');
+      if (chat?.status === 'error' && message?.id) {
+        void run(chat, message.text, message.id, packet.context);
+      }
+    }
     if (packet.type === 'select') {
       const chat = chatFor(packet.chat);
       if (chat) {

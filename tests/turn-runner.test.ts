@@ -7,7 +7,7 @@ function fixture() {
   const chat = newChat('chat', 'one');
   let transport = 'one';
   let current = true;
-  const send = vi.fn(async () => ({
+  const send = vi.fn(async (_input: string) => ({
     stream: async function* (): AsyncGenerator<{ type: string; data: Record<string, unknown> }> {
       yield {
         type: 'content.delta',
@@ -113,4 +113,28 @@ test('interrupting a delivery aborts its stream and drains the runner', async ()
   await turn;
   await f.run.drain();
   expect(f.chat.status).toBe('interrupted');
+});
+
+test('retry after failure restores history without duplicating the user message', async () => {
+  const f = fixture();
+  await f.run(f.chat, 'Earlier question', 'earlier');
+  f.send.mockRejectedValueOnce(new Error('Provider unavailable'));
+  await f.run(f.chat, 'Explain that quest', 'failed');
+  expect(f.chat.status).toBe('error');
+  expect(f.chat.eveId).toBeUndefined();
+  await f.run(f.chat, 'Explain that quest', 'failed');
+  expect(f.chat.status).toBe('done');
+  expect(f.chat.messages.filter((m) => m.id === 'failed')).toHaveLength(1);
+  const input = f.send.mock.calls.at(-1)![0];
+  expect(input).toContain('Earlier question');
+  expect(input).toContain('Explain that quest');
+  expect(f.client.sessions.create).toHaveBeenCalledTimes(2);
+});
+
+test('a follow-up after failure includes the failed question in restored history', async () => {
+  const f = fixture();
+  f.send.mockRejectedValueOnce(new Error('Provider unavailable'));
+  await f.run(f.chat, 'Explain that quest', 'failed');
+  await f.run(f.chat, 'Try that again', 'follow-up');
+  expect(f.send.mock.calls.at(-1)![0]).toContain('Explain that quest');
 });

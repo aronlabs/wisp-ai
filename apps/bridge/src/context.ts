@@ -86,14 +86,15 @@ export function turnInput(
   ].join('\n\n');
 }
 export function withConversationHistory(input: string, messages: Message[]): string {
+  const currentUser = messages.findLastIndex((message) => message.role === 'user');
   const history = messages
+    .slice(0, currentUser < 0 ? messages.length : currentUser)
     .filter(
       (message) =>
         (message.role === 'user' || message.role === 'assistant') &&
         !message.streaming &&
         message.text.trim(),
     )
-    .slice(0, -1)
     .slice(-12)
     .map((message) => ({ role: message.role, text: message.text.slice(0, 2000) }));
   if (!history.length) {
