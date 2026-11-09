@@ -289,7 +289,7 @@ local function layout()
     if header.titleAnchor ~= titleAnchor then
         header.titleAnchor = titleAnchor
         header.title:ClearAllPoints()
-        header.title:SetPoint("LEFT", 12, 0)
+        header.title:SetPoint("LEFT", header.logo, "RIGHT", 6, 0)
         header.title:SetPoint("RIGHT", titleAnchor, "LEFT", -8, 0)
     end
     if chatPanel._sidebarWidth ~= width then
@@ -653,8 +653,13 @@ function C.BuildUI()
         frame:StopMovingOrSizing()
         C.SaveWindowPosition(C.db.minimized)
     end)
+    local logo = header:CreateTexture(nil, "ARTWORK")
+    header.logo = logo
+    logo:SetSize(24, 24)
+    logo:SetPoint("LEFT", 4, 0)
+    logo:SetTexture("Interface\\AddOns\\WispAI\\Textures\\Wisp.tga")
     header.title = label(header, "Wisp AI", GOLD)
-    header.title:SetPoint("LEFT", 12, 0)
+    header.title:SetPoint("LEFT", logo, "RIGHT", 6, 0)
     replyGlow = CreateFrame("Frame", "WispAIReplyGlow", header, "BackdropTemplate")
     replyGlow:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 2)
     replyGlow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 2, -2)
