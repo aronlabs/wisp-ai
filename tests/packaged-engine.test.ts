@@ -1,11 +1,75 @@
 import { test, expect } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { copyFile, mkdir, mkdtemp, writeFile, rm, readdir } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, writeFile, readFile, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const exec = promisify(execFile);
+test.runIf(Boolean(process.env.WISP_TEST_ENGINE_EXECUTABLE))(
+  'packaged install and migration forward their positional folder arguments',
+  { timeout: 60_000 },
+  async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'wisp-cli-args-'));
+    try {
+      const engine = path.join(root, 'wisp-engine.exe');
+      await copyFile(process.env.WISP_TEST_ENGINE_EXECUTABLE!, engine);
+      const wow = path.join(root, 'fake WoW client');
+      const data = path.join(root, 'installed data');
+      const addon = path.join(root, 'addon/WispAI');
+      await mkdir(wow);
+      await writeFile(path.join(wow, 'Wow.exe'), '');
+      await mkdir(addon, { recursive: true });
+      await writeFile(path.join(addon, 'WispAI.toc'), '## Title: Installer fixture\n');
+      const env = {
+        ...process.env,
+        WISP_RESOURCE_ROOT: root,
+        WISP_DATA_DIR: data,
+        LOCALAPPDATA: path.join(root, 'local app data'),
+      };
+      await exec(engine, ['scripts/install.ts', wow], {
+        cwd: root,
+        env,
+        windowsHide: true,
+        timeout: 45_000,
+      });
+      expect(JSON.parse(await readFile(path.join(data, 'config.local.json'), 'utf8')).wow).toBe(
+        wow,
+      );
+      expect(await readFile(path.join(wow, 'Interface/AddOns/WispAI/WispAI.toc'), 'utf8')).toBe(
+        '## Title: Installer fixture\n',
+      );
+
+      const previous = path.join(root, 'previous installation');
+      const imported = path.join(root, 'imported data');
+      await mkdir(path.join(previous, 'runtime'), { recursive: true });
+      await writeFile(
+        path.join(previous, 'config.local.json'),
+        JSON.stringify({ wow, model: 'offline-fixture' }),
+      );
+      const chats = [{ id: 'fixture', eveId: 'old-session', status: 'working', messages: [] }];
+      await writeFile(path.join(previous, 'runtime/chats.json'), JSON.stringify(chats));
+      await exec(engine, ['scripts/migrate-desktop.ts', previous], {
+        cwd: root,
+        env: { ...env, WISP_DATA_DIR: imported },
+        windowsHide: true,
+        timeout: 15_000,
+      });
+      expect(JSON.parse(await readFile(path.join(imported, 'config.local.json'), 'utf8'))).toEqual({
+        wow,
+        model: 'offline-fixture',
+      });
+      expect(JSON.parse(await readFile(path.join(imported, 'runtime/chats.json'), 'utf8'))).toEqual(
+        [{ id: 'fixture', status: 'interrupted', messages: [] }],
+      );
+      expect(JSON.parse(await readFile(path.join(previous, 'runtime/chats.json'), 'utf8'))).toEqual(
+        chats,
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    }
+  },
+);
 test.runIf(Boolean(process.env.WISP_TEST_ENGINE_EXECUTABLE))(
   'packaged npm runs a local MCP executable without installing Node or extracting npm',
   { timeout: 60_000 },

@@ -30,6 +30,7 @@ if (mode === '--version') {
     'scripts/migrate-desktop.ts': './migrate-desktop.mjs',
   };
   if (Object.hasOwn(commands, mode)) {
+    process.argv.splice(1, 2, fileURLToPath(new URL(commands[mode], import.meta.url)));
     await import(commands[mode]);
   } else {
     // npm lifecycle commands may re-enter this executable through pkg's Node
