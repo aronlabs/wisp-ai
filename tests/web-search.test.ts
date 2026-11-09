@@ -356,3 +356,69 @@ test.each([true, false])(
     }
   },
 );
+
+test.each([
+  { depth: 'quick' as const, count: 3, characters: 2000, seconds: 35 },
+  { depth: 'standard' as const, count: 5, characters: 4000, seconds: 85 },
+  { depth: 'deep' as const, count: 12, characters: 8000, seconds: 160 },
+])(
+  'Exa honors the $depth result, excerpt and deadline budget',
+  async ({ depth, count, characters, seconds }) => {
+    let request: any;
+    const fetcher = vi.fn(async (_endpoint: unknown, init?: RequestInit) => {
+      request = JSON.parse(String(init?.body));
+      return Response.json({
+        results: Array.from({ length: 15 }, (_, i) => ({
+          url: `https://example.com/source-${i}`,
+          text: 'x'.repeat(13000),
+        })),
+      });
+    });
+    const f = await fixture(fetcher);
+    await f.search.save({ provider: 'exa', apiKey: 'key' });
+    const result = await f.search.search({ query: 'Ability acquisition', depth }, apiModel);
+    expect(request.numResults).toBe(count);
+    expect(request.contents.text.maxCharacters).toBe(characters);
+    expect(result.budget?.timeoutSeconds).toBe(seconds);
+    expect(result.sources).toHaveLength(count);
+    expect(result.sources.every((source) => source.excerpt?.length === characters)).toBe(true);
+  },
+);
+
+test('Exa executes explicit query variants within one shared deadline and retains successful results', async () => {
+  const queries: string[] = [];
+  const signals: AbortSignal[] = [];
+  const fetcher = vi.fn(async (_endpoint: unknown, init?: RequestInit) => {
+    const request = JSON.parse(String(init?.body));
+    queries.push(request.query);
+    signals.push(init!.signal!);
+    if (request.query === 'Unavailable variant') {return new Response('', { status: 503 });}
+    return Response.json({
+      results: [{ url: 'https://example.com/fact', text: 'Supported evidence' }],
+    });
+  });
+  const f = await fixture(fetcher);
+  await f.search.save({ provider: 'exa', apiKey: 'key' });
+  const result = await f.search.search(
+    {
+      query: 'First query',
+      queries: ['Unavailable variant', 'Never executed'],
+      depth: 'deep',
+      maxQueries: 2,
+      maxResults: 4,
+      timeoutSeconds: 20,
+      excerptCharacters: 1500,
+    },
+    apiModel,
+  );
+  expect(queries).toEqual(['First query', 'Unavailable variant']);
+  expect(result.status).toBe('available');
+  expect(result.sources).toHaveLength(1);
+  expect(result.budget).toMatchObject({
+    maxQueries: 2,
+    maxResults: 4,
+    timeoutSeconds: 20,
+    excerptCharacters: 1500,
+  });
+  expect(signals).toHaveLength(2);
+});

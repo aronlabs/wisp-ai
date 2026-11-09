@@ -55,6 +55,7 @@ test('an API chat searches Wowhead through Exa without a ChatGPT account', async
     return start(options);
   };
   const actualFetch = globalThis.fetch;
+  const exaRequests: Record<string, unknown>[] = [];
   const exa = vi.fn(async () =>
     Response.json({
       results: [
@@ -67,6 +68,7 @@ test('an API chat searches Wowhead through Exa without a ChatGPT account', async
   );
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     if (String(input) === 'https://api.exa.ai/search') {
+      exaRequests.push(JSON.parse(String(init?.body)));
       return exa();
     }
     if (String(input).startsWith('https://mcp.exa.ai/')) {
@@ -123,11 +125,30 @@ test('an API chat searches Wowhead through Exa without a ChatGPT account', async
     await desktop('/search/save', { provider: 'auto', apiKey: 'private-exa-key' });
     chat.status = 'working';
     expect((await agent('/session-model?session=eve-search')).webSearchAvailable).toBe(true);
-    const result = await agent('/wowhead', { eveSession: 'eve-search', query: 'Frost Nova' });
+    const result = await agent('/wowhead', {
+      eveSession: 'eve-search',
+      query: 'Frost Nova',
+      depth: 'deep',
+      maxResults: 7,
+      maxQueries: 1,
+      timeoutSeconds: 120,
+      excerptCharacters: 6000,
+    });
     expect(result).toMatchObject({
       status: 'available',
       provider: 'Exa',
+      budget: {
+        depth: 'deep',
+        maxResults: 7,
+        maxQueries: 1,
+        timeoutSeconds: 120,
+        excerptCharacters: 6000,
+      },
       sources: [{ excerpt: 'Forever reference excerpt' }],
+    });
+    expect(exaRequests.at(-1)).toMatchObject({
+      numResults: 7,
+      contents: { text: { maxCharacters: 6000 } },
     });
     expect(exa).toHaveBeenCalledTimes(2);
     chat.status = 'done';

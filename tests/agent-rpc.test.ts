@@ -46,3 +46,32 @@ test('RPC preserves caller cancellation alongside its timeout', async () => {
   abort.abort();
   expect(signal?.aborted).toBe(true);
 });
+
+test('search budgets survive the RPC envelope and reject out-of-bound overrides', async () => {
+  const payload = {
+    eveSession: 'test',
+    query: 'Availability',
+    depth: 'deep' as const,
+    maxResults: 8,
+    maxQueries: 4,
+    timeoutSeconds: 120,
+    excerptCharacters: 6000,
+    queries: ['Alternate route'],
+  };
+  const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    expect(JSON.parse(String(init?.body))).toEqual(payload);
+    return Response.json({ status: 'available', sources: [] });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  await agentRPC('wowhead', payload);
+  for (const invalid of [
+    { maxResults: 13 },
+    { timeoutSeconds: 181 },
+    { maxQueries: 7 },
+    { excerptCharacters: 12001 },
+    { depth: 'unlimited' },
+    { maxResults: 0 },
+  ])
+    {expect(rpcRequests.wowhead.safeParse({ ...payload, ...invalid }).success).toBe(false);}
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});

@@ -180,7 +180,8 @@ const server = createServer(async (req, res) => {
       value = simulationSnapshot;
     } else if (req.url === '/wowhead') {
       call.query = args.query;
-      value = await searchPublicWeb(args.query, scopedAuth, model);
+      value = await searchPublicWeb(args, scopedAuth, model);
+      call.budget = value.budget;
       call.sources = value.sources?.map((source) => source.url);
       call.research = value.research;
     } else if (req.url === '/memory' && data.operation === 'list') {

@@ -135,3 +135,64 @@ test('irrelevant unsafe search hits do not suppress attributed findings from pub
   expect(result.research).toEqual(dossier);
   expect(result.sources).toEqual([{ url: source, title: undefined }]);
 });
+
+test('ChatGPT receives the chosen research depth and bounds returned findings', async () => {
+  let body: any;
+  const findings = Array.from({ length: 6 }, (_, i) => ({
+    claim: 'Claim ' + i,
+    url,
+    sourceType: 'guide',
+    scope: 'Current community source',
+  }));
+  const auth = {
+    authorized: async (_url: string, init: RequestInit) => {
+      body = JSON.parse(String(init.body));
+      return new Response(
+        'data: ' +
+          JSON.stringify({
+            type: 'response.completed',
+            response: {
+              output: [
+                { type: 'web_search_call', action: { sources: [{ url }] } },
+                {
+                  content: [
+                    {
+                      text: JSON.stringify({
+                        findings,
+                        unresolvedQuestions: [],
+                        suggestedQueries: [],
+                      }),
+                    },
+                  ],
+                },
+              ],
+            },
+          }) +
+          '\n\n',
+      );
+    },
+  } as unknown as ChatGPTAuth;
+  const result = await searchPublicWeb(
+    {
+      query: 'Compare acquisition routes',
+      depth: 'deep',
+      maxResults: 2,
+      maxQueries: 3,
+      timeoutSeconds: 120,
+      queries: ['Check availability'],
+    },
+    auth,
+    'gpt-6.1-sol',
+  );
+  expect(body.reasoning.effort).toBe('medium');
+  expect(body.instructions).toContain('at most 3 targeted search queries');
+  expect(body.instructions).toContain('up to 2 useful findings within 120 seconds');
+  expect(JSON.parse(body.input[0].content[0].text).queryVariants).toEqual(['Check availability']);
+  expect('research' in result && result.research?.findings).toHaveLength(2);
+  expect(result.budget).toMatchObject({
+    depth: 'deep',
+    maxResults: 2,
+    maxQueries: 3,
+    timeoutSeconds: 120,
+  });
+});

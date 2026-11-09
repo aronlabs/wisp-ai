@@ -98,3 +98,58 @@ To evaluate another run, inspect the answer and the per-search findings/scope in
 `report.json`. A generic refusal despite accessible explicit evidence is a failed
 semantic result even if every tool completed. Unavailable providers should remain
 an explicit test limitation, not be interpreted as missing gameplay content.
+
+## Adaptive search budgets
+
+The model selects `depth: quick | standard | deep` and can override individual
+budgets through the same search tool input. It starts with an appropriate depth
+for the question and escalates when evidence is conflicting or acquisition is
+unresolved; the bridge does not guess depth from keywords.
+
+| Depth    | Findings/sources | Query budget | Search deadline | Exa excerpt/source |
+| -------- | ---------------: | -----------: | --------------: | -----------------: |
+| quick    |                3 |            1 |      35 seconds |   2,000 characters |
+| standard |                5 |            2 |      85 seconds |   4,000 characters |
+| deep     |               12 |            4 |     160 seconds |   8,000 characters |
+
+Optional inputs `maxResults`, `maxQueries`, `timeoutSeconds`, and
+`excerptCharacters` override the profile defaults. Validation allows 1–12
+results, 1–6 queries, 10–180 seconds, and 1,000–12,000 excerpt characters.
+Queries can be up to 1,000 characters. `queries` supplies up to five additional
+focused variants; the primary query counts toward the budget.
+
+Exa executes explicit variants concurrently within one shared deadline, retains
+successful responses if another variant fails, deduplicates sources and caps the
+total returned sources/excerpts. Without explicit variants it makes one query.
+ChatGPT receives the selected depth/query/findings/time budget; its query count
+is guidance to the hosted search model, not an independently enforced internal
+query counter. Returned findings/sources and the request deadline are enforced.
+Deep search uses medium reasoning on supported models; other profiles use low.
+The agent RPC deadline includes a 15-second margin above the search deadline.
+Returned results report the selected `budget` for inspection.
+
+Example tool input:
+
+```json
+{
+  "query": "WoW Forever mage ability acquisition",
+  "depth": "deep",
+  "maxResults": 8,
+  "maxQueries": 3,
+  "timeoutSeconds": 120,
+  "queries": [
+    "WoW Forever mage ability availability",
+    "WoW Forever teaching item obtainable source"
+  ]
+}
+```
+
+Legacy callers passing only a query string retain the standard profile.
+
+Headless adaptive check (2026-11-09): with only the empty-catalog boundary
+simulated, the agent chose `standard` with `maxQueries: 3` and supplied an
+availability query variant, then escalated to `deep` while overriding its result
+limit to five sources. Both searches returned available evidence. The real
+model/web run completed, inspected source
+pages and answered the question with attribution. This checks that the model can
+select non-default budgets through the production tool, independently of WoW.

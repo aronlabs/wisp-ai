@@ -250,7 +250,7 @@ export function createAgentHandler(deps: AgentDependencies) {
           req.url === '/database'
             ? await database.query(databaseRequest.parse(args), abort.signal)
             : await webSearch.search(
-                wowheadQuery.parse(args).query,
+                wowheadQuery.parse(args),
                 chat.modelSettings?.model || defaultModel(),
                 abort.signal,
               );
