@@ -33,9 +33,9 @@ test.runIf(Boolean(process.env.WISP_TEST_ENGINE_EXECUTABLE))(
         windowsHide: true,
         timeout: 45_000,
       });
-      expect(JSON.parse(await readFile(path.join(data, 'config.local.json'), 'utf8')).wow).toBe(
+      expect(JSON.parse(await readFile(path.join(data, 'config.local.json'), 'utf8'))).toEqual({
         wow,
-      );
+      });
       expect(await readFile(path.join(wow, 'Interface/AddOns/WispAI/WispAI.toc'), 'utf8')).toBe(
         '## Title: Installer fixture\n',
       );

@@ -37,6 +37,31 @@ async function fixture() {
   return { dataDirectory, options, child: () => child };
 }
 
+test('a fresh addon installation starts before a default model is selected', async () => {
+  const f = await fixture();
+  const config = { wow: path.join(f.dataDirectory, 'wow'), model: '' };
+  await writeFile(path.join(f.dataDirectory, 'config.local.json'), JSON.stringify(config));
+  let bridge: Awaited<ReturnType<typeof startBridge>> | undefined;
+  try {
+    bridge = await startBridge(f.options);
+    const identity = JSON.parse(
+      await readFile(path.join(f.dataDirectory, 'runtime/desktop.json'), 'utf8'),
+    );
+    const response = await fetch(`http://127.0.0.1:${identity.port}/status`, {
+      headers: { authorization: 'Bearer ' + identity.token },
+    });
+    expect(response.ok).toBe(true);
+    expect(statusSchema.parse(await response.json())).toMatchObject({
+      auth: { status: 'signed_out' },
+      gameConnected: false,
+      modelConnected: false,
+    });
+  } finally {
+    await bridge?.stop();
+    await rm(f.dataDirectory, { recursive: true, force: true });
+  }
+});
+
 test('an API chat searches Wowhead through Exa without a ChatGPT account', async () => {
   const f = await fixture();
   const secrets = new Map<string, string>();

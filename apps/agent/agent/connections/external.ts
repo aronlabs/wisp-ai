@@ -7,7 +7,16 @@ export default defineDynamic(async () => {
   if (!file) {
     return null;
   }
-  const config = JSON.parse(await readFile(file, 'utf8')) as {
+  let raw: string;
+  try {
+    raw = await readFile(file, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+  const config = JSON.parse(raw) as {
     servers?: Record<
       string,
       { enabled?: boolean; url: string; description: string; tokenEnv?: string }

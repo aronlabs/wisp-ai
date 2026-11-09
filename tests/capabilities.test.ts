@@ -141,6 +141,24 @@ test('disabled native search is removed from model calls without affecting other
   assert.deepEqual(filtered.toolChoice, { type: 'auto' });
 });
 
+test('a fresh install has no custom MCP connections until configured', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'wisp-external-missing-'));
+  const previous = process.env.WOW_MCP_CONFIG;
+  try {
+    process.env.WOW_MCP_CONFIG = path.join(directory, 'mcp.json');
+    assert.equal(await dynamicEvaluate(external)({} as never), null);
+    await writeFile(process.env.WOW_MCP_CONFIG, 'invalid JSON');
+    await assert.rejects(async () => dynamicEvaluate(external)({} as never), SyntaxError);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.WOW_MCP_CONFIG;
+    } else {
+      process.env.WOW_MCP_CONFIG = previous;
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('custom MCP names with underscores produce legal Eve connection names', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'wisp-external-'));
   const previous = process.env.WOW_MCP_CONFIG;

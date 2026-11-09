@@ -38,7 +38,7 @@ for (let n = 1; n <= SLOT_COUNT; n++) {
     `## Interface: 16001\n## Title: Wisp canal ${n}\n## Group: WispAI\n## DefaultState: enabled\n## LoadOnDemand: 1\n## Dependencies: WispAI\n\n..\\WispAI_Payload\\Payload.lua\n`,
   );
 }
-let config = { wow, model: '' };
+let config: { wow: string; model?: string } = { wow };
 try {
   config = { ...JSON.parse(await readFile(paths.config, 'utf8')), wow };
 } catch {}

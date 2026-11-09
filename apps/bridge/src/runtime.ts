@@ -81,7 +81,11 @@ export async function startBridge(options: BridgeOptions = {}) {
       paths.config,
       z.object({
         wow: z.string().min(1),
-        model: z.string().min(1).optional(),
+        // Earlier installers saved an empty string before model selection.
+        model: z.preprocess(
+          (value) => (value === '' ? undefined : value),
+          z.string().min(1).optional(),
+        ),
         mcpConfig: z.string().min(1).optional(),
       }),
       () => {

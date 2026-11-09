@@ -39,7 +39,6 @@ test(
         },
       }),
     );
-    await writeFile(path.join(root, 'mcp.json'), '{"servers":{}}');
     const requests: Record<string, unknown>[] = [];
     const toolCalls: unknown[] = [];
     const trace: unknown[] = [];

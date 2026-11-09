@@ -60,14 +60,19 @@ try {
     WISP_DESKTOP_EXE: executable,
   };
   await exec(executable, ['--self-test'], { env, windowsHide: true, timeout: 30000 });
-  await writeFile(
-    path.join(data, 'config.local.json'),
-    JSON.stringify({ wow: path.join(temporary, 'fake-wow') }),
-  );
   let log = '';
   const node = path.join(payload, 'runtime/node.exe');
   const engine = path.join(payload, 'wisp-engine.exe');
   await access(engine);
+  const wow = path.join(temporary, 'fake WoW client');
+  await mkdir(wow);
+  await writeFile(path.join(wow, 'Wow.exe'), '');
+  await exec(engine, ['scripts/install.ts', wow], {
+    cwd: payload,
+    env,
+    windowsHide: true,
+    timeout: 60000,
+  });
   const payloadFiles = (await readdir(payload, { recursive: true, withFileTypes: true })).filter(
     (entry) => entry.isFile(),
   ).length;
