@@ -38,11 +38,11 @@ workspace and lockfile from the shared graph; do not maintain a second lockfile.
 ## Launch configuration
 
 `src/site.ts` controls the public URL, displayed launch version, repository and
-default download destination. The website, app and workspace packages all use **v0.0.1**.
+default download destination. The website, app and workspace packages all use **v0.0.2**.
 Download buttons link directly to the published Windows installer asset:
-`releases/download/v0.0.1/WispAI-0.0.1-windows-x64-setup.exe`.
-Make the repository public **and publish the v0.0.1 release containing that asset**
-before sharing the landing; draft releases are not public downloads.
+`releases/download/v0.0.2/WispAI-0.0.2-windows-x64-setup.exe`.
+Publish the stable release containing that asset before deploying a new download
+URL; draft releases are not public downloads.
 For later releases, update the default asset URL/version together or override
 `NEXT_PUBLIC_INSTALL_URL` with another public installer URL and redeploy.
 
