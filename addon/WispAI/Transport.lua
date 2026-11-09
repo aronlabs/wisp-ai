@@ -45,6 +45,7 @@ local compactAck = false
 -- a slightly early callback does not defer useful data for another full tick.
 local COMPACT_RECEIVE_DELAY = 0.04
 local cachedControl
+local baselinePending, persistedControl = true, nil
 local pendingWireAck, lastDataFrame, lastDataAck, partialDownlink
 local lastAcknowledgedFrame
 local downlinkUntil = 0
@@ -506,6 +507,13 @@ local function transmit()
     if not item and not wireAck then
         return
     end
+    if baselinePending then
+        -- Downlink settings survive /reload. Capture the old physical identity
+        -- before our first publication lets the host answer this addon session.
+        local previous = readControl()
+        persistedControl = previous and previous.raw or nil
+        baselinePending = false
+    end
     local stats = not wireAck and deliveries[item.packet.seq]
     if stats and not stats.startedAt then
         stats.startedAt = GetTime()
@@ -571,6 +579,9 @@ local controlGeneration
 local retiredGenerations = {}
 local retiredOrder = {}
 local function receive()
+    if baselinePending then
+        return
+    end
     local unsent, sent = false, false
     for _, packet in pairs(awaiting) do
         if packet.messageId then
@@ -612,6 +623,12 @@ local function receive()
     local incoming = readControl()
     if not incoming then
         return
+    end
+    if persistedControl then
+        if incoming.raw == persistedControl then
+            return
+        end
+        persistedControl = nil
     end
     local incomingGeneration = incoming.generation
     if incomingGeneration ~= controlGeneration then
@@ -670,7 +687,13 @@ local function receive()
     C_AddOns.EnableAddOn(name, character)
     C.slot = C.slot + 1
     local before = C.rev
-    local loaded, reason = C_AddOns.LoadAddOn(name)
+    local outcome = {}
+    C.bulkRead = outcome
+    local ok, loaded, reason = pcall(C_AddOns.LoadAddOn, name)
+    C.bulkRead = nil
+    if not ok then
+        loaded, reason = nil, loaded
+    end
     if enabledBefore == 0 then
         C_AddOns.DisableAddOn(name, character)
     end
@@ -700,7 +723,15 @@ local function receive()
         nextReceive = GetTime() + 2
     end
     if reusable and C.pendingBulkNotification then
-        if not loaded or C.rev == before then
+        local previousSession = loaded
+            and C.rev == before
+            and outcome.session ~= nil
+            and outcome.session ~= C.session
+        if previousSession then
+            -- An old turn may publish after the startup baseline while hello
+            -- is still in flight. Its rejected payload does not break the bank.
+            C.transportStats.staleBulkReads = (C.transportStats.staleBulkReads or 0) + 1
+        elseif not loaded or C.rev == before then
             C.bulkUnavailable = true
         end
         acknowledgeDownlink(C.pendingBulkNotification, not loaded or C.rev == before)

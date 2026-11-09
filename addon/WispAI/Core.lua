@@ -174,6 +174,17 @@ function WispAI_Receive(json)
     end
 end
 function C.ReceiveSnapshot(data)
+    if
+        C.bulkRead
+        and type(data) == "table"
+        and data.v == C.VERSION
+        and type(data.session) == "string"
+        and data.session ~= ""
+        and type(data.rev) == "number"
+        and data.rev > 0
+    then
+        C.bulkRead.session = data.session
+    end
     if type(data) ~= "table" or data.v ~= C.VERSION or data.session ~= C.session then
         return
     end

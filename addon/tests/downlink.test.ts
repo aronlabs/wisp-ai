@@ -172,6 +172,12 @@ end
     );
   }
   run('C.StartTransport();assert(C.reusableDownlink and C.transportStats.mailboxVersion==1)');
+  // Establish the outbound session before accepting server publications, as
+  // the production login does. Exclude that setup work from per-message counts.
+  run(
+    "C.Send({type='hello'});for i=1,10 do timers[.04]()end;C.Acknowledge({1});saves=0;resets=0;stateReads=0",
+  );
+  saved.length = 0;
   function write(frame: Buffer) {
     lua.lua_pushlstring(L, frame, frame.length);
     lua.lua_setglobal(L, to_luastring('diskFrame'));

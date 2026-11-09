@@ -150,6 +150,7 @@ assert(next(timers)==nil and saves==0 and resets==0 and loads==0)
 
 test('missing, corrupt, zero-generation and noncanonical readiness consume no bulk channels', () => {
   const h = transportHarness();
+  h.run("C.Send({type='hello'});timers[.04]()");
   h.run('for i=1,100 do now=now+.1;timers[.1]()end;assert(loads==0 and resets>50 and #logs==0)');
   h.control(1, 17, (frame) => {
     frame[15] ^= 1;
@@ -169,6 +170,7 @@ test('missing, corrupt, zero-generation and noncanonical readiness consume no bu
 
 test('new checked revisions load once and repeated readiness never burns unchanged slots', () => {
   const h = transportHarness();
+  h.run("C.Send({type='hello'});timers[.04]()");
   h.control(1);
   h.run("nextRev=1;now=1;timers[.1]();assert(loads==1 and C.rev==1);C.chats[1].status='working'");
   h.run('for i=1,100 do now=now+.1;timers[.1]()end;assert(loads==1 and C.slot==2)');
@@ -180,6 +182,7 @@ test('new checked revisions load once and repeated readiness never burns unchang
 
 test('a bulk helper overlapping the uplink preserves its disabled state and uses an explicit character', () => {
   const h = transportHarness();
+  h.run("C.Send({type='hello'});timers[.04]()");
   h.run('C.slot=257;states.WispAI_S0257=false;disk.WispAI_S0257=false');
   h.control(1);
   h.run(
@@ -212,7 +215,7 @@ test('reset invalidates cached uplink bits so a following publication remains CR
   h.run(`
 disk.WispAI_S0257=false
 now=.2;timers[.1]()
-assert(resets==1 and states.WispAI_S0257==false)
+assert(resets==2 and states.WispAI_S0257==false)
 C.Send({type='poll'})
 now=.24;timers[.04]()
 assert(states.WispAI_S0257==true and #logs==0)
@@ -227,13 +230,13 @@ test('flat W2 publication reads each full-frame carrier once and reuses its nati
   h.run(`
 C.Send({type='poll'})
 now=.04;timers[.04]()
-assert(stateReads==768 and saves==1)
+assert(stateReads==1152 and saves==1,'one startup downlink baseline precedes the first full-frame publication')
 assert(stateChanges>0 and stateChanges<768)
 firstChanges=stateChanges
 for i=1,128 do assert(states[string.format('WispAI_B%03d',i)],'uplink must never write the downlink B lane')end
 C.Send({type='poll'})
 now=.08;timers[.04]()
-assert(stateReads==768 and saves==2,'cached publication needs one save and no additional native state reads')
+assert(stateReads==1152 and saves==2,'cached publication needs one save and no additional native state reads')
 assert(stateChanges>firstChanges and stateChanges-firstChanges<128,'only changed wire sequence and CRC bits need native mutations')
 assert(#logs==0)
 `);
@@ -242,6 +245,7 @@ assert(#logs==0)
 
 test('a retired host generation cannot consume a slot during the new host session', () => {
   const h = transportHarness();
+  h.run("C.Send({type='hello'});timers[.04]()");
   h.control(1, 100);
   h.run("nextRev=1;now=1;timers[.1]();C.chats[1].status='working';assert(loads==1)");
   h.control(2, 101);
@@ -286,6 +290,7 @@ assert(packets[3].messageId=='retry-me' and packets[3].session==packets[1].sessi
 
 test('consuming the last bulk helper marks exhaustion and subsequent envelopes clamp the advertised cursor', () => {
   const h = transportHarness();
+  h.run("C.Send({type='hello'});timers[.04]()");
   h.run(`
 C.slot=1024
 states.WispAI_S1024=false;disk.WispAI_S1024=false

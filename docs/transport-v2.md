@@ -127,6 +127,15 @@ counter. The displayed UI remains until the replacement state arrives; retired
 generations cannot overwrite the newer state. This is distinct from an addon UI
 reload, which starts a new application session.
 
+On UI reload, the addon baselines the physical downlink before its first uplink
+and ignores that persisted frame until a fresh publication arrives. Baseline reads
+respect the addon-settings pause. A previous turn can still publish while the new
+hello is in flight, so a bulk read records the valid snapshot's session before
+Core rejects mismatched sessions. Loading such an old snapshot requests a fresh
+full state without permanently disabling bulk. A real load failure, invalid data
+or an unapplied current-session snapshot still falls back to the reusable lane.
+The scoped read outcome is cleared even when loading raises an error.
+
 ## Bulk selection and measurement
 
 The earlier fixed 96-byte cutoff has been replaced by
