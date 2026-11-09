@@ -36,11 +36,19 @@ export function projectChats(state: SessionState, now = Date.now()) {
           c.id === state.inlineChat ||
           (c.inline && c.status === 'working') ||
           (c.proactive && c.status === 'done')
-            ? c.messages.map((m, index) => ({
-                ...m,
-                id: m.id || c.id + '-message-' + index,
-                text: m.text.slice(0, 20000),
-              }))
+            ? c.messages.flatMap((m, index) =>
+                // A routine's initial user turn is generated execution context.
+                // Keep it in model history, but never expose it in the conversation.
+                c.routineId && index === 0 && m.role === 'user'
+                  ? []
+                  : [
+                      {
+                        ...m,
+                        id: m.id || c.id + '-message-' + index,
+                        text: m.text.slice(0, 20000),
+                      },
+                    ],
+              )
             : undefined,
       })),
     notifications: state.chats
