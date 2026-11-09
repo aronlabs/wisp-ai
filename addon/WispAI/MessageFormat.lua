@@ -157,9 +157,9 @@ local function formatted(text, references, fromUser)
     text = text:gsub("%*%*([^*]+)%*%*", "|cffe3c77e%1|r")
     text = text:gsub("%*([^*\n]+)%*", "%1"):gsub("_([^_\n]+)_", "%1")
     text = text:gsub("%[([^%]]+)%]%(https?://[^%)]+%)", "%1")
-    return (text:gsub("\1(%d+)\2", function(index)
+    return C.Emoji.render((text:gsub("\1(%d+)\2", function(index)
         return links[tonumber(index)]
-    end))
+    end)))
 end
 C.FormatText = formatted
 local function referenceSignature(references)
