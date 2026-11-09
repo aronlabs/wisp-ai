@@ -18,6 +18,17 @@ test('chat placeholder distinguishes connecting, fetching history and an empty c
     function C.Current() return C.chats[1] end
     assert(load(${JSON.stringify(addonSource('UI.lua'))}))('WispAI',C)
     C.BuildUI()
+    local header=UI_TEST.frames.WispAISettingsButton.parent
+    local setPoint=header.title.SetPoint
+    local titleLeft
+    header.title.SetPoint=function(self,point,relative,relativePoint,x,y)
+      if point=='LEFT' then titleLeft={relative,relativePoint,x,y} end
+      setPoint(self,point,relative,relativePoint,x,y)
+    end
+    header.titleAnchor=nil
+    C.Refresh()
+    assert(titleLeft and titleLeft[1]==header.logo and titleLeft[2]=='RIGHT' and titleLeft[3]>0,
+      'refresh must keep the title to the right of the logo')
     local state=UI_TEST.frames.WispAIChatPlaceholder
     assert(state:IsShown() and state.loading and state.title:GetText()=='Waiting for bridge')
     assert(state.mouseEnabled==false)
