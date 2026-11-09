@@ -123,11 +123,18 @@ export class McpManager {
       let command = server.command!,
         args = [...server.args];
       if (/^node(?:\.exe)?$/i.test(command)) {
-        command = process.execPath;
+        command = process.env.WISP_ENGINE_EXECUTABLE
+          ? path.join(this.root, 'runtime/node.exe')
+          : process.execPath;
       }
       if (/^npx(?:\.cmd)?$/i.test(command)) {
         command = process.execPath;
-        args = [path.join(this.root, 'runtime', 'npm', 'bin', 'npx-cli.js'), ...args];
+        args = [
+          process.env.WISP_ENGINE_EXECUTABLE
+            ? '--npx'
+            : path.join(this.root, 'runtime', 'npm', 'bin', 'npx-cli.js'),
+          ...args,
+        ];
       }
       const allowedEnv = Object.fromEntries(
         [
@@ -146,6 +153,8 @@ export class McpManager {
         ].flatMap((k) => (process.env[k] ? [[k, process.env[k]!]] : [])),
       );
       allowedEnv.PATH =
+        path.join(this.root, 'runtime') +
+        path.delimiter +
         path.dirname(process.execPath) +
         path.delimiter +
         (process.env.PATH || process.env.Path || '');

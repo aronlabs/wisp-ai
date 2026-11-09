@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, readFile, writeFile, access, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, access, mkdir, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Client } from 'eve/client';
@@ -18,7 +18,9 @@ const target = path.join(temporary, 'Installed'),
   data = path.join(process.env.APPDATA, 'com.wisp.ai');
 let child: ReturnType<typeof spawn> | undefined;
 try {
+  const installStarted = performance.now();
   await exec(installer, ['/S', '/D=' + target], { windowsHide: true, timeout: 180000 });
+  const installMilliseconds = performance.now() - installStarted;
   const executable = path.join(target, 'wisp.exe'),
     payload = path.join(target, 'payload');
   await access(executable);
@@ -64,7 +66,22 @@ try {
   );
   let log = '';
   const node = path.join(payload, 'runtime/node.exe');
-  child = spawn(node, [path.join(payload, 'src/main.ts')], {
+  const engine = path.join(payload, 'wisp-engine.exe');
+  await access(engine);
+  const payloadFiles = (await readdir(payload, { recursive: true, withFileTypes: true })).filter(
+    (entry) => entry.isFile(),
+  ).length;
+  for (const name of ['node_modules', 'runtime/npm']) {
+    try {
+      await access(path.join(payload, name));
+      throw Error('Installer extracted loose dependencies: ' + name);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+  child = spawn(engine, ['src/main.ts'], {
     cwd: payload,
     env: {
       ...env,
@@ -95,7 +112,7 @@ try {
   if (!ready) {
     throw Error('Installed agent did not become ready: ' + log);
   }
-  if (!JSON.stringify(await client.info()).includes('manage_panel')) {
+  if (!JSON.stringify(await client.health()).includes('ready')) {
     throw Error('Installed agent did not discover its tools.');
   }
   const identity = JSON.parse(await readFile(path.join(data, 'runtime/desktop.json'), 'utf8'));
@@ -123,7 +140,9 @@ try {
   await writeFile(path.join(data, 'preserve-on-uninstall.txt'), 'keep user data');
   await mkdir(path.join(payload, 'tests'), { recursive: true });
   await writeFile(path.join(payload, 'tests/retired-file.txt'), 'obsolete application resource');
+  const upgradeStarted = performance.now();
   await exec(installer, ['/S', '/D=' + target], { windowsHide: true, timeout: 180000 });
+  const upgradeMilliseconds = performance.now() - upgradeStarted;
   try {
     await access(path.join(payload, 'tests/retired-file.txt'));
     throw Error('Upgrade retained a retired application resource.');
@@ -144,6 +163,11 @@ try {
     installer: true,
     protectedCredentials: true,
     bundledNode: true,
+    packagedEngine: true,
+    noLooseNodeModules: true,
+    payloadFiles,
+    installMilliseconds,
+    upgradeMilliseconds,
     agentReady: true,
     independentSignIn: true,
     noPersonalData: true,

@@ -1,6 +1,6 @@
 import { test, expect, vi } from 'vitest';
 import { createServer } from 'node:http';
-import { mkdtemp, writeFile, open, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, open, readFile, rm, mkdir, copyFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Client } from 'eve/client';
@@ -19,7 +19,17 @@ test(
     const root = await mkdtemp(path.join(tmpdir(), 'wisp-agent-integration-'));
     const engine = path.join(root, 'engine');
     const flags = path.join(root, 'capabilities.json');
-    await prepareEngine(process.env.WISP_TEST_AGENT_ROOT || appPaths(process.cwd()).agent, engine);
+    const sourceExecutable = process.env.WISP_TEST_ENGINE_EXECUTABLE;
+    const executable = sourceExecutable ? path.join(root, 'wisp-engine.exe') : undefined;
+    if (executable) {
+      await copyFile(sourceExecutable!, executable);
+      await mkdir(engine, { recursive: true });
+    } else {
+      await prepareEngine(
+        process.env.WISP_TEST_AGENT_ROOT || appPaths(process.cwd()).agent,
+        engine,
+      );
+    }
     await writeFile(
       flags,
       JSON.stringify({
@@ -31,6 +41,7 @@ test(
     );
     await writeFile(path.join(root, 'mcp.json'), '{"servers":{}}');
     const requests: Record<string, unknown>[] = [];
+    const toolCalls: unknown[] = [];
     const trace: unknown[] = [];
     const text =
       '{"type":"text_delta","text":"Offline integration passed."}\n{"type":"conversation_title","title":"Quest in Ratchet"}\n';
@@ -48,6 +59,17 @@ test(
       let body = '';
       for await (const chunk of req) {
         body += chunk;
+      }
+      if (req.url === '/panels') {
+        if (req.headers.authorization !== 'Bearer offline-token') {
+          res.writeHead(401).end();
+          return;
+        }
+        toolCalls.push(JSON.parse(body));
+        res
+          .writeHead(200, { 'content-type': 'application/json' })
+          .end(JSON.stringify({ panels: [] }));
+        return;
       }
       requests.push(JSON.parse(body));
       if (requests.length === 2) {
@@ -156,25 +178,41 @@ test(
     await new Promise<void>((resolve) => reserved.close(() => resolve()));
     const log = await open(path.join(root, 'eve.log'), 'a');
     // Override the launch port while keeping the production process setup and environment.
-    const child = startEveProcess({
-      root: engine,
-      logFile: log.fd,
-      port,
-      environment: {
-        ...process.env,
-        NODE_ENV: 'development',
-        EVE_MOCK_AUTHORED_MODELS: '0',
-        WOW_BRIDGE_TOKEN: 'offline-token',
-        WOW_BRIDGE_URL: origin,
-        WOW_CAPABILITIES_FILE: flags,
-        WOW_MCP_CONFIG: path.join(root, 'mcp.json'),
-      },
-      onError: () => {},
-      onExit: () => {},
+    const start = () =>
+      startEveProcess({
+        root: engine,
+        logFile: log.fd,
+        port,
+        environment: {
+          ...process.env,
+          ...(executable
+            ? {
+                WISP_ENGINE_EXECUTABLE: executable,
+                PATH: path.join(process.env.WINDIR || 'C:/Windows', 'System32'),
+              }
+            : {}),
+          NODE_ENV: 'development',
+          EVE_MOCK_AUTHORED_MODELS: '0',
+          WOW_BRIDGE_TOKEN: 'offline-token',
+          WOW_BRIDGE_URL: origin,
+          WOW_CAPABILITIES_FILE: flags,
+          WOW_MCP_CONFIG: path.join(root, 'mcp.json'),
+        },
+        onError: () => {},
+        onExit: () => {},
+      });
+    let child = start();
+    const client = new Client({
+      baseUrl: 'http://127.0.0.1:' + port,
+      auth: { bearer: () => 'offline-token' },
     });
-    const client = new Client({ baseUrl: 'http://127.0.0.1:' + port });
     try {
       await vi.waitFor(() => client.health(), { timeout: 75_000, interval: 200 });
+      if (executable) {
+        await expect(
+          new Client({ baseUrl: 'http://127.0.0.1:' + port }).info(),
+        ).rejects.toMatchObject({ status: 401 });
+      }
       const session = (await client.sessions.create()).session;
       const chat = newChat('offline', 'test');
       const input = turnInput(
@@ -231,10 +269,27 @@ test(
       expect(names(2)).toContain('wow__get_settings');
       expect(names(2)).not.toContain('wow__update_settings');
       expect(JSON.stringify(requests[2])).toContain('Settings capabilities:');
+      if (executable) {
+        await stopEveProcess(child);
+        child = start();
+        await vi.waitFor(() => client.health(), { timeout: 15_000, interval: 200 });
+        expect(JSON.stringify(await session.snapshot())).toContain('Offline integration passed.');
+        expect(
+          (await readdir(root, { recursive: true })).some((entry) =>
+            entry.split(/[\\/]/).includes('node_modules'),
+          ),
+        ).toBe(false);
+      }
     } catch (error) {
       throw new Error(
         'Offline agent integration failed: ' +
           JSON.stringify(trace) +
+          '\nModel tools: ' +
+          JSON.stringify(
+            requests.map((request) =>
+              (request.tools as { name?: string }[] | undefined)?.map((tool) => tool.name),
+            ),
+          ) +
           '\n' +
           (await readFile(path.join(root, 'eve.log'), 'utf8')),
         { cause: error },
@@ -243,7 +298,7 @@ test(
       await stopEveProcess(child);
       await log.close();
       await new Promise<void>((resolve) => model.close(() => resolve()));
-      await rm(root, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }
   },
 );

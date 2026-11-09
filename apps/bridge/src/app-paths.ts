@@ -4,8 +4,10 @@ import path from 'node:path';
 import { cp, mkdir, readFile, realpath, lstat, symlink, unlink, rm } from 'node:fs/promises';
 
 export function appPaths(root: string, data = process.env.WISP_DATA_DIR) {
-  const agent = path.dirname(fileURLToPath(import.meta.resolve('@wisp/agent/package.json')));
   const dataRoot = data ? path.resolve(data) : root;
+  const agent = process.env.WISP_ENGINE_EXECUTABLE
+    ? path.join(dataRoot, 'engine')
+    : path.dirname(fileURLToPath(import.meta.resolve('@wisp/agent/package.json')));
   return {
     root,
     agent,
@@ -18,6 +20,29 @@ export function appPaths(root: string, data = process.env.WISP_DATA_DIR) {
 
 export async function prepareEngine(root: string, engine: string) {
   if (root === engine) {
+    await mkdir(engine, { recursive: true });
+    if (process.env.WISP_ENGINE_EXECUTABLE) {
+      // Older installers copied authored code and dependency junctions here.
+      // Retire only that marked application code; keep Eve's durable .eve data.
+      const marker = path.join(engine, 'package.json');
+      let legacy = false;
+      try {
+        legacy = JSON.parse(await readFile(marker, 'utf8')).name === '@wisp/agent';
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
+      }
+      if (legacy) {
+        for (const name of ['src', 'agent', 'dist', 'node_modules', 'package.json']) {
+          const target = path.resolve(engine, name);
+          if (path.dirname(target) !== path.resolve(engine)) {
+            throw Error('Invalid legacy engine directory.');
+          }
+          await rm(target, { recursive: true, force: true });
+        }
+      }
+    }
     return;
   }
   await mkdir(engine, { recursive: true });
