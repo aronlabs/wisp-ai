@@ -51,7 +51,7 @@
     </nav>
     <div class="rail-footer">
       <span>Wisp AI</span><span class="version"
-        >v{app.info?.version || "0.0.5"}</span
+        >v{app.info?.version || "0.0.6"}</span
       >
     </div>
   </aside>
@@ -68,7 +68,7 @@
 
     <Updates
       showSettings={app.page === "Settings"}
-      version={app.info?.version || "0.0.5"}
+      version={app.info?.version || "0.0.6"}
       locked={!!app.busy}
       openSettings={() => (app.page = "Settings")}
       onBusy={(label) => (app.busy = label)}
