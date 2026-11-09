@@ -2,7 +2,7 @@
   <img src="assets/wisp.png" alt="Wisp AI logo" width="120" />
 </p>
 
-# Wisp AI for WoW: Forever
+<h1 align="center">Wisp AI for WoW: Forever</h1>
 
 Ask about your character without leaving the game. Wisp brings your chosen AI provider into World of Warcraft: Forever, with live readings of your quests, talents, spells, equipment and bags.
 
