@@ -76,7 +76,10 @@ export function SiteHeader({ locale }: { locale: Locale }) {
             id={menuId}
             aria-label={t('Main navigation')}
             onBlur={(event) => {
+              // Touch browsers can blur the focused link before dispatching a click.
+              // Only close for a known focus destination; outside taps are handled above.
               if (
+                event.relatedTarget !== null &&
                 !event.currentTarget.contains(event.relatedTarget) &&
                 !menuButton.current?.contains(event.relatedTarget)
               ) {
