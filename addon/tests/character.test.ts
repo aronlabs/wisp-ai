@@ -23,6 +23,33 @@ function vm() {
   };
 }
 const file = 'addon/WispAI/Character.lua';
+test('first visible text is measured once for the current message, excluding old or hidden rows', () => {
+  const v = vm();
+  v.run(
+    `C={}; SlashCmdList={}; now=0; function time()return 123 end; function GetTime()return now end; callbacks={}; C_Timer={After=function(_,f)callbacks[#callbacks+1]=f end}`,
+  );
+  v.run(
+    `assert(load(${JSON.stringify(readFileSync('addon/WispAI/Core.lua', 'utf8'))}))('WispAI',C)`,
+  );
+  v.run(`
+local sent={}; C.Send=function(p)sent[#sent+1]=p end
+local old={role='assistant',text='old'}
+local answer={role='assistant',text='new'}
+local chat={id='chat',messages={old,{role='user',id='m',text='question'},answer}}
+local visible=false
+local row={IsShown=function()return true end,IsVisible=function()return visible end}
+C.BeginResponseTiming('chat','m',0)
+C.responseTiming.chat.acknowledgedAt=1
+C.RecordFirstText(chat,old,row)
+assert(#callbacks==0)
+now=3;C.RecordFirstText(chat,answer,row);callbacks[1]()
+assert(#sent==0, 'hidden text is not displayed text')
+visible=true;C.RecordFirstText(chat,answer,row);callbacks[2]()
+assert(#sent==1 and sent[1].data.totalMs==3000 and sent[1].data.afterSendingMs==2000)
+C.RecordFirstText(chat,answer,row)
+assert(#callbacks==2, 'measure only the first display')
+`);
+});
 function talentVM() {
   const v = vm();
   v.run(`

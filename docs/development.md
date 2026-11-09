@@ -112,6 +112,31 @@ The bridge owns accounts, persistence and tool execution. Eve runs on loopback *
 
 Game transport uses addon enable states for outbound frames and preinstalled load-on-demand helpers for inbound snapshots. Sequence IDs, acknowledgements and revisions handle retries and stale packets. For framing, polling and reply contracts, use [transport.ts](../apps/bridge/src/transport.ts), [reply-stream.ts](../apps/bridge/src/reply-stream.ts) and the protocol source rather than treating documentation as a wire specification.
 
+Interactive packets take priority over unsent background traffic; in-flight frames
+are never interleaved. Polls coalesce, and acknowledged retries are removed. The
+Sending indicator follows the message's transport acknowledgement while keeping
+optimistic history until an authoritative snapshot arrives. Recent user actions
+temporarily poll more frequently; idle clients still consume no helper channels.
+Interactive acknowledgement reads start only after the message's final frame,
+using a short 250 ms polling window. Receipt requests an immediate snapshot publish
+instead of waiting for the normal 400 ms UI batch. Character identity travels by
+acknowledged revision; changed integration reports still accompany a message, and
+heartbeats keep availability fresh. Delivery metrics report compressed bytes,
+frame/retry counts, queue time, transmission time and acknowledgement wait.
+
+Manual turns revalidate a bounded quest summary locally. Quest-log events warm a
+session/character-scoped bridge cache, and acknowledged, unchanged summaries travel
+as revision references. Missing revisions fall back to normal game reads. The
+quest data stays out of `game_context`. When requested, `wow__query_character`
+serves quests from a private turn-verified reading without a game round trip; mixed
+requests fetch only other sections live. Missing/partial readings or `refresh=true`
+fall back to the addon. Automatic conversation titles
+are assigned from the first message before model preparation, without waiting for a response.
+Optional large tool schemas and their instruction modules load through
+`wisp__load_tools`, or after related read tools, without changing capability flags.
+Compaction keeps the full instruction set. Bridge logs record `Message delivery`
+and `Turn timing` entries for receipt, admission and first visible text latency.
+
 ### Runtime boundaries
 
 The bridge entrypoint only starts the runtime and handles process signals.

@@ -8,6 +8,65 @@ C.pendingMessages, C.pendingChats = {}, {}
 C.deletedChats = {}
 C.capabilityPending = {}
 C.workStarted = {}
+C.responseTiming = {}
+function C.BeginResponseTiming(chat, messageId, startedAt)
+    C.responseTiming[chat] = { messageId = messageId, startedAt = startedAt }
+end
+function C.RecordFirstText(chat, message, row)
+    local timing = chat and C.responseTiming[chat.id]
+    if
+        not timing
+        or timing.recorded
+        or timing.pending
+        or message.role ~= "assistant"
+        or not (message.text or ""):match("%S")
+    then
+        return
+    end
+    local userIndex, responseIndex
+    for index, entry in ipairs(chat.messages or {}) do
+        if entry.role == "user" then
+            userIndex = index
+        end
+        if entry == message then
+            responseIndex = index
+        end
+    end
+    if
+        not userIndex
+        or not responseIndex
+        or responseIndex <= userIndex
+        or chat.messages[userIndex].id ~= timing.messageId
+    then
+        return
+    end
+    timing.pending = true
+    timing.hasText = true
+    -- Measure a displayed row on the next UI frame, not just receipt of data.
+    C_Timer.After(0, function()
+        timing.pending = nil
+        if
+            C.responseTiming[chat.id] ~= timing
+            or timing.recorded
+            or not row:IsShown()
+            or (row.IsVisible and not row:IsVisible())
+        then
+            return
+        end
+        timing.recorded = true
+        C.Send({
+            type = "inline_status",
+            chat = chat.id,
+            data = {
+                event = "first_text",
+                messageId = timing.messageId,
+                totalMs = math.floor((GetTime() - timing.startedAt) * 1000),
+                afterSendingMs = timing.acknowledgedAt
+                    and math.floor((GetTime() - timing.acknowledgedAt) * 1000),
+            },
+        })
+    end)
+end
 C.connected, C.rev = false, 0
 function C.Log(text)
     DEFAULT_CHAT_FRAME:AddMessage("|cffd5bb75Wisp:|r " .. text)
@@ -125,7 +184,8 @@ function C.Submit()
     local message = { id = messageId, role = "user", text = text }
     C.pendingMessages[messageId] = { chat = C.active, message = message }
     C.workStarted[C.active] = GetTime()
-    local context = C.Capture and C.Capture({ "character", "location" })
+    local context = C.CaptureTurn and C.CaptureTurn()
+        or (C.Capture and C.Capture({ "character", "location" }))
     C.Send({ type = "say", chat = C.active, text = text, messageId = messageId, context = context })
     chat = C.Current()
     if chat then
@@ -169,12 +229,39 @@ function C.SetCapability(id, enabled)
 end
 function WispAI_Receive(json)
     local ok, data = pcall(C_EncodingUtil.DeserializeJSON, json)
-    if not ok or type(data) ~= "table" or data.v ~= C.VERSION or data.session ~= C.session then
+    if ok then
+        C.ReceiveSnapshot(data)
+    end
+end
+function C.ReceiveSnapshot(data)
+    if
+        C.bulkRead
+        and type(data) == "table"
+        and data.v == C.VERSION
+        and type(data.session) == "string"
+        and data.session ~= ""
+        and type(data.rev) == "number"
+        and data.rev > 0
+    then
+        C.bulkRead.session = data.session
+    end
+    if type(data) ~= "table" or data.v ~= C.VERSION or data.session ~= C.session then
         return
     end
     C.Acknowledge(data.acks or {})
     if (data.rev or 0) <= C.rev then
         return
+    end
+    local applyStarted = C.BeginTransportApply and C.BeginTransportApply()
+    if C.reusableDownlink and C.RememberDownlink then
+        C.RememberDownlink(data)
+    end
+    if data.questRevision == 0 then
+        -- The bridge restarted or has no usable cache; resend on the next turn.
+        C.questAcknowledged = 0
+    end
+    if data.characterRevision == 0 then
+        C.characterAcknowledged = 0
     end
     local previous = C.Current()
     local previousState = previous and previous.status
@@ -327,6 +414,9 @@ function WispAI_Receive(json)
     if C.Refresh then
         C.Refresh()
     end
+    if C.RecordTransportSnapshot then
+        C.RecordTransportSnapshot(data, applyStarted)
+    end
 end
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
@@ -358,7 +448,7 @@ events:SetScript("OnEvent", function(_, event, name)
             C.InitAdvice()
         end
         C.StartTransport()
-        C.Send({ type = "hello", chat = C.active, context = C.Capture({ "character", "location" }) })
+        C.Send({ type = "hello", chat = C.active, context = C.CaptureTurn() })
     end
 end)
 SLASH_WISPAI1 = "/wisp"

@@ -35,6 +35,55 @@ end
   );
   return { run };
 }
+
+test('turn snapshots revalidate quests but send an unchanged log only until its revision is acknowledged', () => {
+  vm().run(`
+local complete, count, reads = false, 1, 0
+C_QuestLog = {
+    GetNumQuestLogEntries=function() reads=reads+1; return count end,
+    GetInfo=function(i)return {questID=i,title='Quest '..i,level=12}end,
+    IsComplete=function()return complete end,
+    GetQuestObjectives=function()return {{text='Deliver crate',finished=complete,numFulfilled=0,numRequired=1,unused='omit'}}end,
+}
+C_EncodingUtil={SerializeJSON=function(data)return tostring(data.count)..tostring(data.quests[1].complete)end}
+local first=C.CaptureTurn()
+assert(first.questRevision==1 and first.sections.quests.data.count==1)
+assert(first.sections.quests.data.quests[1].objectives[1].unused==nil)
+C.questAcknowledged=1
+local second=C.CaptureTurn()
+assert(reads==2 and second.questRevision==1 and second.sections.quests==nil, 'revalidate without resending')
+complete=true
+local third=C.CaptureTurn()
+assert(third.questRevision==2 and third.sections.quests.data.quests[1].complete)
+assert(C.CaptureTurn().sections.quests~=nil, 'lost/unconfirmed revisions must resend')
+C.questAcknowledged=2
+assert(C.CaptureTurn().sections.quests==nil)
+count=42
+local bounded=C.CaptureTurn().sections.quests.data
+assert(bounded.count==42 and bounded.truncated and #bounded.quests==40)
+C_QuestLog.GetNumQuestLogEntries=function()error('not ready')end
+local failed=C.CaptureTurn()
+assert(failed.questRevision==nil and failed.sections.quests==nil, 'never reuse stale data on failure')
+`);
+});
+
+test('turn context sends only changed character identity and excludes unrelated live fields', () => {
+  vm().run(`
+local level=13
+C.Capture=function()return {capturedAt=123,source='WoW addon live API',character='Mage',sections={character={status='available',data={name='Mage',realm='Realm',class='MAGE',level=level,moneyCopper=999,xp=100,xpMax=1000,raceToken='ORC'}},location={status='available',data={zone='Test'}}}}end
+C_EncodingUtil={SerializeJSON=function(data)return tostring(data.level)end}
+local first=C.CaptureTurn()
+assert(first.characterRevision==1 and first.sections.character.data.level==13)
+assert(first.sections.character.data.moneyCopper==nil and first.sections.character.data.xp==nil and first.sections.character.data.raceToken==nil)
+assert(first.source==nil and first.character==nil)
+C.characterAcknowledged=1
+local second=C.CaptureTurn()
+assert(second.characterRevision==1 and second.sections.character==nil)
+level=14
+local third=C.CaptureTurn()
+assert(third.characterRevision==2 and third.sections.character.data.level==14)
+`);
+});
 test('reference reads distinguish loading from a missing item and expose real tooltip text', () => {
   vm().run(
     `

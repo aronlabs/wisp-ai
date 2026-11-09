@@ -54,6 +54,46 @@ test('quest graphs terminate on cycles and report depth, size and missing-record
     assert(C.ReadQuestieChain({questId=1,direction='followups',maxDepth=1}).truncated)
   `);
 });
+
+test('Questie sparse objective tuples serialize as objects without losing positional meaning', () => {
+  const run = vm();
+  run(`
+    -- Quest 5041 has only the item group (3), with a missing tuple slot (2).
+    local objectives = { [3] = { { [1] = 12708, [3] = 0 } } }
+    local quest = {name='Supplies for the Crossroads',startedBy={{3429}},objectives=objectives}
+    LibQuestieDB={flavor={expansion='Forever'},RequireContract=function()return true end,Quest={Exists=function()return true end,Get=function(_,key)return quest[key]end}}
+    local function assertJSON(value)
+        if type(value) ~= 'table' then return end
+        local count, highest, numbers, strings = 0, 0, false, false
+        for key, child in pairs(value) do
+            count = count + 1
+            if type(key) == 'number' then
+                assert(key >= 1 and key % 1 == 0)
+                numbers = true
+                highest = math.max(highest, key)
+            else
+                assert(type(key) == 'string')
+                strings = true
+            end
+            assertJSON(child)
+        end
+        assert(not (numbers and strings), 'WoW JSON rejects mixed keys')
+        assert(not numbers or highest == count, 'WoW JSON rejects sparse arrays')
+    end
+    local result = C.InspectIntegration({kind='questie_quest',args={questId=5041}})
+    assert(result.status=='available')
+    assertJSON(result)
+    local groups = result.data.data.objectives
+    assert(groups['3'][1]['1']==12708 and groups['3'][1]['3']==0)
+    assert(groups['1']==nil and groups['3'][1]['2']==nil, 'missing positions must stay unknown')
+    assert(result.data.data.startedBy[1][1]==3429, 'dense arrays stay arrays')
+    assert(objectives[3][1][1]==12708 and objectives['3']==nil, 'provider data is never mutated')
+    quest.objectives = {[0]=false, label='mixed', [4]={value=true}}
+    result = C.ReadQuestieQuest({questId=5041})
+    assertJSON(result)
+    assert(result.data.objectives['0']==false and result.data.objectives['4'].value)
+  `);
+});
 test('Syndicator uses scoped public cached reads and guild opt-in without mutating provider rows', () => {
   const run = vm();
   run(`

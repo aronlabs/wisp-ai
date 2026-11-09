@@ -14,6 +14,8 @@ export interface SessionState {
   chats: Chat[];
   activeTransport: string;
   firstReadyRevision: number;
+  questRevision?: number;
+  characterRevision?: number;
   activeChat: string;
   inlineChat: string;
   currentCharacterKey?: string;

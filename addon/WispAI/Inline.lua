@@ -153,7 +153,7 @@ function C.AskPanel(panelId, node, values)
         key = panelId,
         nodeId = node.id,
         values = values,
-        context = C.Capture({ "character", "location" }),
+        context = C.CaptureTurn and C.CaptureTurn() or C.Capture({ "character", "location" }),
     })
     C.RefreshInline()
     entry:SetFocus()
@@ -264,7 +264,7 @@ function C.SendInline()
         chat = chat.id,
         messageId = id,
         text = text,
-        context = C.Capture({ "character", "location" }),
+        context = C.CaptureTurn and C.CaptureTurn() or C.Capture({ "character", "location" }),
     })
     entry:SetText("")
     C.RefreshInline()
@@ -302,6 +302,9 @@ function C.RefreshInline()
             C.PositionMessageRow(row, content, y, width)
             if not row:IsShown() then
                 row:Show()
+            end
+            if C.RecordFirstText then
+                C.RecordFirstText(chat, message, row)
             end
             y = y + h
             row:SetScript("OnMouseWheel", function(_, delta)

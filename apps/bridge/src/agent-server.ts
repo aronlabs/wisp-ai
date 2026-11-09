@@ -2,7 +2,7 @@ import { parseCharacterKey } from '@wisp/protocol/character-key';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import { rpcRequests } from '@wisp/protocol/agent-rpc';
+import { rpcRequests, rpcResponses } from '@wisp/protocol/agent-rpc';
 import { actionTools } from '@wisp/protocol/game-actions';
 import { routineInput, routineEvents } from '@wisp/protocol/routines';
 import { panelInput } from '@wisp/protocol/panels';
@@ -24,7 +24,7 @@ import { proxyConnectionModel } from './model-proxy.ts';
 import { proxyModel } from './model-proxy.ts';
 import type { WowheadSearch } from './web-search.ts';
 import { chooseChatModel } from './chat-model.ts';
-import { characterIdentity, conversationTitle } from './context.ts';
+import { characterIdentity, conversationTitle, queryCharacterSections } from './context.ts';
 export interface MemoryView {
   entries?: unknown[];
   status: string;
@@ -32,6 +32,7 @@ export interface MemoryView {
   requestId?: string;
 }
 interface AgentDependencies {
+  log?: (message: string) => void;
   token: string;
   auth: ChatGPTAuth;
   connections: ModelConnections;
@@ -87,7 +88,7 @@ export function createAgentHandler(deps: AgentDependencies) {
     ) {
       try {
         if (req.url === '/model/responses') {
-          await proxyModel(req, res, auth);
+          await proxyModel(req, res, auth, deps.log);
         } else {
           await proxyConnectionModel(req, res, connections);
         }
@@ -408,7 +409,7 @@ export function createAgentHandler(deps: AgentDependencies) {
       if (action && !chat.characterKey) {
         throw new Error('A fresh character identity is required before applying an action');
       }
-      const sections = !inspection && !action ? rpcRequests.state.parse(raw).sections : undefined;
+      const stateRequest = !inspection && !action ? rpcRequests.state.parse(raw) : undefined;
       const identity = action ? parseCharacterKey(chat.characterKey!) : undefined;
       const abort = new AbortController();
       res.once('close', () => {
@@ -416,6 +417,22 @@ export function createAgentHandler(deps: AgentDependencies) {
           abort.abort();
         }
       });
+      if (stateRequest) {
+        const result = await queryCharacterSections(
+          chat,
+          stateRequest.sections,
+          async (sections) =>
+            rpcResponses.state.parse(
+              await pending.request(
+                { chat: chat.id, session: currentTransport(), sections },
+                abort.signal,
+              ),
+            ),
+          stateRequest.refresh,
+        );
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(result));
+        return;
+      }
       const result = await pending.request(
         {
           chat: chat.id,
@@ -429,7 +446,7 @@ export function createAgentHandler(deps: AgentDependencies) {
               }
             : inspection
               ? { inspection }
-              : { sections: [...new Set(sections!)] }),
+              : {}),
         },
         abort.signal,
       );

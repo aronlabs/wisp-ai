@@ -23,13 +23,17 @@ export function beginTurn(
   if (chat.status === 'working') {
     throw Error('A turn is already running for this conversation.');
   }
+  const retrying = chat.status === 'error';
   chat.status = 'working';
   chat.activity = [];
   chat.owner = owner;
   chat.characterKey = characterKey;
   chat.historyVersion = 3;
   chat.lastUsedAt = chat.lastActivityAt = Date.now();
-  chat.messages.push({ id: messageId, role: 'user', text });
+  const previous = chat.messages.findLast((message) => message.role === 'user');
+  if (!retrying || previous?.id !== messageId) {
+    chat.messages.push({ id: messageId, role: 'user', text });
+  }
 }
 export function isWorking(chat: Chat) {
   return chat.status === 'working';

@@ -6,7 +6,7 @@ export default enabledTool(
   'get_quest',
   defineTool({
     description:
-      'Read a verified quest ID from installed QuestieDB Forever: objectives, starters/finishers, level and race/class requirements, prerequisites and exclusions. Static database data does not prove that the quest is currently offered or available to this character. Use wow__query_progression for fresh completion/progression. Resolve NPC and object objective IDs with the corresponding Questie location tools; never invent drop rates or coordinates.',
+      'Read a verified quest ID from installed QuestieDB Forever when details missing from the live quest log are needed: objectives, starters/finishers, level and race/class requirements, prerequisites and exclusions. For a simple next-quest recommendation, use the fresh quest log first. Sparse positional tuples are JSON objects with numeric-string keys; missing positions remain unknown. Static database data does not prove that the quest is currently offered or available to this character. Use wow__query_progression for fresh completion/progression. Resolve NPC and object objective IDs with the corresponding Questie location tools; never invent drop rates or coordinates.',
     inputSchema: questInput,
     label: { start: () => 'Reading quest details' },
     execute: (args, ctx) =>

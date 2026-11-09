@@ -1,6 +1,170 @@
 import { integrationContext, type CapabilityView } from '@wisp/protocol/capabilities';
 import type { Chat, Message } from './events.ts';
 import { linkedReferences } from '@wisp/protocol/references';
+import { z } from 'zod';
+
+const questSummary = z.object({
+  status: z.literal('available'),
+  data: z.object({
+    quests: z
+      .array(
+        z.object({
+          id: z.number().int().positive(),
+          title: z.string().max(500),
+          level: z.number().finite().optional(),
+          complete: z.boolean().optional(),
+          objectives: z
+            .array(
+              z.object({
+                text: z.string().max(2000).optional(),
+                finished: z.boolean().optional(),
+                numFulfilled: z.number().nonnegative().optional(),
+                numRequired: z.number().nonnegative().optional(),
+              }),
+            )
+            .max(40),
+        }),
+      )
+      .max(40),
+    count: z.number().int().nonnegative(),
+    truncated: z.boolean(),
+  }),
+});
+const characterSummary = z.object({
+  status: z.literal('available'),
+  data: z.object({
+    name: z.string().min(1),
+    realm: z.string().min(1),
+    level: z.number().optional(),
+    class: z.string().optional(),
+    race: z.string().optional(),
+    faction: z.string().optional(),
+    game: z.string().optional(),
+    version: z.string().optional(),
+    build: z.string().optional(),
+  }),
+});
+
+// A revision is meaningful only within this addon session and character.
+// Missing/mismatched revisions fall back to tools, never the last known log.
+export class TurnContextCache {
+  private character?: { revision: number; section: z.infer<typeof characterSummary> };
+  get characterRevision() {
+    return this.character?.revision || 0;
+  }
+  private cached?: { revision: number; identity: string; quests: z.infer<typeof questSummary> };
+  get revision() {
+    return this.cached?.revision || 0;
+  }
+  resolve(value: unknown): unknown {
+    let input = record(value);
+    const characterRevision = input.characterRevision;
+    if (Number.isSafeInteger(characterRevision) && Number(characterRevision) > 0) {
+      const sections = record(input.sections),
+        current = characterSummary.safeParse(sections.character);
+      if (current.success) {
+        if (!this.character || Number(characterRevision) >= this.character.revision) {
+          this.character = { revision: Number(characterRevision), section: current.data };
+        }
+      } else if (
+        !Object.hasOwn(sections, 'character') &&
+        this.character &&
+        this.character.revision === characterRevision
+      ) {
+        input = { ...input, sections: { ...sections, character: this.character.section } };
+        value = input;
+      }
+    }
+    const identity = characterIdentity(input);
+    const revision = input.questRevision;
+    if (!identity || !Number.isSafeInteger(revision) || Number(revision) <= 0) {
+      return value;
+    }
+    const summary = questSummary.safeParse(record(input.sections).quests);
+    if (summary.success) {
+      if (
+        !this.cached ||
+        this.cached.identity !== identity ||
+        Number(revision) >= this.cached.revision
+      ) {
+        this.cached = { revision: Number(revision), identity, quests: summary.data };
+      }
+      return { ...input, sections: { ...record(input.sections), quests: summary.data } };
+    }
+    if (this.cached?.identity === identity && this.cached.revision === revision) {
+      return { ...input, sections: { ...record(input.sections), quests: this.cached.quests } };
+    }
+    return value;
+  }
+}
+
+type QuestOwner = Pick<Chat, 'owner' | 'characterKey'>;
+const turnQuests = new WeakMap<
+  QuestOwner,
+  {
+    owner: string;
+    identity: string;
+    capturedAt: number;
+    quests: z.infer<typeof questSummary>;
+  }
+>();
+
+// Readings stay in bridge memory, separate from prompts and persisted chats.
+// A new turn always replaces its reading, even when the snapshot is missing.
+export function rememberTurnQuests(chat: QuestOwner, context: unknown) {
+  turnQuests.delete(chat);
+  const input = record(context),
+    identity = characterIdentity(input);
+  const summary = questSummary.safeParse(record(input.sections).quests);
+  if (
+    identity &&
+    identity === chat.characterKey &&
+    typeof input.capturedAt === 'number' &&
+    summary.success &&
+    !summary.data.data.truncated
+  ) {
+    turnQuests.set(chat, {
+      owner: chat.owner,
+      identity,
+      capturedAt: input.capturedAt,
+      quests: summary.data,
+    });
+  }
+}
+
+export async function queryCharacterSections(
+  chat: QuestOwner,
+  sections: string[],
+  query: (sections: string[]) => Promise<Record<string, unknown>>,
+  refresh = false,
+): Promise<Record<string, unknown>> {
+  const cached = turnQuests.get(chat);
+  const requested = [...new Set(sections)];
+  if (
+    refresh ||
+    !requested.includes('quests') ||
+    !cached ||
+    cached.identity !== chat.characterKey ||
+    cached.owner !== chat.owner
+  ) {
+    return query(requested);
+  }
+  const remaining = requested.filter((section) => section !== 'quests');
+  const result = remaining.length
+    ? await query(remaining)
+    : {
+        capturedAt: cached.capturedAt,
+        source: 'WoW addon live API',
+        cache: 'verified at turn submission',
+      };
+  return {
+    ...result,
+    sections: {
+      ...record(result.sections),
+      quests: { ...cached.quests, capturedAt: cached.capturedAt },
+    },
+  };
+}
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -76,7 +240,6 @@ export function turnInput(
     tagged('conversation_context', {
       id: chat.id,
       title: chat.title,
-      needsTitle: !chat.titleGenerated,
       automatic: chat.proactive === true,
       routineId: chat.routineId,
     }),
@@ -86,14 +249,15 @@ export function turnInput(
   ].join('\n\n');
 }
 export function withConversationHistory(input: string, messages: Message[]): string {
+  const currentUser = messages.findLastIndex((message) => message.role === 'user');
   const history = messages
+    .slice(0, currentUser < 0 ? messages.length : currentUser)
     .filter(
       (message) =>
         (message.role === 'user' || message.role === 'assistant') &&
         !message.streaming &&
         message.text.trim(),
     )
-    .slice(0, -1)
     .slice(-12)
     .map((message) => ({ role: message.role, text: message.text.slice(0, 2000) }));
   if (!history.length) {

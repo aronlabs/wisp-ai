@@ -10,10 +10,11 @@ import { defaultCapabilities } from '@wisp/protocol/capabilities';
 import { newChat } from '@wisp/bridge/chat-lifecycle';
 import { applyEvent } from '@wisp/bridge/events';
 import { ReplyProjection } from '@wisp/bridge/reply-stream';
+import { turnInput } from '@wisp/bridge/context';
 
 test(
   'the real Eve agent and AI SDK middleware complete an offline streamed turn',
-  { timeout: 60_000 },
+  { timeout: 100_000 },
   async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'wisp-agent-integration-'));
     const engine = path.join(root, 'engine');
@@ -22,15 +23,17 @@ test(
     await writeFile(
       flags,
       JSON.stringify({
-        enabled: Object.fromEntries(
-          defaultCapabilities().map((capability) => [capability.id, false]),
-        ),
+        enabled: {
+          ...Object.fromEntries(defaultCapabilities().map((capability) => [capability.id, false])),
+          'tool:get_settings': true,
+        },
       }),
     );
     await writeFile(path.join(root, 'mcp.json'), '{"servers":{}}');
     const requests: Record<string, unknown>[] = [];
     const trace: unknown[] = [];
-    const text = '{"type":"text_delta","text":"Offline integration passed."}\n';
+    const text =
+      '{"type":"text_delta","text":"Offline integration passed."}\n{"type":"conversation_title","title":"Quest in Ratchet"}\n';
     const model = createServer(async (req, res) => {
       if (req.url?.startsWith('/session-model?')) {
         res.writeHead(200, { 'content-type': 'application/json' }).end(
@@ -47,6 +50,53 @@ test(
         body += chunk;
       }
       requests.push(JSON.parse(body));
+      if (requests.length === 2) {
+        const item = {
+          id: 'search-item',
+          type: 'function_call',
+          call_id: 'search-call',
+          name: 'wisp__search_tools',
+          arguments: JSON.stringify({ query: 'graphics settings' }),
+        };
+        const events = [
+          {
+            type: 'response.created',
+            response: { id: 'search-response', model: 'offline-test', created_at: 1 },
+          },
+          { type: 'response.output_item.added', output_index: 0, item: { ...item, arguments: '' } },
+          {
+            type: 'response.function_call_arguments.delta',
+            item_id: item.id,
+            output_index: 0,
+            delta: item.arguments,
+          },
+          {
+            type: 'response.function_call_arguments.done',
+            item_id: item.id,
+            output_index: 0,
+            arguments: item.arguments,
+          },
+          {
+            type: 'response.output_item.done',
+            output_index: 0,
+            item: { ...item, status: 'completed' },
+          },
+          {
+            type: 'response.completed',
+            response: {
+              id: 'search-response',
+              model: 'offline-test',
+              created_at: 1,
+              output: [item],
+              usage: { input_tokens: 20, output_tokens: 10 },
+            },
+          },
+        ];
+        res
+          .writeHead(200, { 'content-type': 'text/event-stream' })
+          .end(events.map((e) => 'data: ' + JSON.stringify(e) + '\n\n').join(''));
+        return;
+      }
       const events = [
         {
           type: 'response.created',
@@ -124,12 +174,29 @@ test(
     });
     const client = new Client({ baseUrl: 'http://127.0.0.1:' + port });
     try {
-      await vi.waitFor(() => client.health(), { timeout: 40_000, interval: 200 });
+      await vi.waitFor(() => client.health(), { timeout: 75_000, interval: 200 });
       const session = (await client.sessions.create()).session;
-      const delivery = await session.send('Reply with the supplied offline text.', {
+      const chat = newChat('offline', 'test');
+      const input = turnInput(
+        'What quest should I do next?',
+        {
+          capturedAt: 100,
+          sections: {
+            quests: {
+              status: 'available',
+              data: {
+                quests: [{ id: 1492, title: 'Ratchet delivery', complete: true, objectives: [] }],
+                count: 1,
+                truncated: false,
+              },
+            },
+          },
+        },
+        chat,
+      );
+      const delivery = await session.send(input, {
         signal: AbortSignal.timeout(15000),
       });
-      const chat = newChat('offline', 'test');
       const projection = new ReplyProjection();
       for await (const event of delivery.stream({ signal: AbortSignal.timeout(15000) })) {
         if (event.type.startsWith('content.')) {
@@ -140,10 +207,30 @@ test(
       projection.flush(chat, Date.now(), true);
       expect((await delivery.result()).status).toBe('completed');
       expect(chat.messages.map((message) => message.text)).toContain('Offline integration passed.');
-      expect(requests.length).toBeGreaterThan(0);
+      expect(requests.length).toBe(1);
+      expect(chat.title).toBe('New conversation');
+      expect(chat.titleGenerated).not.toBe(true);
+      expect(JSON.stringify(requests[0])).not.toContain('Ratchet delivery');
+      expect(JSON.stringify(requests[0])).not.toContain('<wisp_module');
+      expect(JSON.stringify(requests[0])).not.toContain('Allowed kinds and fields');
       expect(
         requests.every((request) => request.store === false && !('safety_identifier' in request)),
       ).toBe(true);
+      const next = await session.send(
+        turnInput('Search settings tools', undefined, { ...chat, titleGenerated: true }),
+        { signal: AbortSignal.timeout(15000) },
+      );
+      for await (const _event of next.stream({ signal: AbortSignal.timeout(15000) })) {
+        /* Drain the real tool loop. */
+      }
+      expect((await next.result()).status).toBe('completed');
+      expect(requests).toHaveLength(3);
+      const names = (i: number) =>
+        (requests[i]!.tools as { name: string }[]).map((tool) => tool.name);
+      expect(names(1)).not.toContain('wow__get_settings');
+      expect(names(2)).toContain('wow__get_settings');
+      expect(names(2)).not.toContain('wow__update_settings');
+      expect(JSON.stringify(requests[2])).toContain('Settings capabilities:');
     } catch (error) {
       throw new Error(
         'Offline agent integration failed: ' +

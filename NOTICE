@@ -1,10 +1,7 @@
 Wisp AI
 
-This project includes outbound framing and addon-file transport concepts adapted
-from thott-bot/chat: https://github.com/thott-bot/chat
-Copyright (C) 2026 Eden Blue Ventures LLC.
-Upstream code is licensed under GNU GPL version 3 only.
-This combined project is distributed under GPL-3.0-only. See LICENSE.
+This project is distributed under GPL-3.0-only. See LICENSE.
+The WoW bridge uses Wisp's checked-frame and reusable-mailbox protocol.
 
 Eve and its dependencies retain their own licenses in node_modules.
 
@@ -12,7 +9,6 @@ Emoji artwork: Twemoji 17.0.3, copyright Twitter, Inc. and other contributors.
 https://github.com/jdecked/twemoji/tree/v17.0.3
 Graphics licensed under CC BY 4.0. Wisp resizes and packs the artwork into
 TGA atlases. See addon/WispAI/Textures/Emoji/LICENSE-GRAPHICS.txt.
-No thott.bot logos, fonts or brand artwork are included.
 
 The local simulation engine is WoWSims Forever, using StewBagger's levelsim branch.
 Original project: https://github.com/wowsims/forever

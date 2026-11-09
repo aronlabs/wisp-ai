@@ -1,11 +1,13 @@
-// Framing derived from thott-bot/chat helper/outbox.go (GPL-3.0-only).
-import { inflateSync } from 'node:zlib';
 import { z } from 'zod';
 export const PREFIX = 'WispAI';
 export const BIT_COUNT = 128;
 export const SLOT_COUNT = 1024;
 const identifier = z.string().min(1).max(200);
 const envelope = z.object({
+  transportVersion: z.literal(2).optional(),
+  mailboxVersion: z.literal(1).optional(),
+  compactAck: z.boolean().optional(),
+  bulkAvailable: z.boolean().optional(),
   session: z.string().min(1).max(100),
   seq: z.number().int().safe().positive(),
   at: z.number().int().safe(),
@@ -18,6 +20,27 @@ const envelope = z.object({
   requestId: identifier.optional(),
   data: z.unknown().optional(),
   context: z.unknown().optional(),
+  transport: z
+    .preprocess(
+      // WoW SerializeJSON emits [] for an empty Lua table. Before the first
+      // delivery measurement, transport has no defined fields.
+      (value) => (Array.isArray(value) && value.length === 0 ? {} : value),
+      z.object({
+        delivery: z
+          .object({
+            messageId: identifier,
+            ms: z.number().nonnegative().finite(),
+            queueMs: z.number().nonnegative().finite().optional(),
+            transmitMs: z.number().nonnegative().finite().optional(),
+            ackMs: z.number().nonnegative().finite().optional(),
+            bytes: z.number().int().nonnegative().optional(),
+            frames: z.number().int().nonnegative().optional(),
+            retries: z.number().int().nonnegative().optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
   slot: z.enum(['preferences', 'character']).optional(),
   key: identifier.optional(),
   enabled: z.boolean().optional(),
@@ -28,10 +51,17 @@ const envelope = z.object({
 });
 export const packetSchema = z.discriminatedUnion('type', [
   envelope.extend({
-    type: z.enum(['hello', 'poll', 'model_catalog', 'capabilities_list', 'memory_list']),
+    type: z.enum([
+      'hello',
+      'poll',
+      'quest_sync',
+      'model_catalog',
+      'capabilities_list',
+      'memory_list',
+    ]),
   }),
   envelope.extend({
-    type: z.enum(['new', 'select', 'delete', 'cancel', 'dismiss_tip', 'promote_inline']),
+    type: z.enum(['new', 'select', 'delete', 'cancel', 'retry', 'dismiss_tip', 'promote_inline']),
     chat: identifier,
   }),
   envelope.extend({
@@ -80,67 +110,6 @@ export const packetSchema = z.discriminatedUnion('type', [
   }),
 ]);
 export type Packet = z.infer<typeof packetSchema>;
-export function parseFrame(text: string): Buffer | null {
-  const bytes = Buffer.alloc(16);
-  const seen = new Set<number>();
-  for (const line of text.split(/\r?\n/)) {
-    const m = /^WispAI_B(\d{3}):\s*(enabled|disabled)\s*$/.exec(line.trim());
-    if (!m) {
-      continue;
-    }
-    const i = Number(m[1]) - 1;
-    if (i < 0 || i >= 128 || seen.has(i)) {
-      return null;
-    }
-    seen.add(i);
-    if (m[2] === 'enabled') {
-      bytes[i >> 3] |= 0x80 >> (i % 8);
-    }
-  }
-  return seen.size === 128 ? bytes : null;
-}
-export class FrameDecoder {
-  last: Buffer | null = null;
-  buffer: Buffer | null = null;
-  baseline(frame: Buffer) {
-    this.last = frame;
-    this.buffer = null;
-  }
-  add(frame: Buffer): Packet | null {
-    if (frame.length !== 16) {
-      return null;
-    }
-    if (this.last?.equals(frame)) {
-      return null;
-    }
-    if (this.last && (frame[0] & 127) !== ((this.last[0] + 1) & 127)) {
-      this.buffer = null;
-    }
-    this.last = Buffer.from(frame);
-    if (frame[0] & 128) {
-      this.buffer = Buffer.from(frame.subarray(1));
-    } else if (this.buffer) {
-      this.buffer = Buffer.concat([this.buffer, frame.subarray(1)]);
-    }
-    if (!this.buffer || this.buffer.length < 2) {
-      return null;
-    }
-    const size = this.buffer.readUInt16BE();
-    if (this.buffer.length < size + 2) {
-      return null;
-    }
-    const data = this.buffer.subarray(2, size + 2);
-    this.buffer = null;
-    try {
-      const packet = JSON.parse(
-        inflateSync(data, { maxOutputLength: 1024 * 1024 }).toString('utf8'),
-      );
-      return packetSchema.parse(packet);
-    } catch {
-      return null;
-    }
-  }
-}
 export function luaJson(json: string): string {
   let eq = '=';
   while (json.includes(']' + eq + ']')) {

@@ -250,6 +250,98 @@ function C.Capture(sections)
     return out
 end
 
+-- Revalidate at send time; acknowledged revisions avoid retransmitting an
+-- unchanged log. Quest events warm the bridge cache outside the user's turn.
+local questSignature, questRevision = nil, 0
+local characterSignature, characterRevision = nil, 0
+function C.CaptureTurn()
+    local snapshot = C.Capture({ "character", "location" })
+    -- The bridge knows this source and resolves identity from the section.
+    snapshot.source, snapshot.character = nil, nil
+    local character = snapshot.sections.character
+    if character and character.status == "available" then
+        local data = {}
+        for _, key in ipairs({
+            "name",
+            "realm",
+            "level",
+            "class",
+            "race",
+            "faction",
+            "game",
+            "version",
+            "build",
+        }) do
+            data[key] = character.data[key]
+        end
+        local signature = C_EncodingUtil.SerializeJSON(data)
+        if signature ~= characterSignature then
+            characterSignature = signature
+            characterRevision = characterRevision + 1
+        end
+        snapshot.characterRevision = characterRevision
+        snapshot.sections.character = { status = "available", data = data }
+        if (C.characterAcknowledged or 0) >= characterRevision then
+            snapshot.sections.character = nil
+        end
+    end
+    local ok, data = pcall(collectors.quests)
+    if not ok then
+        return snapshot -- Ordinary query tools remain the fallback.
+    end
+    local compact = { quests = {}, count = data.count, truncated = data.count > 40 }
+    for index, quest in ipairs(data.quests) do
+        if index > 40 then
+            break
+        end
+        local objectives = {}
+        for _, objective in ipairs(quest.objectives) do
+            objectives[#objectives + 1] = {
+                text = objective.text,
+                finished = objective.finished,
+                numFulfilled = objective.numFulfilled,
+                numRequired = objective.numRequired,
+            }
+        end
+        compact.quests[#compact.quests + 1] = {
+            id = quest.id,
+            title = quest.title,
+            level = quest.level,
+            complete = quest.complete,
+            objectives = objectives,
+        }
+    end
+    local encoded, signature = pcall(C_EncodingUtil.SerializeJSON, compact)
+    if not encoded then
+        return snapshot
+    end
+    if signature ~= questSignature then
+        questSignature = signature
+        questRevision = questRevision + 1
+    end
+    snapshot.questRevision = questRevision
+    if (C.questAcknowledged or 0) < questRevision then
+        snapshot.sections.quests = { status = "available", data = compact }
+    end
+    return snapshot
+end
+local questEvents, questSyncPending, questSyncSent = CreateFrame("Frame"), false, nil
+questEvents:RegisterEvent("QUEST_LOG_UPDATE")
+questEvents:SetScript("OnEvent", function()
+    if questSyncPending or not C.connected then
+        return
+    end
+    questSyncPending = true
+    C_Timer.After(0.5, function()
+        questSyncPending = false
+        local snapshot = C.CaptureTurn()
+        if snapshot.sections.quests and snapshot.questRevision ~= questSyncSent then
+            questSyncSent = snapshot.questRevision
+            C.Send({ type = "quest_sync", context = snapshot })
+        end
+    end)
+end)
+
 local inspectors = {}
 local function tooltip(link)
     if not C_TooltipInfo or not C_TooltipInfo.GetHyperlink then
