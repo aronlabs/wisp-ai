@@ -219,7 +219,7 @@ test('requests an AI title without copying the first message and keeps explicit 
   f.chat.titleGenerated = true;
   await f.run(f.chat, 'Otra pregunta');
   expect(f.chat.title).toBe('Mi ruta');
-  expect(f.send.mock.calls.at(-1)[0]).not.toContain('needsTitle');
+  expect(f.send.mock.calls.at(-1)![0]).not.toContain('needsTitle');
 });
 
 test('does not automatically name inline or proactive conversations', async () => {
@@ -243,5 +243,5 @@ test('an unnamed greeting can receive a title on a later turn', async () => {
   const f = fixture();
   await f.run(f.chat, 'Hola');
   await f.run(f.chat, 'Quiero una build de mago');
-  expect(f.send.mock.calls.at(-1)[0]).toContain('"needsTitle":true');
+  expect(f.send.mock.calls.at(-1)![0]).toContain('"needsTitle":true');
 });

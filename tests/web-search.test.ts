@@ -392,7 +392,9 @@ test('Exa executes explicit query variants within one shared deadline and retain
     const request = JSON.parse(String(init?.body));
     queries.push(request.query);
     signals.push(init!.signal!);
-    if (request.query === 'Unavailable variant') {return new Response('', { status: 503 });}
+    if (request.query === 'Unavailable variant') {
+      return new Response('', { status: 503 });
+    }
     return Response.json({
       results: [{ url: 'https://example.com/fact', text: 'Supported evidence' }],
     });

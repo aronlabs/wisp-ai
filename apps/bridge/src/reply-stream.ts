@@ -83,8 +83,11 @@ export class ReplyStream {
         const delta = data.text.slice(0, 20000 - this.text.length);
         this.text += delta;
         const last = this.parts.at(-1);
-        if (last?.type === 'text') last.text += delta;
-        else if (delta) this.parts.push({ type: 'text', text: delta });
+        if (last?.type === 'text') {
+          last.text += delta;
+        } else if (delta) {
+          this.parts.push({ type: 'text', text: delta });
+        }
         this.records++;
       } else if (data.type === 'reference') {
         const key = keySchema.parse(data.key),
@@ -130,7 +133,9 @@ export class ReplyStream {
         }
         if (index < 0) {
           this.ui.push(node);
-          if (!node.parent) this.parts.push({ type: 'ui', id: node.id });
+          if (!node.parent) {
+            this.parts.push({ type: 'ui', id: node.id });
+          }
         } else {
           this.ui[index] = node;
         }
@@ -226,8 +231,11 @@ export class ReplyStream {
     const parts = this.parts.map((part) => ({ ...part }));
     if (pending) {
       const last = parts.at(-1);
-      if (last?.type === 'text') last.text += pending;
-      else parts.push({ type: 'text', text: pending });
+      if (last?.type === 'text') {
+        last.text += pending;
+      } else {
+        parts.push({ type: 'text', text: pending });
+      }
     }
     return {
       text: renderText(this.text + pending),

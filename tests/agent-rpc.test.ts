@@ -71,7 +71,8 @@ test('search budgets survive the RPC envelope and reject out-of-bound overrides'
     { excerptCharacters: 12001 },
     { depth: 'unlimited' },
     { maxResults: 0 },
-  ])
-    {expect(rpcRequests.wowhead.safeParse({ ...payload, ...invalid }).success).toBe(false);}
+  ]) {
+    expect(rpcRequests.wowhead.safeParse({ ...payload, ...invalid }).success).toBe(false);
+  }
   expect(fetcher).toHaveBeenCalledTimes(1);
 });

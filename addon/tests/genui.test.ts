@@ -31,8 +31,9 @@ test('native layout places prose on both sides of a panel', () => {
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);
   const run = (source: string) => {
-    if (lauxlib.luaL_dostring(L, to_luastring(source)) !== lua.LUA_OK)
+    if (lauxlib.luaL_dostring(L, to_luastring(source)) !== lua.LUA_OK) {
       throw new Error(to_jsstring(lua.lua_tolstring(L, -1)));
+    }
   };
   run(readFileSync('addon/tests/wow-ui-stub.lua', 'utf8'));
   run('C = {}; host = CreateFrame("Frame")');

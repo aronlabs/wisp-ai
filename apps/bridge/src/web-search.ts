@@ -288,7 +288,9 @@ export class WebSearch implements WowheadSearch {
         queries.map((variant) => this.exa(variant, key, requestSignal, perQuery)),
       );
       const successful = attempts.filter((attempt) => attempt.status === 'fulfilled');
-      if (!successful.length) {throw (attempts[0] as PromiseRejectedResult).reason;}
+      if (!successful.length) {
+        throw (attempts[0] as PromiseRejectedResult).reason;
+      }
       const results = successful.flatMap((attempt) => attempt.value);
       const sources = new Map<string, { url: string; title: string; excerpt: string }>();
       for (const item of results) {
