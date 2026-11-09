@@ -1,0 +1,150 @@
+diff --git a/sim/mage/arcane_explosion.go b/sim/mage/arcane_explosion.go
+index c6ec2ec..59a0ce5 100644
+--- a/sim/mage/arcane_explosion.go
++++ b/sim/mage/arcane_explosion.go
+@@ -8,11 +8,11 @@ import (
+ // Only the highest rank the mage knows at its level is registered, not every rank
+ // spellData.ArcaneExplosion lists.
+ func (mage *Mage) registerArcaneExplosionSpell() {
+-	index, rank := mage.learnedRank(spellData.ArcaneExplosion, spellData.ArcaneExplosion.Highest())
+-	if rank == spelldata.Nil {
+-		return
+-	}
+-	mage.registerArcaneExplosionRank(index, rank)
++	spellData.ArcaneExplosion.Each(func(index int32, rank *spelldata.Spell) {
++		if spelldata.TaughtAt(rank) <= mage.Level {
++			mage.registerArcaneExplosionRank(index, rank)
++		}
++	})
+ }
+ 
+ func (mage *Mage) registerArcaneExplosionRank(_ int32, rank *spelldata.Spell) {
+diff --git a/sim/mage/arcane_missiles.go b/sim/mage/arcane_missiles.go
+index 156d36c..227389e 100644
+--- a/sim/mage/arcane_missiles.go
++++ b/sim/mage/arcane_missiles.go
+@@ -10,12 +10,11 @@ var arcaneMissilesTrainerRank = spellData.ArcaneMissiles.ByID(10212)
+ var arcaneMissilesBookRank = spellData.ArcaneMissiles.ByID(25345)
+ 
+ func (mage *Mage) registerArcaneMissilesSpell() {
+-	if _, rank := mage.learnedRank(spellData.ArcaneMissiles, arcaneMissilesTrainerRank); rank != spelldata.Nil {
+-		mage.registerArcaneMissilesRank(rank)
+-	}
+-	if mage.knowsBookRank(spellData.ArcaneMissiles, arcaneMissilesBookRank) {
+-		mage.registerArcaneMissilesRank(arcaneMissilesBookRank)
+-	}
++	spellData.ArcaneMissiles.Each(func(index int32, rank *spelldata.Spell) {
++		if spelldata.TaughtAt(rank) <= mage.Level {
++			mage.registerArcaneMissilesRank(rank)
++		}
++	})
+ }
+ 
+ // The channel's periodic effect names the missile it fires each tick, a rank of
+diff --git a/sim/mage/fire_blast.go b/sim/mage/fire_blast.go
+index 8509259..f15e4c4 100644
+--- a/sim/mage/fire_blast.go
++++ b/sim/mage/fire_blast.go
+@@ -13,17 +13,21 @@ import (
+ // Only the highest rank the mage knows at its level is registered, not every rank
+ // spellData.FireBlast lists.
+ func (mage *Mage) registerFireBlastSpell() {
+-	index, rank := mage.learnedRank(spellData.FireBlast, spellData.FireBlast.Highest())
+-	if rank == spelldata.Nil {
+-		return
+-	}
+-	mage.registerFireBlastRank(index, rank)
++	spellData.FireBlast.Each(func(index int32, rank *spelldata.Spell) {
++		if spelldata.TaughtAt(rank) <= mage.Level {
++			mage.registerFireBlastRank(index, rank)
++		}
++	})
+ }
+ 
+ func (mage *Mage) registerFireBlastRank(_ int32, rank *spelldata.Spell) {
+ 	damage := rank.DamageEffect()
+ 
+ 	config := spelldata.SpellConfig(&mage.Unit, rank, spelldata.Magic(core.ProcMaskSpellDamage))
++	// All ranks of this ability share its cooldown.
++	if config.Cast.CD.Timer != nil {
++		config.Cast.CD.Timer = mage.CategoryTimer(-2136)
++	}
+ 	config.ClassSpellMask = MageSpellFireBlast
+ 
+ 	config.ApplyEffects = func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
+diff --git a/sim/mage/fireball.go b/sim/mage/fireball.go
+index 8c24d36..4863a40 100644
+--- a/sim/mage/fireball.go
++++ b/sim/mage/fireball.go
+@@ -10,12 +10,11 @@ var fireballTrainerRank = spellData.Fireball.ByID(10151)
+ var fireballBookRank = spellData.Fireball.ByID(25306)
+ 
+ func (mage *Mage) registerFireballSpell() {
+-	if _, rank := mage.learnedRank(spellData.Fireball, fireballTrainerRank); rank != spelldata.Nil {
+-		mage.registerFireballRank(rank)
+-	}
+-	if mage.knowsBookRank(spellData.Fireball, fireballBookRank) {
+-		mage.registerFireballRank(fireballBookRank)
+-	}
++	spellData.Fireball.Each(func(index int32, rank *spelldata.Spell) {
++		if spelldata.TaughtAt(rank) <= mage.Level {
++			mage.registerFireballRank(rank)
++		}
++	})
+ }
+ 
+ func (mage *Mage) registerFireballRank(rank *spelldata.Spell) {
+diff --git a/sim/mage/frost_nova.go b/sim/mage/frost_nova.go
+index b89e2b3..5adf92d 100644
+--- a/sim/mage/frost_nova.go
++++ b/sim/mage/frost_nova.go
+@@ -8,11 +8,11 @@ import (
+ // Only the highest rank the mage knows at its level is registered, not every rank
+ // spellData.FrostNova lists.
+ func (mage *Mage) registerFrostNovaSpell() {
+-	index, rank := mage.learnedRank(spellData.FrostNova, spellData.FrostNova.Highest())
+-	if rank == spelldata.Nil {
+-		return
+-	}
+-	mage.registerFrostNovaRank(index, rank)
++	spellData.FrostNova.Each(func(index int32, rank *spelldata.Spell) {
++		if spelldata.TaughtAt(rank) <= mage.Level {
++			mage.registerFrostNovaRank(index, rank)
++		}
++	})
+ }
+ 
+ // Frost Nova
+@@ -25,6 +25,10 @@ func (mage *Mage) registerFrostNovaRank(_ int32, rank *spelldata.Spell) {
+ 	// row does not state.
+ 	config := spelldata.SpellConfig(&mage.Unit, rank,
+ 		spelldata.Magic(core.ProcMaskSpellDamage), spelldata.Flags(core.SpellFlagBinary))
++	// All ranks of this ability share its cooldown.
++	if config.Cast.CD.Timer != nil {
++		config.Cast.CD.Timer = mage.CategoryTimer(-122)
++	}
+ 	config.ClassSpellMask = MageSpellFrostNova
+ 
+ 	config.ApplyEffects = func(sim *core.Simulation, _ *core.Unit, spell *core.Spell) {
+diff --git a/sim/mage/frostbolt.go b/sim/mage/frostbolt.go
+index 264d814..e9c0d35 100644
+--- a/sim/mage/frostbolt.go
++++ b/sim/mage/frostbolt.go
+@@ -10,12 +10,11 @@ var frostboltTrainerRank = spellData.Frostbolt.ByID(10181)
+ var frostboltBookRank = spellData.Frostbolt.ByID(25304)
+ 
+ func (mage *Mage) registerFrostboltSpell() {
+-	if _, rank := mage.learnedRank(spellData.Frostbolt, frostboltTrainerRank); rank != spelldata.Nil {
+-		mage.registerFrostboltRank(rank)
+-	}
+-	if mage.knowsBookRank(spellData.Frostbolt, frostboltBookRank) {
+-		mage.registerFrostboltRank(frostboltBookRank)
+-	}
++	spellData.Frostbolt.Each(func(index int32, rank *spelldata.Spell) {
++		if spelldata.TaughtAt(rank) <= mage.Level {
++			mage.registerFrostboltRank(rank)
++		}
++	})
+ }
+ 
+ func (mage *Mage) registerFrostboltRank(rank *spelldata.Spell) {

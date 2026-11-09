@@ -92,7 +92,21 @@ for (const adapter of Object.values(adapters)) {
   }
   classData[adapter.token] = {
     talents: talentTrees.map((t: any) =>
-      t.talents.map((x: any) => ({ id: x.spellId, max: x.maxPoints })),
+      t.talents.map((x: any) => ({
+        id: x.spellId,
+        name: x.fancyName,
+        max: x.maxPoints,
+        row: x.location.rowIdx,
+        ...(x.prereqLocation
+          ? {
+              prerequisiteId: t.talents.find(
+                (p: any) =>
+                  p.location.rowIdx === x.prereqLocation.rowIdx &&
+                  p.location.colIdx === x.prereqLocation.colIdx,
+              )?.spellId,
+            }
+          : {}),
+      })),
     ),
     ranks,
     triggerParents,
@@ -123,6 +137,14 @@ await writeFile(
   ) + '\n',
 );
 manifest.supportedClasses = Object.keys(adapters);
+manifest.patches = [
+  {
+    file: 'scripts/simulator-downranking.patch',
+    sha256: createHash('sha256')
+      .update(await readFile(path.join(root, 'scripts/simulator-downranking.patch')))
+      .digest('hex'),
+  },
+];
 delete manifest.supportedClass;
 manifest.wandIds = [
   ...new Set(

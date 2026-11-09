@@ -6,7 +6,7 @@ import { rpcRequests, rpcResponses } from '@wisp/protocol/agent-rpc';
 import { actionTools } from '@wisp/protocol/game-actions';
 import { routineInput, routineEvents } from '@wisp/protocol/routines';
 import { panelInput } from '@wisp/protocol/panels';
-import { simulationInput } from '@wisp/protocol/simulation';
+import { simulationInput, simulationNeedsLiveState } from '@wisp/protocol/simulation';
 import { databaseRequest } from '@wisp/protocol/database';
 import { wowheadQuery } from '@wisp/protocol/search';
 import type { Chat } from './events.ts';
@@ -166,7 +166,7 @@ export function createAgentHandler(deps: AgentDependencies) {
       let body = '';
       for await (const chunk of req) {
         body += chunk;
-        if (body.length > 32768) {
+        if (body.length > (req.url === '/simulate' ? 1024 * 1024 : 32768)) {
           throw new Error('Request is too large');
         }
       }
@@ -179,7 +179,15 @@ export function createAgentHandler(deps: AgentDependencies) {
         })
         .parse(raw);
       const chat = getChats().find((c) => c.eveId === eveSession && c.status === 'working');
-      if (!chat || !currentTransport() || chat.owner !== currentTransport()) {
+      let detachedSimulation = false;
+      if (req.url === '/simulate') {
+        const { eveSession: _session, ...args } = rpcRequests.simulate.parse(raw);
+        detachedSimulation = !simulationNeedsLiveState(args);
+      }
+      if (
+        !chat ||
+        (!detachedSimulation && (!currentTransport() || chat.owner !== currentTransport()))
+      ) {
         throw new Error('No active connection for this character');
       }
       if (
@@ -207,10 +215,12 @@ export function createAgentHandler(deps: AgentDependencies) {
             abort.abort();
           }
         });
-        const snapshot = await readSimulationCharacter(chat.id);
+        const needsLiveState = simulationNeedsLiveState(input);
+        const snapshot = needsLiveState ? await readSimulationCharacter(chat.id) : undefined;
         if (
-          chat.owner !== currentTransport() ||
-          (chat.characterKey && characterIdentity(snapshot) !== chat.characterKey)
+          needsLiveState &&
+          (chat.owner !== currentTransport() ||
+            (chat.characterKey && characterIdentity(snapshot) !== chat.characterKey))
         ) {
           throw Error('The character changed. Request a new simulation.');
         }

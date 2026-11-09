@@ -14,6 +14,14 @@ if ($head -ne $commit) {
     git -C $source checkout --detach $commit
     if ($LASTEXITCODE -ne 0) { throw 'Could not select the pinned simulator revision.' }
 }
+$rankPatch = Join-Path $PSScriptRoot 'simulator-downranking.patch'
+git -C $source apply --reverse --check $rankPatch 2>$null
+if ($LASTEXITCODE -ne 0) {
+    git -C $source apply --check $rankPatch
+    if ($LASTEXITCODE -ne 0) { throw 'Simulator rank patch does not match the pinned source.' }
+    git -C $source apply $rankPatch
+    if ($LASTEXITCODE -ne 0) { throw 'Could not apply simulator rank patch.' }
+}
 $oldBin = $env:GOBIN
 try {
     $env:GOBIN = Join-Path $source 'bin'

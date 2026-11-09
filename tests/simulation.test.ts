@@ -1,12 +1,126 @@
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { Simulator } from '@wisp/bridge/simulation';
-import { simulationInput } from '@wisp/protocol/simulation';
+import { simulationInput, simulationNeedsLiveState } from '@wisp/protocol/simulation';
 import type { ClassMetadata } from '../apps/bridge/src/simulation/adapters/types.ts';
 import { adapters } from '../apps/bridge/src/simulation/adapters/index.ts';
 const simulator = new Simulator(process.cwd());
 const input = { plans: [{ label: 'Frostbolt', priority: [{ spellId: 205 }] }] };
+
+test('hypothetical input removes live dependency and helper gameplay policies', async () => {
+  const hypothetical = {
+    character: { class: 'MAGE' as const, level: 11, raceToken: 'Human' as const },
+    includeCurrentEquipment: false,
+    equipmentSets: [{ label: 'Empty', base: 'empty' as const, replacements: [] }],
+    durationSeconds: 600,
+    iterations: 5000,
+    targetDistanceYards: 100,
+    plans: Array.from({ length: 5 }, (_, i) => ({
+      label: String(i),
+      priority: [{ spellId: 2948 }],
+      talents: [{ id: 11070, rank: 5 }],
+    })),
+  };
+  assert.equal(simulationNeedsLiveState(hypothetical), false);
+  assert.equal(simulationNeedsLiveState({ ...hypothetical, includeCurrentEquipment: true }), true);
+  assert.equal(simulationNeedsLiveState({ nativeRequest: { raid: {} } }), false);
+  const prepared = await simulator.prepare(undefined, hypothetical, [], 'empty');
+  assert.equal(prepared.character.name, 'Hypothetical');
+  assert.equal(prepared.scenario.talentPoints, 5);
+  assert.deepEqual(prepared.scenario.spellIds, [2948]);
+  await assert.rejects(
+    simulator.prepare(undefined, { ...hypothetical, includeCurrentEquipment: true }),
+  );
+});
+
+test(
+  'native requests pass through without live state, including helper-unlisted spells and zero DPS',
+  { skip: !existsSync('simulator/wowsimcli.exe'), timeout: 60000 },
+  async () => {
+    const prepared = await simulator.prepare(mageSnapshot(22), { ...input, iterations: 2 });
+    const request = structuredClone(prepared.request);
+    request.raid.parties[0].players[0].rotation.priorityList = [
+      { action: { castSpell: { spellId: { spellId: 2948 } } } },
+    ];
+    const original = structuredClone(request);
+    const native = await simulator.run(undefined, { nativeRequest: request });
+    assert.equal(native.status, 'native', JSON.stringify(native));
+    if (native.status === 'native') {
+      assert.deepEqual(native.request, original);
+      assert.ok(
+        native.result.raidMetrics.parties[0].players[0].actions.some(
+          (a: any) => a.id?.spellId === 2948,
+        ),
+      );
+    }
+    request.raid.parties[0].players[0].rotation.priorityList = [];
+    const zero = await simulator.run(undefined, { nativeRequest: request });
+    assert.equal(zero.status, 'native', JSON.stringify(zero));
+    if (zero.status === 'native') {
+      assert.equal(zero.result.raidMetrics.parties[0].players[0].dps.avg ?? 0, 0);
+    }
+    const invalid = await simulator.run(undefined, {
+      nativeRequest: { unsupportedEngineField: true },
+    });
+    assert.equal(invalid.status, 'unavailable');
+    const structuredZero = await simulator.run(mageSnapshot(), {
+      iterations: 2,
+      plans: [{ label: 'Idle', priority: [] }],
+    });
+    assert.equal(structuredZero.status, 'available', JSON.stringify(structuredZero));
+    if (structuredZero.status === 'available') {
+      assert.equal(structuredZero.results[0].dps.average, 0);
+      assert.equal(structuredZero.results[0].relativeToFirstPercent, null);
+      assert.equal(structuredZero.results[0].equipmentDeltaPercent, null);
+    }
+  },
+);
+
+test(
+  'time-budget continuation preserves completed scenarios and resumes their original indices',
+  { skip: !existsSync('simulator/wowsimcli.exe'), timeout: 60000 },
+  async () => {
+    const instance = new Simulator(process.cwd());
+    const original = (instance as any).runSingle.bind(instance);
+    let now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const runner = vi
+      .spyOn(instance as any, 'runSingle')
+      .mockImplementation(async (...args: unknown[]) => {
+        const result = await original(...args);
+        now += 41000;
+        return result;
+      });
+    const options = {
+      iterations: 2,
+      plans: Array.from({ length: 4 }, (_, i) => ({ ...input.plans[0], label: 'Plan ' + i })),
+    };
+    let first;
+    try {
+      first = await instance.run(mageSnapshot(), options);
+    } finally {
+      clock.mockRestore();
+      runner.mockRestore();
+    }
+    assert.equal(first.status, 'available', JSON.stringify(first));
+    if (first.status !== 'available') {
+      return;
+    }
+    assert.equal(first.nextIndex, 1);
+    assert.equal(first.results.length, 1);
+    const rest = await instance.run(mageSnapshot(), { ...options, startIndex: first.nextIndex! });
+    assert.equal(rest.status, 'available', JSON.stringify(rest));
+    if (rest.status === 'available') {
+      assert.equal(rest.nextIndex, null);
+      assert.deepEqual(
+        rest.results.map((r) => r.planIndex),
+        [1, 2, 3],
+      );
+      assert.ok(rest.results.every((r) => r.relativeToFirstPercent === null));
+    }
+  },
+);
 export function mageSnapshot(level = 11) {
   return {
     sections: {
@@ -48,16 +162,65 @@ test('level 11 preparation uses exact live state, learned rank and no max-level 
   assert.deepEqual(p.rotation.priorityList, [
     { action: { castSpell: { spellId: { spellId: 205 } } } },
   ]);
-  for (const input of [
-    { level: 60 },
-    { iterations: 1000000 },
-    { durationSeconds: 500 },
-    { rotation: 'arbitrary' },
-    { targetLevel: 63 },
-  ]) {
+  for (const input of [{ level: 60 }, { rotation: 'arbitrary' }, { targetLevel: 63 }]) {
     assert.equal(simulationInput.safeParse(input).success, false);
   }
 });
+
+test('rank selection preserves lower and mixed spell IDs without learned-spell restrictions', async () => {
+  const snapshot = mageSnapshot(14);
+  snapshot.sections.spells.data.known = [{ id: 145 }];
+  const prepared = await simulator.prepare(snapshot, {
+    plans: [
+      { label: 'Mixed Fireball ranks', opener: [{ spellId: 133 }], priority: [{ spellId: 143 }] },
+    ],
+  });
+  assert.deepEqual(prepared.scenario.spellIds, [133, 143]);
+});
+
+test(
+  'native level-14 downranking executes requested Fireball ranks and keeps cooldowns shared',
+  { skip: !existsSync('simulator/wowsimcli.exe'), timeout: 60000 },
+  async () => {
+    const snapshot = mageSnapshot(14);
+    snapshot.sections.spells.data.known = [{ id: 145 }];
+    const original = structuredClone(snapshot);
+    const result = await simulator.run(snapshot, {
+      iterations: 100,
+      plans: [
+        { label: 'Rank 1', priority: [{ spellId: 133 }] },
+        { label: 'Rank 3', priority: [{ spellId: 145 }] },
+        { label: 'Mixed ranks', opener: [{ spellId: 133 }], priority: [{ spellId: 143 }] },
+      ],
+    });
+    assert.equal(result.status, 'available', JSON.stringify(result));
+    if (result.status !== 'available') {
+      return;
+    }
+    assert.ok(result.results[0].castsBySpell.some((s) => s.spellId === 133 && s.castsPerFight > 0));
+    assert.ok(result.results[1].castsBySpell.some((s) => s.spellId === 145 && s.castsPerFight > 0));
+    assert.notEqual(result.results[0].dps.average, result.results[1].dps.average);
+    for (const id of [133, 143]) {
+      assert.ok(
+        result.results[2].castsBySpell.some((s) => s.spellId === id && s.castsPerFight > 0),
+      );
+    }
+    assert.deepEqual(snapshot, original);
+    const cooldown = await simulator.run(mageSnapshot(18), {
+      iterations: 100,
+      plans: [
+        {
+          label: 'Shared cooldown',
+          priority: [{ spellId: 2137 }, { spellId: 2136 }, { spellId: 133 }],
+        },
+      ],
+    });
+    assert.equal(cooldown.status, 'available', JSON.stringify(cooldown));
+    if (cooldown.status === 'available') {
+      assert.ok(cooldown.results[0].unusedSpellIds.includes(2136));
+    }
+  },
+);
 test('incomplete, unsupported, changed and mismatched character data cannot produce a DPS result', async () => {
   const cases = [
     (s: any) => {
@@ -70,16 +233,7 @@ test('incomplete, unsupported, changed and mismatched character data cannot prod
       s.sections.character.data.game = 'Classic';
     },
     (s: any) => {
-      s.sections.spells.data.known = [{ id: 116 }];
-    },
-    (s: any) => {
       s.sections.talents.data.selected = [{ id: 999999, rank: 1 }];
-    },
-    (s: any) => {
-      s.sections.talents.data.selected = [{ id: 11070, rank: 5 }];
-    },
-    (s: any) => {
-      s.sections.talents.data.hasPendingChanges = true;
     },
     (s: any) => {
       s.sections.gear.status = 'unavailable';
@@ -251,18 +405,143 @@ test(
   },
 );
 
-test('candidate equipment rejects invalid slots, levels, class, duplicates and unsupported overrides', async () => {
+test('empty equipment sets ignore live items and preserve the character snapshot', async () => {
+  const snapshot = mageSnapshot();
+  snapshot.sections.gear.data.items = [{ slot: 1, id: 99999999, link: 'item:99999999' }];
+  const original = structuredClone(snapshot);
+  const prepared = await simulator.prepare(snapshot, input, [{ slot: 11, itemId: 1449 }], 'empty');
+  assert.deepEqual(prepared.scenario.equipment, [{ slot: 11, id: 1449 }]);
+  assert.equal(prepared.scenario.equipmentBase, 'empty');
+  assert.deepEqual(snapshot, original);
+  const naked = await simulator.prepare(snapshot, input, [], 'empty');
+  assert.equal(naked.scenario.equippedItems, 0);
+  assert.equal(
+    simulationInput.safeParse({ ...input, includeCurrentEquipment: false }).success,
+    false,
+  );
+});
+
+test(
+  'hypothetical-only runs bypass unsupported live gear without inventing current-gear deltas',
+  { skip: !existsSync('simulator/wowsimcli.exe'), timeout: 60000 },
+  async () => {
+    const snapshot = mageSnapshot();
+    snapshot.sections.gear.data.items = [{ slot: 1, id: 99999999, link: 'item:99999999' }];
+    const original = structuredClone(snapshot);
+    const result = await simulator.run(snapshot, {
+      ...input,
+      iterations: 100,
+      includeCurrentEquipment: false,
+      equipmentSets: [
+        { label: 'Naked', base: 'empty', replacements: [] },
+        { label: 'Unowned ring', base: 'empty', replacements: [{ slot: 11, itemId: 1449 }] },
+      ],
+    });
+    assert.equal(result.status, 'available', JSON.stringify(result));
+    if (result.status !== 'available') {
+      return;
+    }
+    assert.equal(result.results.length, 2);
+    assert.equal(result.results[0].equipmentLabel, 'Naked');
+    assert.equal(result.results[0].relativeToFirstPercent, 0);
+    assert.ok(result.results[1].dps.average > 0);
+    for (const row of result.results) {
+      assert.equal(row.equipmentDeltaDps, null);
+      assert.equal(row.equipmentDeltaPercent, null);
+    }
+    assert.deepEqual(snapshot, original);
+  },
+);
+
+test('hypothetical talents and spells ignore live selection without changing it', async () => {
+  const snapshot = mageSnapshot();
+  snapshot.sections.talents.data.hasPendingChanges = true;
+  snapshot.sections.spells.data.known = [];
+  const original = structuredClone(snapshot);
+  const prepared = await simulator.prepare(snapshot, {
+    plans: [
+      { label: 'Hypothetical', talents: [{ id: 11070, rank: 2 }], priority: [{ spellId: 205 }] },
+    ],
+  });
+  assert.equal(prepared.scenario.talentSource, 'hypothetical');
+  assert.equal(prepared.scenario.talentPoints, 2);
+  assert.deepEqual(snapshot, original);
+  const nakedBuild = await simulator.prepare(snapshot, {
+    plans: [{ ...input.plans[0], talents: [] }],
+  });
+  assert.equal(nakedBuild.scenario.talentPoints, 0);
+  for (const talents of [
+    [{ id: 99999999, rank: 1 }],
+    [
+      { id: 11070, rank: 1 },
+      { id: 11070, rank: 1 },
+    ],
+  ]) {
+    await assert.rejects(simulator.prepare(snapshot, { plans: [{ ...input.plans[0], talents }] }));
+  }
+});
+
+test('simulator catalog exposes requirements and hypothetical identity selects level-specific spells', async () => {
+  const catalog = await simulator.run(mageSnapshot(), { catalogOnly: true });
+  assert.equal(catalog.status, 'catalog');
+  if (catalog.status === 'catalog') {
+    assert.ok(catalog.metadata.talents.flat().every((t) => t.row !== undefined));
+  }
+  const prepared = await simulator.prepare(
+    mageSnapshot(),
+    {
+      character: { class: 'MAGE', level: 60, raceToken: 'Gnome' },
+      plans: [
+        {
+          label: 'Level 60',
+          talents: [],
+          priority: [{ spellId: classMetadata.MAGE.ranks.Frostbolt.at(-1)!.id }],
+        },
+      ],
+    },
+    [],
+    'empty',
+  );
+  assert.equal(prepared.character.source, 'hypothetical');
+  assert.equal(prepared.character.level, 60);
+  assert.equal(prepared.scenario.talentPoints, 0);
+});
+
+test(
+  'native simulation compares different talent builds without a respec',
+  { skip: !existsSync('simulator/wowsimcli.exe'), timeout: 60000 },
+  async () => {
+    const snapshot = mageSnapshot();
+    snapshot.sections.spells.data.known = [];
+    const original = structuredClone(snapshot);
+    const result = await simulator.run(snapshot, {
+      iterations: 100,
+      plans: [
+        { label: 'No talents', talents: [], priority: [{ spellId: 205 }] },
+        {
+          label: 'Improved Frostbolt',
+          talents: [{ id: 11070, rank: 2 }],
+          priority: [{ spellId: 205 }],
+        },
+      ],
+    });
+    assert.equal(result.status, 'available', JSON.stringify(result));
+    if (result.status === 'available') {
+      assert.equal(result.results.length, 2);
+      assert.notEqual(result.results[0].dps.average, result.results[1].dps.average);
+      assert.equal(result.results[0].scenario.talentPoints, 0);
+      assert.equal(result.results[1].scenario.talentPoints, 2);
+    }
+    assert.deepEqual(snapshot, original);
+  },
+);
+
+test('candidate equipment rejects ambiguous slots, unknown IDs and unrepresentable fields', async () => {
   for (const replacements of [
     [{ slot: 11, itemId: 99999999 }],
-    [{ slot: 11, itemId: 11287 }],
     [
       { slot: 11, itemId: 1449 },
       { slot: 11, itemId: 1116 },
-    ],
-    [{ slot: 7, itemId: 2978 }],
-    [
-      { slot: 16, itemId: 2847 },
-      { slot: 17, itemId: 2847 },
     ],
   ]) {
     await assert.rejects(simulator.prepare(mageSnapshot(), input, replacements));
@@ -290,7 +569,7 @@ test('candidate equipment rejects invalid slots, levels, class, duplicates and u
   );
 });
 
-test('non-mana conditions and class distance defaults are validated', async () => {
+test('resource conditions and distances pass through with class defaults', async () => {
   const fixture = classFixture('ROGUE', 11);
   const prepared = await simulator.prepare(fixture.snapshot, {
     plans: [
@@ -304,14 +583,15 @@ test('non-mana conditions and class distance defaults are validated', async () =
     ],
   });
   assert.equal(prepared.scenario.targetDistanceYards, 5);
-  await assert.rejects(
-    simulator.prepare(fixture.snapshot, { ...fixture.input, targetDistanceYards: 20 }),
-  );
-  await assert.rejects(
-    simulator.prepare(fixture.snapshot, {
-      plans: [{ label: 'Wrong resource', priority: [{ spellId: 1757, manaBelowPercent: 20 }] }],
-    }),
-  );
+  await simulator.prepare(fixture.snapshot, { ...fixture.input, targetDistanceYards: 20 });
+  await simulator.prepare(fixture.snapshot, {
+    plans: [
+      {
+        label: 'Engine decides resource behavior',
+        priority: [{ spellId: 1757, manaBelowPercent: 20 }],
+      },
+    ],
+  });
 });
 
 for (const [token, adapter] of Object.entries(adapters)) {
@@ -418,24 +698,23 @@ test(
   },
 );
 
-test('talent-granted actions and DoT conditions reject inconsistent plans', async () => {
+test('talent-granted actions and DoT conditions are delegated to the engine', async () => {
   const fixture = classFixture('WARLOCK', 60);
-  await assert.rejects(
-    simulator.prepare(fixture.snapshot, {
-      plans: [{ label: 'Missing talent', priority: [{ spellId: 1293813 }] }],
-    }),
-    /applied talent/,
-  );
-  await assert.rejects(
-    simulator.prepare(mageSnapshot(), {
-      plans: [{ label: 'Not a dot', priority: [{ spellId: 205, dotRefreshBelowSeconds: 1 }] }],
-    }),
-    /damage-over-time/,
-  );
+  await simulator.prepare(fixture.snapshot, {
+    plans: [{ label: 'Missing talent', priority: [{ spellId: 1293813 }] }],
+  });
+  await simulator.prepare(mageSnapshot(), {
+    plans: [
+      {
+        label: 'Engine decides dot support',
+        priority: [{ spellId: 205, dotRefreshBelowSeconds: 1 }],
+      },
+    ],
+  });
 });
 
 import { replaceEquipment, type CatalogItem } from '../apps/bridge/src/simulation/equipment.ts';
-test('weapon combinations require explicit off-hand removal and replacements do not inherit enchants', () => {
+test('equipment policies are delegated to the engine and replacements do not inherit enchants', () => {
   const catalog = new Map<number, CatalogItem>([
     [1, { id: 1, name: 'Dagger', type: 13, weaponType: 2, handType: 2 }],
     [2, { id: 2, name: 'Staff', type: 13, weaponType: 8, handType: 4 }],
@@ -449,9 +728,9 @@ test('weapon combinations require explicit off-hand removal and replacements do 
     { slot: 17, id: 3, link: 'item:3' },
   ];
   const original = structuredClone(current);
-  assert.throws(
-    () => replaceEquipment(current, [{ slot: 16, itemId: 2 }], catalog, 'MAGE', 11, 'Human'),
-    /explicit removal/,
+  assert.equal(
+    replaceEquipment(current, [{ slot: 16, itemId: 2 }], catalog, 'MAGE', 11, 'Human').length,
+    2,
   );
   const replaced = replaceEquipment(
     current,
@@ -474,6 +753,6 @@ test('weapon combinations require explicit off-hand removal and replacements do 
     ],
     [{ slot: 11, itemId: 6 }],
   ]) {
-    assert.throws(() => replaceEquipment(current, replacements, catalog, 'MAGE', 11, 'Human'));
+    replaceEquipment(current, replacements, catalog, 'MAGE', 11, 'Human');
   }
 });

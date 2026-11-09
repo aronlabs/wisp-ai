@@ -3,7 +3,7 @@
   "source": "https://github.com/StewBagger/forever-levelsim/tree/levelsim",
   "upstream": "https://github.com/wowsims/forever",
   "commit": "7f9c0e733fe3f8823407566dd417aca11f833e6f",
-  "sha256": "fab945e104815236274bce1f27fda052c7644b8747be10311dbab6fd9f62125b",
+  "sha256": "b518af234e9ee19d836d2912563316a5989f96ad4de11ddb424eb4910188e27c",
   "minLevel": 1,
   "maxLevel": 60,
   "wandIds": [
@@ -24,5 +24,11 @@
     "SHAMAN",
     "WARLOCK",
     "DRUID"
+  ],
+  "patches": [
+    {
+      "file": "scripts/simulator-downranking.patch",
+      "sha256": "3eab3162c7cd6258dcebdffa6d587d18d94ebed75b8e423a86e2ec9fd32f40bd"
+    }
   ]
 }

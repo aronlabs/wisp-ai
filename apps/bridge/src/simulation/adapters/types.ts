@@ -21,7 +21,7 @@ export interface SpellRank {
   maxRange: number;
 }
 export interface ClassMetadata {
-  talents: { id: number; max: number }[][];
+  talents: { id: number; name?: string; max: number; row?: number; prerequisiteId?: number }[][];
   ranks: Record<string, SpellRank[]>;
   triggerParents: Record<string, number>;
 }

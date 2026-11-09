@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.tga binary
+# Unified diff context contains intentional whitespace.
+scripts/simulator-downranking.patch -whitespace

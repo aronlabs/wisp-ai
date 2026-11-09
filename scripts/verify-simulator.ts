@@ -24,6 +24,9 @@ export async function verifySimulator(root: string) {
       !manifest.supportedClasses?.includes(adapter.token) ||
       !Array.isArray(metadata?.talents) ||
       metadata.talents.length !== 3 ||
+      metadata.talents.some((tree: { row?: number }[]) =>
+        tree.some((t) => !Number.isInteger(t.row) || t.row! < 0),
+      ) ||
       adapter.families.some((f) => !metadata.ranks?.[f]?.length)
     ) {
       throw Error('Invalid simulator class metadata: ' + adapter.token);
