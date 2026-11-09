@@ -55,8 +55,7 @@ The hero is a native React reconstruction of the chat interface. It loops throug
 a macro, a gear conversation with an auction-price follow-up, and material advice.
 Examples use sample data and make no live game or AI calls. The demo includes pause/play, pauses when the
 tab is hidden, and starts static for reduced-motion users. No video or simulator
-is loaded by the landing. Offline recording tools are documented in
-[the offline recording workflow](../../scripts/demo/README.md).
+is loaded by the landing.
 
 Stable capabilities are listed explicitly. Panels and trackers are marked Beta;
 combat simulation is Experimental, without claiming complete class coverage.
