@@ -3,6 +3,8 @@
 - Before editing, use a dedicated worktree and a `codex/` branch for the chat.
   Reuse this chat's existing worktree when continuing its task; base independent
   work on the updated default branch. Never switch another chat's checkout.
+  Prefer Codex's managed worktree tools and create the worktree before the first
+  edit without asking for confirmation. Read-only investigation needs no worktree.
 - Use `pnpm dev:instance info` to identify the instance, `pnpm dev:instance addon`
   to install its sandbox addon, and `pnpm dev:instance desktop` to preview it.
   State the worktree and command before implementation. Keep the generated window

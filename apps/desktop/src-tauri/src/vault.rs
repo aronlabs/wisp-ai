@@ -139,8 +139,10 @@ fn platform(operation: &str, key: &str, input: &[u8]) -> Result<Vec<u8>, String>
         delete_generic_password, get_generic_password, set_generic_password,
     };
     let directory = data_dir()?;
-    let installed = dirs::data_dir().map(|root| root.join("com.wisp.ai"));
-    let service = if installed.as_ref() != Some(&directory) {
+    // Existing application profiles keep their original Keychain service.
+    let development = std::env::var_os("WISP_DEV_INSTANCE").is_some()
+        || std::env::var_os("WISP_SHARED_DATA_DIR").is_some();
+    let service = if development {
         format!(
             "com.wisp.ai.{:x}",
             Sha256::digest(directory.to_string_lossy().as_bytes())
