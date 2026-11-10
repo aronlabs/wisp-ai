@@ -21,19 +21,31 @@ function M.fixture(path, env)
 end
 
 function M.addon(name, env)
+    if name == "MessageFormat.lua" and not env.C.Markdown then
+        for _, dependency in ipairs({ "Syntax", "Block", "Parser" }) do
+            M.addon("Markdown/" .. dependency .. ".lua", env)
+        end
+        M.addon("Markdown/Cache.lua", env)
+    end
     if name == "UI.lua" then
         for _, dependency in ipairs({
+            "RichUI.lua",
             "Widgets.lua",
             "EmojiData.lua",
             "Emoji.lua",
             "MessageFormat.lua",
+            "Markdown/ReplyView.lua",
             "ModelControls.lua",
             "MessageRows.lua",
         }) do
             M.addon(dependency, env)
         end
     end
-    return setfenv(assert(loadfile("addon/WispAI/" .. name)), env)("WispAI", env.C)
+    local result = setfenv(assert(loadfile("addon/WispAI/" .. name)), env)("WispAI", env.C)
+    if name == "MessageFormat.lua" then
+        M.addon("Markdown/InlineRenderer.lua", env)
+    end
+    return result
 end
 
 return M
