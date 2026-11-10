@@ -3,18 +3,6 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-    # Branch pushes only need an installer when app/build inputs change.
-    # GitHub does not apply path filters to tag pushes; manual builds also remain available.
-    paths-ignore:
-      - 'apps/web/**'
-      - 'docs/**'
-      - 'releases/**'
-      - '.agents/**'
-      - '.github/**'
-      - '**/AGENTS.md'
-      - '**/README.*'
-      - 'scripts/revalidate-web.ts'
-      - 'scripts/tests/revalidate-web.test.ts'
   workflow_dispatch:
 permissions:
   contents: write
@@ -22,13 +10,32 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  release-inputs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      app: ${{ steps.inputs.outputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.1'
+      - name: Determine whether app packaging is needed
+        id: inputs
+        run: node scripts/release-inputs.ts
+        env:
+          RELEASE_BASE_SHA: ${{ github.event.before }}
   validate:
     permissions:
       contents: read
       actions: read
     uses: ./.github/workflows/check.yml
   windows:
-    needs: validate
+    needs: [validate, release-inputs]
+    if: needs.release-inputs.outputs.app == 'true'
     runs-on: windows-latest
     env:
       CARGO_INCREMENTAL: '0'
@@ -71,34 +78,7 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
           cache-on-failure: true
-      - name: Restore pinned simulator build
-        id: simulator-binary
-        uses: actions/cache@v4
-        with:
-          path: |
-            simulator/wowsimcli.exe
-            simulator/manifest.json
-            simulator/item-ids.json
-            simulator/mage-talents.json
-          key: wisp-simulator-v1-${{ runner.os }}-${{ runner.arch }}-go1.25.14-${{ hashFiles('scripts/build-simulator.ps1', 'scripts/simulator-metadata.ts', 'scripts/verify-simulator.ts', 'simulator/*.json') }}
-      - uses: actions/setup-go@v6
-        if: steps.simulator-binary.outputs.cache-hit != 'true'
-        with:
-          go-version: '1.25.14'
-          cache: false
-      - run: choco install protoc --yes --no-progress
-        if: steps.simulator-binary.outputs.cache-hit != 'true'
-      - uses: actions/cache@v4
-        if: steps.simulator-binary.outputs.cache-hit != 'true'
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/AppData/Local/go-build
-            node_modules/.cache/wowsims-levelsim
-          key: wowsims-windows-go125-7f9c0e7
-      - run: ./scripts/build-simulator.ps1
-        if: steps.simulator-binary.outputs.cache-hit != 'true'
-        shell: pwsh
+      - uses: ./.github/actions/setup-simulator
       - run: pnpm build:desktop
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
