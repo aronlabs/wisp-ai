@@ -120,6 +120,13 @@ export function SiteHeader({ locale }: { locale: Locale }) {
             >
               {t('Get started')}
             </NavigationLink>
+            <NavigationLink
+              href={localizedPath(locale, '/changelog')}
+              aria-current={pathname.startsWith('/changelog') ? 'page' : undefined}
+              onClick={() => setMenuOpen(false)}
+            >
+              {locale === 'es' ? 'Novedades' : 'Changelog'}
+            </NavigationLink>
             <NavigationLink external href={site.repository} onClick={() => setMenuOpen(false)}>
               GitHub <Icon name="external" size={12} />
             </NavigationLink>

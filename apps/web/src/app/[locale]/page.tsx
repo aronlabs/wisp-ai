@@ -103,7 +103,7 @@ export default async function Home({ params }: LocalePageProps) {
             >
               <a
                 className={`release-badge gap-[9px] flex items-center text-[9px] tracking-[1.6px] text-[#d6c8af] mb-[23px] md:text-[10px] md:mb-[25px] [&_i]:[background:var(--gold)] [&_i]:[box-shadow:0_0_8px_#d6b77780]`}
-                href={`${site.repository}/releases`}
+                href={localizedPath(locale, '/changelog')}
               >
                 <i className="w-[5px] h-[5px] rounded-[50%]" />
                 {t('FOR WOW: FOREVER ')}
