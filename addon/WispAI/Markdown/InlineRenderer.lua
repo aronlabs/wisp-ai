@@ -28,8 +28,19 @@ local function compile(root, limit, fromUser)
     if cached and cached.limit == limit and cached.fromUser == fromUser then
         return cached.parts
     end
-    local parts, colors, stack, remaining = {}, {}, { { node = root } }, limit
-    local clipped = false
+    local parts, colors, stack, remaining =
+        { styles = {}, links = {} }, {}, { { node = root } }, limit
+    local clipped, openLinks = false, 0
+    local function append(value, entry, kind)
+        parts[#parts + 1] = value
+        parts.styles[#parts] = {
+            color = colors[#colors],
+            code = kind == "code" or kind == "code_block",
+            strike = entry.strike,
+            url = entry.url,
+            atomic = kind == "reference" or kind == "reference_pending" or kind == "native_link",
+        }
+    end
     while #stack > 0 do
         local entry = table.remove(stack)
         local node, kind = entry.node, entry.node.type
@@ -37,6 +48,10 @@ local function compile(root, limit, fromUser)
             or (kind == "strikethrough" and "|cff99948a")
             or (kind == "emph" and "|cffded6be")
         if entry.close then
+            if entry.link then
+                parts[#parts + 1] = "|h"
+                parts.links[#parts], openLinks = -1, openLinks - 1
+            end
             colors[#colors] = nil
             parts[#parts + 1] = "|r" .. (colors[#colors] or "")
         elseif kind == "reference" then
@@ -45,39 +60,59 @@ local function compile(root, limit, fromUser)
                 clipped = true
                 break
             end
-            parts[#parts + 1] = { key = node.key, restore = colors[#colors] or "" }
+            append({ key = node.key, restore = colors[#colors] or "" }, entry, kind)
         elseif kind == "reference_pending" then
-            parts[#parts + 1] = { pending = true, literal = node.literal }
+            append({ pending = true, literal = node.literal }, entry, kind)
         elseif kind == "native_link" then
-            parts[#parts + 1] = fromUser
-                    and (C.Emoji.render(node.literal) .. (colors[#colors] or ""))
-                or escaped(node.literal)
+            append(
+                fromUser and (C.Emoji.render(node.literal) .. (colors[#colors] or ""))
+                    or escaped(node.literal),
+                entry,
+                kind
+            )
         elseif node.literal ~= nil then
             local value, cut = prefix(node.literal, remaining)
             remaining = remaining - #value
             local plain = escaped(value)
             local text = (kind == "code" or kind == "code_block") and plain or C.Emoji.render(plain)
             -- Repeated emoji textures can expand a short source substantially.
-            parts[#parts + 1] = #text <= math.max(4096, limit * 2) and text or plain
+            append(#text <= math.max(4096, limit * 2) and text or plain, entry, kind)
             if cut then
                 clipped = true
                 break
             end
         elseif kind == "softbreak" or kind == "linebreak" then
-            parts[#parts + 1] = "\n"
+            append("\n", entry, kind)
         else
+            local url = kind == "link" and C.Markdown.Links.valid(node.destination) or entry.url
+            local link = kind == "link" and url ~= nil
+            if link then
+                color = "|cff80c8ef"
+            end
             if color then
                 colors[#colors + 1] = color
-                parts[#parts + 1] = color
-                stack[#stack + 1] = { node = node, close = true }
+                parts[#parts + 1] = link and (color .. "|H" .. C.Markdown.Links.encode(url) .. "|h")
+                    or color
+                if link then
+                    parts.links[#parts], openLinks = 1, openLinks + 1
+                end
+                stack[#stack + 1] = { node = node, close = true, link = link }
             end
             for index = #(node.children or {}), 1, -1 do
-                stack[#stack + 1] = { node = node.children[index] }
+                stack[#stack + 1] = {
+                    node = node.children[index],
+                    strike = kind == "strikethrough" or entry.strike,
+                    url = url,
+                }
             end
         end
     end
     if clipped then
-        parts[#parts + 1] = "..."
+        append("...", {}, "text")
+        for _ = 1, openLinks do
+            parts[#parts + 1] = "|h"
+            parts.links[#parts] = -1
+        end
         if #colors > 0 then
             parts[#parts + 1] = "|r"
         end
@@ -86,10 +121,12 @@ local function compile(root, limit, fromUser)
     return parts
 end
 
-local function render(node, references, streaming, limit, fromUser)
+local function render(node, references, streaming, limit, fromUser, wantRuns)
     fromUser = fromUser == true
     local result, bytes, maximum = {}, 0, math.max(4096, (limit or 65536) * 2)
-    for _, part in ipairs(compile(node, limit or 65536, fromUser)) do
+    local template, runs = compile(node, limit or 65536, fromUser), wantRuns and {} or nil
+    local openLinks = 0
+    for index, part in ipairs(template) do
         local value
         if type(part) == "string" then
             value = part
@@ -105,12 +142,34 @@ local function render(node, references, streaming, limit, fromUser)
             value = value .. part.restore
         end
         if bytes + #value > maximum then
-            result[#result + 1] = "...|r"
+            result[#result + 1] = string.rep("|h", openLinks) .. "...|r"
+            if runs then
+                runs[#runs + 1] = { text = "..." }
+            end
             break
         end
         result[#result + 1], bytes = value, bytes + #value
+        openLinks = openLinks + (template.links[index] or 0)
+        local style = template.styles[index]
+        if runs and style then
+            local run = {
+                text = value,
+                color = style.color,
+                code = style.code,
+                strike = style.strike,
+                atomic = style.atomic or style.url ~= nil,
+            }
+            if style.url then
+                run.text = "|cff80c8ef|H"
+                    .. C.Markdown.Links.encode(style.url)
+                    .. "|h"
+                    .. value
+                    .. "|h|r"
+            end
+            runs[#runs + 1] = run
+        end
     end
-    return table.concat(result)
+    return table.concat(result), runs
 end
 
 local function formatted(value, references, fromUser, streaming)

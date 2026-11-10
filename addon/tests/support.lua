@@ -35,6 +35,7 @@ function M.addon(name, env)
             "Emoji.lua",
             "MessageFormat.lua",
             "Markdown/ReplyView.lua",
+            "Markdown/TextStyle.lua",
             "ModelControls.lua",
             "MessageRows.lua",
         }) do
@@ -43,9 +44,31 @@ function M.addon(name, env)
     end
     local result = setfenv(assert(loadfile("addon/WispAI/" .. name)), env)("WispAI", env.C)
     if name == "MessageFormat.lua" then
+        M.addon("Markdown/Links.lua", env)
         M.addon("Markdown/InlineRenderer.lua", env)
     end
     return result
+end
+
+function M.rendered(font)
+    local text = font:IsShown() and font:GetText() or ""
+    for _, run in ipairs(font.runs or {}) do
+        if run:IsShown() then
+            text = text .. run:GetText()
+        end
+    end
+    return text
+end
+
+function M.rowText(row)
+    if row.text:IsShown() then
+        return row.text:GetText()
+    end
+    local parts = {}
+    for _, font in ipairs(row.rich and row.rich.prose or {}) do
+        parts[#parts + 1] = M.rendered(font)
+    end
+    return table.concat(parts)
 end
 
 return M

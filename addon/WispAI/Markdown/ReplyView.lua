@@ -37,7 +37,7 @@ local function project(message)
     for _, node in ipairs(message.ui or {}) do
         ui[#ui + 1], ids[node.id] = node, true
     end
-    local function prose(value, style, level, indent)
+    local function prose(value, style, level, indent, runs, marker)
         if value ~= "" then
             parts[#parts + 1] = {
                 type = "text",
@@ -46,7 +46,14 @@ local function project(message)
                 style = style,
                 level = level,
                 indent = indent or 0,
+                runs = runs,
+                marker = marker,
             }
+            for _, run in ipairs(runs or {}) do
+                if run.code or run.strike then
+                    parts[#parts].styled = true
+                end
+            end
         end
     end
     local function format(node, limit)
@@ -153,13 +160,21 @@ local function project(message)
                 if kind == "table" then
                     tableView(node, entry.indent)
                 elseif kind == "thematic_break" then
-                    prose("----------------", "quote", nil, entry.indent)
+                    prose("----------------", "rule", nil, entry.indent)
                 else
                     local style = kind == "heading" and "heading"
                         or (kind == "code_block" and "code")
                         or (entry.quote and "quote")
                     local prefix = (entry.prefix or "") .. (entry.quote and "> " or "")
-                    prose(prefix .. format(node), style, node.level, entry.indent)
+                    local formatted, runs = C.Markdown.InlineRenderer.render(
+                        node,
+                        message.references,
+                        message.streaming,
+                        nil,
+                        nil,
+                        true
+                    )
+                    prose(prefix .. formatted, style, node.level, entry.indent, runs, entry.prefix)
                 end
             end
         end
@@ -191,6 +206,7 @@ local function project(message)
         and #parts == 1
         and parts[1].type == "text"
         and not parts[1].style
+        and not parts[1].styled
         and parts[1].indent == 0
     result._markdownPending, result._markdownError = pending, errorCode
     result._markdownSources = sources

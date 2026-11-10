@@ -10,6 +10,7 @@ for _, name in ipairs({
     "EmojiData",
     "Emoji",
     "MessageFormat",
+    "Markdown/Links",
     "Markdown/InlineRenderer",
     "Markdown/ReplyView",
 }) do

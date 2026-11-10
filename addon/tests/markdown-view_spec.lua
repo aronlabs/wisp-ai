@@ -41,10 +41,11 @@ it("renders reviewed inline expressions and linked image labels consistently", f
     local source = "**2*3=6**\n\n[![**alt**](image.png)](https://outer)\n\n[a\\*b]\n\n[a\\*b]: /url"
     local view = settled(C, message(source))
     assert.equal("|cffe3c77e2*3=6|r", view.parts[1].text)
-    assert.equal("|cffe3c77ealt|r", view.parts[2].text)
+    local link = "|cff80c8ef|H" .. C.Markdown.Links.encode("https://outer") .. "|h"
+    assert.equal(link .. "|cffe3c77ealt|r|cff80c8ef|h|r", view.parts[2].text)
     assert.equal("a*b", view.parts[3].text)
     assert.equal("|cffe3c77e2*3=6|r", C.FormatText("**2*3=6**"))
-    assert.equal("alt", C.FormatText("[![alt](image.png)](https://outer)"))
+    assert.equal(link .. "alt|h|r", C.FormatText("[![alt](image.png)](https://outer)"))
 end)
 
 it("applies the profile's entities and hard breaks to native UI labels too", function()

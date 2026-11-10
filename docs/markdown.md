@@ -35,6 +35,16 @@ returned trees as read-only.
 Prose, tables and UI labels share the same formatter. Syntax is cached separately
 from layout and reference data; long responses are processed across frames.
 
+Reply presentation uses the cached parser's tree and the shared inline formatter.
+The formatter can also emit preformatted runs for inline code and strike-through;
+layout and decoration do not parse Markdown again or change cached syntax.
+Headings and emphasis retain the game typeface, while code uses JetBrains Mono
+with a localized game-font fallback. Web links expose their URL on hover and
+open a selectable copy dialog on click.
+Inline layout keeps at most 256 extra font strings per reply host; dense content
+falls back to the complete shared formatter output instead of growing widgets
+without a bound.
+
 Tables show 20 rows per page, up to 6 columns and 200 rows per table. Notices
 identify clipped content.
 

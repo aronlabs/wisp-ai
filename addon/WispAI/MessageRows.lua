@@ -11,6 +11,13 @@ local function linked(row)
     row:SetScript("OnHyperlinkEnter", function(self, link, text)
         C.hoverLink = text or ("|H" .. link .. "|h[Reference]|h")
         GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+        local url = C.Markdown.Links.decode(link)
+        if url then
+            GameTooltip:SetText(url, 0.5, 0.78, 0.94)
+            GameTooltip:AddLine("Click to copy this web address.", 0.65, 0.65, 0.65, true)
+            GameTooltip:Show()
+            return
+        end
         local zone = tonumber(link:match("^wispzone:(%d+)$"))
         if zone then
             local info = C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(zone)
@@ -79,6 +86,27 @@ local function linked(row)
         GameTooltip:Hide()
     end)
     row:SetScript("OnHyperlinkClick", function(self, link, text, mouse)
+        local url = C.Markdown.Links.decode(link)
+        if url then
+            StaticPopupDialogs.WISPAI_COPY_URL = StaticPopupDialogs.WISPAI_COPY_URL
+                or {
+                    text = "Copy web address (Ctrl+C)",
+                    button2 = "Close",
+                    hasEditBox = true,
+                    maxLetters = 2048,
+                    OnShow = function(popup, value)
+                        local edit = popup.GetEditBox and popup:GetEditBox() or popup.editBox
+                        edit:SetText(value)
+                        edit:SetFocus()
+                        edit:HighlightText()
+                    end,
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                }
+            StaticPopup_Show("WISPAI_COPY_URL", nil, nil, url)
+            return
+        end
         if IsShiftKeyDown() then
             C.draft:Insert(text)
             C.draft:SetFocus()

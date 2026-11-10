@@ -607,6 +607,9 @@ function C.RenderRichUI(host, chat, message, width)
     end
     local y = 0
     host.prose = host.prose or {}
+    if C.Markdown and C.Markdown.TextStyle then
+        C.Markdown.TextStyle.hide(host.prose)
+    end
     local proseCount = 0
     local function indent(value)
         return math.max(0, math.min(tonumber(value) or 0, math.max(0, width - 40)))
@@ -632,32 +635,43 @@ function C.RenderRichUI(host, chat, message, width)
                     root(node, part.indent)
                 end
             elseif part.type == "text" and part.text ~= "" then
-                proseCount = proseCount + 1
-                local f = host.prose[proseCount] or font(host)
-                host.prose[proseCount] = f
-                f:ClearAllPoints()
-                local left = indent(part.indent)
-                local style = "GameFontNormal"
-                if part.style == "heading" then
-                    style = (part.level or 1) == 1 and "GameFontNormalHuge" or "GameFontNormalLarge"
-                    f:SetTextColor(0.95, 0.83, 0.52)
-                elseif part.style == "code" then
-                    style = "GameFontHighlightSmall"
-                    f:SetTextColor(0.75, 0.79, 0.83)
-                elseif part.style == "quote" then
-                    f:SetTextColor(0.65, 0.63, 0.58)
+                if
+                    part._markdown
+                    and (part.runs or part.style == "rule")
+                    and C.Markdown.TextStyle
+                then
+                    y, proseCount =
+                        C.Markdown.TextStyle.render(host, host.prose, part, width, y, proseCount)
+                    y = y + 8
                 else
-                    f:SetTextColor(0.89, 0.85, 0.75)
+                    proseCount = proseCount + 1
+                    local f = host.prose[proseCount] or font(host)
+                    host.prose[proseCount] = f
+                    f:ClearAllPoints()
+                    local left = indent(part.indent)
+                    local style = "GameFontNormal"
+                    if part.style == "heading" then
+                        style = (part.level or 1) == 1 and "GameFontNormalHuge"
+                            or "GameFontNormalLarge"
+                        f:SetTextColor(0.95, 0.83, 0.52)
+                    elseif part.style == "code" then
+                        style = "GameFontHighlightSmall"
+                        f:SetTextColor(0.75, 0.79, 0.83)
+                    elseif part.style == "quote" then
+                        f:SetTextColor(0.65, 0.63, 0.58)
+                    else
+                        f:SetTextColor(0.89, 0.85, 0.75)
+                    end
+                    if f.markdownStyle ~= style then
+                        f:SetFontObject(_G[style] or style)
+                        f.markdownStyle = style
+                    end
+                    f:SetPoint("TOPLEFT", left, -y)
+                    f:SetWidth(math.max(1, width - left))
+                    text(f, part._markdown and part.text or rendered(part.text))
+                    f:Show()
+                    y = y + f:GetStringHeight() + 8
                 end
-                if f.markdownStyle ~= style then
-                    f:SetFontObject(_G[style] or style)
-                    f.markdownStyle = style
-                end
-                f:SetPoint("TOPLEFT", left, -y)
-                f:SetWidth(math.max(1, width - left))
-                text(f, part._markdown and part.text or rendered(part.text))
-                f:Show()
-                y = y + f:GetStringHeight() + 8
             end
         end
     else
@@ -665,9 +679,13 @@ function C.RenderRichUI(host, chat, message, width)
             root(node)
         end
     end
-    for index, f in ipairs(host.prose) do
-        if index > proseCount then
-            f:Hide()
+    if C.Markdown and C.Markdown.TextStyle then
+        C.Markdown.TextStyle.hide(host.prose, proseCount + 1)
+    else
+        for index, f in ipairs(host.prose) do
+            if index > proseCount then
+                f:Hide()
+            end
         end
     end
     for id, w in pairs(widgets) do

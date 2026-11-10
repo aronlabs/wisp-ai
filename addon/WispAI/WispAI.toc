@@ -29,8 +29,10 @@ Widgets.lua
 EmojiData.lua
 Emoji.lua
 MessageFormat.lua
+Markdown\Links.lua
 Markdown\InlineRenderer.lua
 Markdown\ReplyView.lua
+Markdown\TextStyle.lua
 ModelControls.lua
 MessageRows.lua
 UI.lua
