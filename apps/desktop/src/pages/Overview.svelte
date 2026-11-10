@@ -278,6 +278,10 @@
       {#if app.info?.addonOutdated}<p class="field-hint">
           Update the addon, then type /reload in WoW.
         </p>{/if}
+      <p class="field-hint">
+        <strong>Use at your own risk.</strong> We don’t know whether Blizzard permits
+        Wisp or whether using it could lead to an account ban.
+      </p>
       <div class="actions">
         {#if !app.info?.configured && !app.detectingGame}<button
             class="primary"

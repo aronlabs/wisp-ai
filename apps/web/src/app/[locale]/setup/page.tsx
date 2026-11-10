@@ -4,6 +4,7 @@ import { localizedMetadata } from '../../../seo';
 import { Icon } from '../../../components/icon';
 import { site } from '../../../site';
 import { PageSchema } from '../../../components/page-schema';
+import { UsageRisk } from '../../../components/usage-risk';
 export async function generateMetadata({ params }: LocalePageProps) {
   return localizedMetadata(await resolveLocale(params), '/setup');
 }
@@ -29,6 +30,7 @@ export default async function Setup({ params }: LocalePageProps) {
           {t('Download for Windows')}
           <Icon name="download" size={17} />
         </a>
+        <UsageRisk locale={locale} />
         <ol className="guide-steps">
           <li>
             <h2>{t('Install the app and addon')}</h2>

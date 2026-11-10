@@ -9,6 +9,7 @@ import { Icon } from '../../components/icon';
 import { site } from '../../site';
 import { getLatestRelease } from '../../release.server';
 import { PageSchema } from '../../components/page-schema';
+import { UsageRisk } from '../../components/usage-risk';
 export const revalidate = 300;
 const baseFaqs = [
   [
@@ -108,6 +109,7 @@ export default async function Home({ params }: LocalePageProps) {
               </p>
               <InstallLink locale={locale} />
               <span className="download-note">{t('Windows x64 · Choose your AI connection')}</span>
+              <UsageRisk locale={locale} />
             </div>
             <div className="hero-product">
               <Demo locale={locale} />
@@ -364,6 +366,7 @@ export default async function Home({ params }: LocalePageProps) {
             {release && `v${release.version}`}
             {t(' · Windows x64 · Open source')}
           </p>
+          <UsageRisk locale={locale} />
         </section>
       </main>
     </>

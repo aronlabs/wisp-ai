@@ -222,6 +222,19 @@ em {
   line-height: 1.6;
   margin-top: 13px;
 }
+.usage-risk {
+  max-width: 440px;
+  margin-top: 14px;
+  color: #b8ad99;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.usage-risk strong {
+  color: #ddd3c2;
+}
+.install-section .usage-risk {
+  margin-inline: auto;
+}
 .hero-product {
   position: relative;
   align-self: end;
