@@ -5,16 +5,13 @@ import { enabledTool } from '@wisp/agent/enabled-tool';
 export default enabledTool(
   'set_conversation_title',
   defineTool({
-    description:
-      'Assigns a descriptive conversation title when conversation_context.needsTitle=true, or renames it on an explicit user request. Summarize the topic in the user’s language rather than copying their message.',
+    description: 'Sets the initial conversation title or renames it at the user’s request.',
     inputSchema: z.object({
       title: z
         .string()
         .min(1)
         .max(60)
-        .describe(
-          'A natural title of 3–6 words about the topic; no quotes, markup, generic greeting or character-state dump.',
-        ),
+        .describe('A short title in the user’s language based on their message.'),
     }),
     label: { start: () => 'Naming conversation' },
     execute: ({ title }, ctx) =>
