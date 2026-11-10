@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { databaseScope } from './database-fixture.ts';
 import { MemoryStore } from '@wisp/bridge/memory-store';
 import { characterIdentity } from '@wisp/bridge/context';
 import { localMemory } from '@wisp/agent/agent-memory';
 
 test('memory survives new store instances, isolates characters, and serializes concurrent updates', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'wow-wisp-memory-'));
+  const scope = databaseScope();
   try {
-    const store = new MemoryStore(directory);
+    const file = path.join(directory, 'wisp.sqlite');
+    const store = new MemoryStore(scope.open(file));
     await Promise.all([
       store.update(
         'character',
@@ -22,7 +25,7 @@ test('memory survives new store instances, isolates characters, and serializes c
       store.update('character', 'warrior', 'guide', 'Following Guide B'),
       store.update('preferences', 'local-player', 'pace', 'Prefers exploration'),
     ]);
-    const restarted = new MemoryStore(directory);
+    const restarted = new MemoryStore(scope.open(file));
     assert.equal((await restarted.read('character', 'mage')).length, 2);
     assert.equal((await restarted.read('character', 'warrior'))[0].text, 'Following Guide B');
     await restarted.update('character', 'mage', 'guide', 'Stopped following Guide A');
@@ -31,7 +34,7 @@ test('memory survives new store instances, isolates characters, and serializes c
       1,
     );
     await restarted.update('character', 'mage', 'guide');
-    assert.equal((await new MemoryStore(directory).read('character', 'mage')).length, 1);
+    assert.equal((await new MemoryStore(scope.open(file)).read('character', 'mage')).length, 1);
     assert.equal(
       (await restarted.read('preferences', 'local-player'))[0].text,
       'Prefers exploration',
@@ -40,6 +43,7 @@ test('memory survives new store instances, isolates characters, and serializes c
     await assert.rejects(restarted.update('character', 'mage', 'oversized', 'x'.repeat(1001)));
   } finally {
     assert.ok(directory.startsWith(path.join(tmpdir(), 'wow-wisp-memory-')));
+    await scope.close();
     await rm(directory, { recursive: true, force: true });
   }
 });

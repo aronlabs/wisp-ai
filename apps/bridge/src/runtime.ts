@@ -20,6 +20,8 @@ import { Client } from 'eve/client';
 import { COMPACTION_THRESHOLD } from '@wisp/protocol/context-usage';
 import { DiskTransport } from './transport.ts';
 import { ChatStore } from './chat-store.ts';
+import { applicationDatabaseFile } from './db/application-file.ts';
+import { ApplicationDatabase } from './db/application-database.ts';
 import { createTurnRunner } from './turn-runner.ts';
 import { errorMessage } from './errors.ts';
 import { MemoryStore } from './memory-store.ts';
@@ -70,7 +72,10 @@ export async function startBridge(options: BridgeOptions = {}) {
     const simulator = new Simulator(ROOT, runtime);
     await prepareEngine(paths.agent, paths.engine);
     await mkdir(runtime, { recursive: true });
-    const memoryStore = new MemoryStore(path.join(runtime, 'memory'));
+    const databaseFile = applicationDatabaseFile(runtime);
+    const applicationDatabase = new ApplicationDatabase(databaseFile);
+    resources.defer(() => applicationDatabase.close());
+    const memoryStore = new MemoryStore(applicationDatabase);
     async function memorySnapshot(identity: string | undefined) {
       const preferences = (await memoryStore.read('preferences', 'local-player')).map((entry) => ({
         ...entry,
@@ -144,9 +149,9 @@ export async function startBridge(options: BridgeOptions = {}) {
       })());
     }
     const database = new TheWoWDB();
-    const panelStore = new PanelStore(path.join(runtime, 'panels.json'));
+    const panelStore = new PanelStore(applicationDatabase);
     await panelStore.load();
-    const routineStore = new RoutineStore(path.join(runtime, 'routines.json'));
+    const routineStore = new RoutineStore(applicationDatabase);
     await routineStore.load();
     const capabilitySettings = new CapabilitySettings(path.join(runtime, 'capabilities.json'));
     await capabilitySettings.load();
@@ -216,11 +221,17 @@ export async function startBridge(options: BridgeOptions = {}) {
         (!tool || capabilitySettings.enabled('mcp_tool:' + name + ':' + tool)),
     );
     resources.defer(() => mcpRelay.close());
-    const chatStore = new ChatStore(path.join(runtime, 'chats.json'), (error) =>
+    const chatStore = new ChatStore(applicationDatabase, (error) =>
       log('Conversation save failed: ' + errorMessage(error)),
     );
     const state = createSessionState(await chatStore.load());
-    resources.defer(() => chatStore.flush(state.chats));
+    resources.defer(async () => {
+      try {
+        await chatStore.flush(state.chats);
+      } finally {
+        await chatStore.close();
+      }
+    });
     const snapshots = new SnapshotGate();
     let eveReady = false;
     let contextWindowTokens: number | undefined;
@@ -461,8 +472,8 @@ export async function startBridge(options: BridgeOptions = {}) {
           ...p,
           character: characterLabel(p.characterKey, ' - '),
         })),
-        routines: routineStore.routines,
-        routineRuns: routineStore.runs.filter((r) => r.status !== 'no_tip').slice(-200),
+        routines: routineStore.list(),
+        routineRuns: routineStore.history({ includeSilent: false, limit: 200 }),
       };
     }
     const desktopServer = await startDesktopServer(
@@ -559,9 +570,8 @@ export async function startBridge(options: BridgeOptions = {}) {
               .map((r) => ({ id: r.id, title: r.title, enabled: r.enabled }))
           : [],
         routineRuns: state.currentCharacterKey
-          ? routineStore.runs
-              .filter((r) => r.characterKey === state.currentCharacterKey && r.status !== 'no_tip')
-              .slice(-50)
+          ? routineStore
+              .history({ characterKey: state.currentCharacterKey, includeSilent: false, limit: 50 })
               .map(({ summary: _summary, ...r }) => r)
           : [],
         routineSubscriptions:

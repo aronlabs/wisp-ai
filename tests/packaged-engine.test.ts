@@ -4,8 +4,151 @@ import { promisify } from 'node:util';
 import { copyFile, mkdir, mkdtemp, writeFile, readFile, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
+import { savedRoutine } from '@wisp/protocol/routines';
+import { ChatStore, conversationInstanceId } from '@wisp/bridge/chat-store';
+import { newChat } from '@wisp/bridge/chat-lifecycle';
 
 const exec = promisify(execFile);
+test.runIf(Boolean(process.env.WISP_TEST_ENGINE_EXECUTABLE))(
+  'packaged engine supports SQLite and imports committed database history',
+  { timeout: 60_000 },
+  async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'wisp-packaged-sqlite-'));
+    const previous = path.join(root, 'previous');
+    const destination = path.join(root, 'imported');
+    await mkdir(path.join(previous, 'runtime'), { recursive: true });
+    const source = new ChatStore(path.join(previous, 'runtime/wisp.sqlite'), () => {});
+    try {
+      await source.load();
+      const chat = {
+        ...newChat('history', 'game'),
+        eveId: 'old-session',
+        messages: [{ role: 'user' as const, text: 'History survives packaging 🧙' }],
+      };
+      await source.flush([chat]);
+      expect((await readFile(source.file + '-wal')).length).toBeGreaterThan(0);
+      const routine = savedRoutine.parse({
+        id: 'review',
+        title: 'Review',
+        instruction: 'Review spells',
+        triggers: [{ kind: 'interval', seconds: 60 }],
+        characterKey: 'mage',
+        enabled: true,
+        updatedAt: 1,
+        nextAt: 100,
+      });
+      const productSources = {
+        'routines.json': JSON.stringify({
+          routines: [routine],
+          runs: [
+            {
+              id: 'run',
+              routineId: 'removed',
+              characterKey: 'mage',
+              title: 'Old routine',
+              startedAt: 1,
+              status: 'done',
+              event: 'interval',
+              summary: 'Keep history',
+            },
+          ],
+        }),
+        'panels.json': JSON.stringify([
+          {
+            id: 'goal',
+            title: 'Goal',
+            characterKey: 'mage',
+            updatedAt: 1,
+            ui: [{ id: 'card', kind: 'card', title: 'Goal' }],
+          },
+        ]),
+      };
+      for (const [name, content] of Object.entries(productSources)) {
+        await writeFile(path.join(previous, 'runtime', name), content);
+      }
+      await mkdir(path.join(previous, 'runtime/memory'));
+      const memoryName =
+        createHash('sha256')
+          .update(JSON.stringify(['character', 'mage']))
+          .digest('hex') + '.json';
+      await writeFile(
+        path.join(previous, 'runtime/memory', memoryName),
+        JSON.stringify({
+          slot: 'character',
+          owner: 'mage',
+          entries: [{ key: 'goal', text: 'Keep plan', updatedAt: '2026-11-09' }],
+        }),
+      );
+      await writeFile(
+        path.join(previous, 'config.local.json'),
+        JSON.stringify({ wow: 'fixture-wow' }),
+      );
+      const executable = process.env.WISP_TEST_ENGINE_EXECUTABLE!;
+      const env = {
+        ...process.env,
+        WISP_DATA_DIR: destination,
+        LOCALAPPDATA: path.join(root, 'local'),
+      };
+      const selfTest = await exec(executable, ['--self-test'], {
+        env,
+        windowsHide: true,
+        timeout: 30000,
+      });
+      expect(JSON.parse(selfTest.stdout).sqlite).toBe(true);
+      await exec(executable, ['scripts/migrate-desktop.ts', previous], {
+        env,
+        windowsHide: true,
+        timeout: 30000,
+      });
+      const db = new DatabaseSync(path.join(destination, 'runtime/wisp.sqlite'), {
+        readOnly: true,
+      });
+      try {
+        expect(db.prepare('SELECT count(*) AS n FROM __drizzle_migrations').get()!.n).toBe(1);
+        expect(db.prepare('SELECT text FROM messages').get()!.text).toBe(chat.messages[0].text);
+        expect(
+          db
+            .prepare('SELECT eve_id FROM chat_instance_state WHERE instance_id = ?')
+            .get(conversationInstanceId(path.join(destination, 'runtime')))!.eve_id,
+        ).toBeNull();
+        expect(db.prepare('SELECT title FROM routines').get()!.title).toBe('Review');
+        expect(db.prepare('SELECT summary FROM routine_runs').get()!.summary).toBe('Keep history');
+        expect(db.prepare('SELECT title FROM panels').get()!.title).toBe('Goal');
+        expect(db.prepare('SELECT text FROM memory_entries').get()!.text).toBe('Keep plan');
+        for (const [name, content] of Object.entries(productSources)) {
+          expect(await readFile(path.join(previous, 'runtime', name), 'utf8')).toBe(content);
+          const digest = createHash('sha256').update(content).digest('hex');
+          expect(
+            await readFile(
+              path.join(
+                destination,
+                'runtime',
+                name.replace(/\.json$/, `.pre-sqlite-${digest}.json`),
+              ),
+              'utf8',
+            ),
+          ).toBe(content);
+        }
+        expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+        const original = new DatabaseSync(source.file, { readOnly: true });
+        try {
+          expect(original.prepare('SELECT eve_id FROM chat_instance_state').get()!.eve_id).toBe(
+            'old-session',
+          );
+        } finally {
+          original.close();
+        }
+      } finally {
+        db.close();
+      }
+    } finally {
+      await source.close();
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    }
+  },
+);
 test.runIf(Boolean(process.env.WISP_TEST_ENGINE_EXECUTABLE))(
   'packaged install and migration forward their positional folder arguments',
   { timeout: 60_000 },
