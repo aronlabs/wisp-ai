@@ -5323,7 +5323,7 @@ dependencies = [
 
 [[package]]
 name = "wisp"
-version = "0.0.7"
+version = "0.1.0"
 dependencies = [
  "dirs 6.0.0",
  "prost",
