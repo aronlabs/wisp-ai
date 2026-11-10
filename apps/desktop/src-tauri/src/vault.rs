@@ -138,14 +138,24 @@ fn platform(operation: &str, key: &str, input: &[u8]) -> Result<Vec<u8>, String>
     use security_framework::passwords::{
         delete_generic_password, get_generic_password, set_generic_password,
     };
+    let directory = data_dir()?;
+    let installed = dirs::data_dir().map(|root| root.join("com.wisp.ai"));
+    let service = if installed.as_ref() != Some(&directory) {
+        format!(
+            "com.wisp.ai.{:x}",
+            Sha256::digest(directory.to_string_lossy().as_bytes())
+        )
+    } else {
+        "com.wisp.ai".into()
+    };
     match operation {
-        "read" => match get_generic_password("com.wisp.ai", key) {
+        "read" => match get_generic_password(&service, key) {
             Ok(v) => Ok(v),
             Err(e) if e.code() == -25300 => Ok(vec![]),
             Err(_) => Err("Cannot unlock Keychain".into()),
         },
         "write" if input.is_empty() => {
-            match delete_generic_password("com.wisp.ai", key) {
+            match delete_generic_password(&service, key) {
                 Ok(_) => {}
                 Err(e) if e.code() == -25300 => {}
                 Err(_) => return Err("Cannot remove Keychain secret".into()),
@@ -153,7 +163,7 @@ fn platform(operation: &str, key: &str, input: &[u8]) -> Result<Vec<u8>, String>
             Ok(vec![])
         }
         "write" => {
-            set_generic_password("com.wisp.ai", key, input)
+            set_generic_password(&service, key, input)
                 .map_err(|_| "Cannot save Keychain secret")?;
             Ok(vec![])
         }
