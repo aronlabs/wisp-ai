@@ -510,16 +510,14 @@ it(
         local progress = UI_TEST.frames.WispAIProgress
         assert(not progress:IsShown())
         ns.chats[1].status = "working"
+        table.insert(ns.chats[1].messages, { id = "m", role = "user", text = "Sending test" })
         ns.pendingMessages = { m = { chat = "chat" } }
         ns.UI.Refresh()
-        assert(
-            progress:IsShown() and progress.title:GetText() == "Sending.",
-            "sending must be visible before bridge confirmation"
-        )
-        ns.pendingMessages = {}
+        assert(not progress:IsShown(), "sending must not show an assistant progress row")
+        ns.pendingMessages.m.acknowledged = true
         ns.UI.Refresh()
         assert(
-            progress.title:GetText():match("^Thinking"),
+            progress:IsShown() and progress.title:GetText():match("^Thinking"),
             "an acknowledged message should show an assistant thinking row"
         )
         ns.chats[1].activity = { { label = "Searching the web", status = "running" } }
@@ -903,18 +901,19 @@ it(
         local bar = UI_TEST.frames.WispAITranscriptScrollBar
         local _, _, _, _, bottom = bar:GetPoint()
         assert(bottom == 104, "there must be no additional reserved progress gap")
+        table.insert(ns.chats[1].messages, { id = "next", role = "user", text = "What next?" })
         ns.chats[1].status = "working"
         ns.UI.Refresh()
         assert(
             progress:IsShown()
                 and progress.parent:GetHeight() == progress.y + progress:GetHeight()
-                and #ns.chats[1].messages == 1,
+                and #ns.chats[1].messages == 2,
             "thinking occupies transcript space without becoming a saved message"
         )
         ns.chats[1].status = "done"
         ns.UI.Refresh()
         assert(
-            not progress:IsShown() and progress.parent:GetHeight() == progress.y,
+            not progress:IsShown() and progress.parent:GetHeight() == progress.y - 12,
             "completion removes the transient row and its space"
         )
     end

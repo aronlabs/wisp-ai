@@ -4,6 +4,205 @@ local GOLD, TEXT, MUTED = ns.UI.Widgets.GOLD, ns.UI.Widgets.TEXT, ns.UI.Widgets.
 local mapLocation, macroNameFromLink =
     ns.UI.MessageFormat.MapLocation, ns.UI.MessageFormat.MacroNameFromLink
 local formatted = ns.UI.FormatText
+local truncateUtf8 = ns.Shared.Text.TruncateUtf8Bytes
+local writingText, writingPrefix =
+    ns.Markdown.InlineRenderer.WritingText, ns.Markdown.InlineRenderer.WritingPrefix
+local CHEVRON_GAP = 4
+local DELIVERY_HEIGHT = 20
+local DELIVERY_DELAY = 15
+local TOOL_STATES = {
+    completed = { cell = 0, tint = MUTED },
+    running = { cell = 1, tint = GOLD },
+    failed = { cell = 2, tint = { 0.85, 0.52, 0.46 } },
+}
+local toolGroupsExpanded = {}
+
+local function drawWriting(entry, bytes)
+    local prefix, shown = writingPrefix(entry.text, entry.visible, entry.ranges, bytes)
+    entry.shown = shown
+    setText(entry.font, prefix)
+end
+
+local function finishWriting(row)
+    local writing = row.writing
+    if writing then
+        for _, entry in ipairs(writing.entries) do
+            setText(entry.font, entry.text)
+        end
+        row.writing = nil
+        row:SetScript("OnUpdate", nil)
+    end
+end
+
+local function updateWriting(row, elapsed)
+    local writing = row.writing
+    writing.elapsed = writing.elapsed + elapsed
+    if writing.elapsed >= writing.duration then
+        finishWriting(row)
+    elseif writing.elapsed - writing.updated >= 0.02 then
+        writing.updated = writing.elapsed
+        local position = writing.bytes * writing.elapsed / writing.duration
+        while writing.index <= #writing.entries do
+            local entry = writing.entries[writing.index]
+            local progress = math.max(0, math.min(1, (position - entry.offset) / entry.bytes))
+            drawWriting(entry, entry.start + math.floor(entry.bytes * progress))
+            if progress < 1 then
+                break
+            end
+            writing.index = writing.index + 1
+        end
+    end
+end
+
+local function matchWritingLayout(views, previous, interrupted)
+    if not previous then
+        return
+    end
+    local changed = #views ~= #previous.order
+    if not changed then
+        for index, view in ipairs(views) do
+            if view.font ~= previous.order[index] then
+                changed = true
+                break
+            end
+        end
+    end
+    if not changed then
+        return
+    end
+    local prefix = {}
+    for _, font in ipairs(previous.order) do
+        local visible = previous.fonts[font]
+        local active = interrupted and interrupted.byFont[font]
+        prefix[#prefix + 1] = active and visible:sub(1, active.shown) or visible
+        if active and active.shown < #visible then
+            break
+        end
+    end
+    local shown = table.concat(prefix):gsub("%s+", "")
+    local starts, position = {}, 1
+    for _, view in ipairs(views) do
+        local start = 0
+        for index = 1, #view.visible do
+            if position > #shown then
+                break
+            end
+            local byte = view.visible:byte(index)
+            if byte == 32 or (byte >= 9 and byte <= 13) then
+                start = index
+            elseif byte == shown:byte(position) then
+                start, position = index, position + 1
+            else
+                return
+            end
+        end
+        starts[view.font] = start
+    end
+    if position > #shown then
+        return starts
+    end
+end
+
+local function revealWriting(row, fonts, source, previous, interrupted, streaming, pending)
+    local snapshot = {
+        source = source,
+        fonts = {},
+        order = {},
+        streaming = streaming,
+        pending = pending,
+    }
+    row.writingSnapshot = snapshot
+    if not fonts or not row:IsVisible() then
+        return
+    end
+    snapshot.order = fonts
+    local previousSource = previous and previous.source or ""
+    local appended = source:sub(1, #previousSource) == previousSource
+    -- Match existing fonts first. If Markdown changed the layout, fall back
+    -- to the amount of new source measured from the end of the reply.
+    local remaining = appended and #source:sub(#previousSource + 1):gsub("^%s+", "") or 0
+    if previousSource == "" then
+        remaining = math.huge
+    end
+    if previous and previousSource ~= "" and previous.pending and not pending and appended then
+        remaining = #source
+    end
+    if interrupted then
+        for _, entry in ipairs(interrupted.entries) do
+            remaining = remaining + #entry.visible - entry.shown
+        end
+    end
+    local views = {}
+    for index, font in ipairs(fonts) do
+        local text = font:GetText() or ""
+        local visible, ranges = writingText(text)
+        snapshot.fonts[font] = visible
+        views[index] = { font = font, text = text, visible = visible, ranges = ranges }
+    end
+    local layoutStarts = appended and matchWritingLayout(views, previous, interrupted)
+    local entries, bytes = {}, 0
+    for index = #views, 1, -1 do
+        local view = views[index]
+        local font, visible = view.font, view.visible
+        local before = previous and previous.fonts[font]
+        local active = interrupted and interrupted.byFont[font]
+        local start = #visible - math.min(#visible, remaining)
+        remaining = math.max(0, remaining - #visible)
+        if layoutStarts then
+            start = layoutStarts[font]
+        elseif before then
+            local shown = active and active.shown or #before
+            if visible:sub(1, shown) == before:sub(1, shown) then
+                start = shown
+            end
+        end
+        if appended and start < #visible then
+            start = #truncateUtf8(visible, start)
+            view.start = start
+            view.bytes = #visible - start
+            entries[#entries + 1] = view
+            bytes = bytes + view.bytes
+        end
+    end
+    if #entries == 0 then
+        return
+    end
+    local writing = {
+        entries = {},
+        byFont = {},
+        index = 1,
+        bytes = bytes,
+        elapsed = 0,
+        updated = 0,
+        duration = math.min(0.9, math.max(0.14, bytes * 0.012)),
+    }
+    local offset = 0
+    for index = #entries, 1, -1 do
+        local entry = entries[index]
+        entry.offset = offset
+        offset = offset + entry.bytes
+        writing.entries[#writing.entries + 1] = entry
+        writing.byFont[entry.font] = entry
+        drawWriting(entry, entry.start)
+    end
+    row.writing = writing
+    local first = writing.entries[1]
+    if first.start == 0 then
+        local leading = first.visible:find("%S") or 1
+        local firstBytes = (first.visible:find("[^\128-\191]", leading + 1) or #first.visible + 1)
+            - 1
+        writing.elapsed = writing.duration * firstBytes / writing.bytes
+        drawWriting(first, firstBytes)
+    end
+    -- Keep the first glyph visible while syntax is pending. Starting the
+    -- reveal on the raw preview would replay the same text after formatting.
+    if pending and previousSource == "" then
+        snapshot.source = ""
+        return
+    end
+    row:SetScript("OnUpdate", updateWriting)
+end
+
 ns.itemRevision = 0
 local function linked(row)
     row:EnableMouse(true)
@@ -167,9 +366,42 @@ local function linked(row)
     end)
 end
 ns.UI.LinkWidget = linked
+
+local function updateDelivery(delivery)
+    local elapsed = GetTime() - delivery.startedAt
+    for index, dot in ipairs(delivery.dots) do
+        dot:SetAlpha(0.35 + 0.65 * (0.5 + 0.5 * math.sin(elapsed * 5 - (index - 1) * 0.8)))
+    end
+    local delayed = elapsed >= DELIVERY_DELAY
+    if delivery.waiting:IsShown() ~= delayed then
+        delivery.waiting:SetShown(delayed)
+    end
+end
+
+local function makeDelivery(row)
+    local delivery = CreateFrame("Frame", nil, row)
+    delivery:SetSize(140, DELIVERY_HEIGHT)
+    delivery:SetPoint("TOPRIGHT", row.bubble, "BOTTOMRIGHT", -8, 0)
+    delivery.dots = {}
+    for index = 1, 3 do
+        local dot = label(delivery, ".", GOLD)
+        dot:SetFontObject("GameFontNormalLarge")
+        dot:SetPoint("RIGHT", delivery, "RIGHT", (index - 3) * 8, 4)
+        delivery.dots[index] = dot
+    end
+    delivery.waiting = label(delivery, "Waiting for bridge", MUTED)
+    delivery.waiting:SetFontObject("GameFontHighlightSmall")
+    delivery.waiting:SetTextColor(unpack(MUTED))
+    delivery.waiting:SetPoint("RIGHT", delivery, "RIGHT", -30, 0)
+    delivery.waiting:Hide()
+    delivery:SetScript("OnUpdate", updateDelivery)
+    return delivery
+end
+
 local function makeRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     linked(row)
+    row:SetScript("OnHide", finishWriting)
     row.author = label(row, "", GOLD)
     row.author:SetPoint("TOPLEFT", 0, 0)
     row.text = label(row, "")
@@ -179,9 +411,11 @@ local function makeRow(parent)
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetSize(14, 14)
     row.icon:SetPoint("TOPLEFT", 0, -1)
+    row.chevron = row:CreateTexture(nil, "ARTWORK")
+    row.chevron:SetSize(14, 14)
+    row.chevron:Hide()
     row.bubble = CreateFrame("Frame", nil, row, "BackdropTemplate")
     row.bubble:SetFrameLevel(row:GetFrameLevel())
-    row.bubble:SetAllPoints(row)
     row.bubble:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -193,14 +427,9 @@ local function makeRow(parent)
     row.bubble:EnableMouse(false)
     row.bubble:Hide()
     row.disclosure = CreateFrame("Button", nil, row)
-    row.disclosure:SetAllPoints(row)
     row.disclosure:SetScript("OnClick", function()
-        ns.toolGroupsExpanded = ns.toolGroupsExpanded or {}
-        ns.toolGroupsExpanded[row.groupKey] = not ns.toolGroupsExpanded[row.groupKey]
-        ns.UI.Refresh()
-        if ns.Inline.RefreshInline then
-            ns.Inline.RefreshInline()
-        end
+        toolGroupsExpanded[row.groupKey] = not toolGroupsExpanded[row.groupKey] or nil
+        ns.UI.Refresh(row.chatId)
     end)
     row.disclosure:Hide()
     row.retry = ns.UI.Widgets.Button(row, "Retry", 80, function(self)
@@ -216,71 +445,146 @@ local function makeRow(parent)
     return row
 end
 ns.UI.MakeMessageRow = makeRow
-ns.toolGroupsExpanded = {}
+
+local function toolDetails(tool, name)
+    local lines = {}
+    if type(tool.inputPreview) == "string" and tool.inputPreview ~= "" then
+        lines[#lines + 1] = "Input  " .. tool.inputPreview
+    end
+    if type(tool.resultPreview) == "string" and tool.resultPreview ~= "" then
+        lines[#lines + 1] = "Result  " .. tool.resultPreview
+    elseif type(tool.detail) == "string" and tool.detail ~= "" and tool.detail ~= name then
+        lines[#lines + 1] = tool.detail
+    end
+    return #lines > 0 and table.concat(lines, "\n\n") or nil
+end
+
+local function toolCallRow(chatId, call, id, callId, indent)
+    local tool = call.tool or {}
+    local name = tool.label or call.text or "Tool"
+    local detail = toolDetails(tool, name)
+    local key = detail and (chatId .. ":" .. callId)
+    local expanded = key and toolGroupsExpanded[key]
+    return {
+        id = id,
+        role = "tool",
+        text = name,
+        tool = { status = tool.status or "completed" },
+        toolIndent = indent,
+        groupKey = key,
+        groupExpanded = expanded,
+        toolDetail = expanded and detail or nil,
+    }
+end
+
+local function appendToolGroup(messages, chatId, calls, id, spinning)
+    if #calls == 1 then
+        local call = calls[1]
+        local entry = toolCallRow(chatId, call, id, id .. "-call-" .. (call.id or 1), 0)
+        messages[#messages + 1] = entry
+        return entry.tool.status == "running"
+    end
+    local running, failed, latest
+    for _, call in ipairs(calls) do
+        local tool = call.tool or {}
+        latest = tool.label or call.text or "Tool"
+        local status = tool.status or "completed"
+        if status == "running" then
+            running = latest
+        elseif status ~= "completed" then
+            failed = true
+        end
+    end
+    local key = chatId .. ":" .. id
+    local expanded = toolGroupsExpanded[key]
+    messages[#messages + 1] = {
+        id = id,
+        role = "tool",
+        text = running
+            or (
+                expanded and not spinning and (#calls .. " tool calls")
+                or (latest .. "  +" .. (#calls - 1))
+            ),
+        tool = { status = running and "running" or (failed and "failed" or "completed") },
+        groupKey = key,
+        groupExpanded = expanded,
+    }
+    if expanded then
+        for index, call in ipairs(calls) do
+            local callId = id .. "-call-" .. (call.id or index)
+            messages[#messages + 1] = toolCallRow(chatId, call, callId, callId, 18)
+        end
+    end
+    return running ~= nil
+end
+
+local function isTextReply(message)
+    return message.role == "assistant" and (message.text or ""):find("%S") ~= nil
+end
+
 function ns.UI.DisplayMessages(chat)
-    local messages, group = {}, nil
+    local messages, calls, groupId, groupOffset = {}, {}, nil, nil
+    local hasReplyText, turnStart = false, 1
+    local function flushTools(currentTurn)
+        if not groupId then
+            return
+        end
+        local group = {}
+        local spinning = currentTurn and chat.status == "working" and not hasReplyText
+        local running = appendToolGroup(group, chat.id, calls, groupId, spinning)
+        local active = currentTurn and chat.status == "working" and running
+        group[1].turnSpinning = spinning
+        -- While a call runs, its group occupies the current activity slot.
+        local offset = active and #messages + 1 or groupOffset
+        for index = #group, 1, -1 do
+            table.insert(messages, offset, group[index])
+        end
+        calls, groupId, groupOffset = {}, nil, nil
+    end
     for index, message in ipairs(chat and chat.messages or {}) do
         if message.role == "tool" then
             if ns.db.showTools then
-                if not group then
-                    group = {
-                        id = "tools-" .. (message.id or index),
-                        role = "tool",
-                        text = "",
-                        calls = {},
-                    }
-                    messages[#messages + 1] = group
-                end
-                group.calls[#group.calls + 1] = message
+                groupId = groupId or ("tools-" .. (message.id or index))
+                calls[#calls + 1] = message
+                groupOffset = #messages + 1
             end
-        else
-            group = nil
+        elseif
+            message.role ~= "assistant"
+            or isTextReply(message)
+            or (message.ui and #message.ui > 0)
+        then
+            if message.role == "user" or message.role == "system" then
+                flushTools(false)
+                hasReplyText = false
+                turnStart = #messages + 2
+            elseif isTextReply(message) then
+                hasReplyText = true
+            end
             messages[#messages + 1] = message
         end
     end
-    for _, message in ipairs(messages) do
-        if message.calls then
-            local labels, details, running, failed = {}, {}, nil, false
-            local extraDetails = {}
-            for _, call in ipairs(message.calls) do
-                local tool = call.tool or {}
-                local name = tool.label or call.text or "Tool"
-                labels[#labels + 1] = name
-                details[#details + 1] = name .. " - " .. (tool.status or "completed")
-                if type(tool.detail) == "string" and tool.detail ~= "" and tool.detail ~= name then
-                    extraDetails[#extraDetails + 1] = tool.detail
-                    details[#details] = details[#details] .. "\n" .. tool.detail
-                end
-                if tool.status == "running" then
-                    running = name
-                end
-                if tool.status and tool.status ~= "running" and tool.status ~= "completed" then
-                    failed = true
-                end
-            end
-            if #labels > 1 or #extraDetails > 0 then
-                message.groupKey = chat.id .. ":" .. message.id
-            end
-            local expanded = message.groupKey and ns.toolGroupsExpanded[message.groupKey]
-            local summary = running or table.concat(labels, " / ", 1, math.min(2, #labels))
-            if #labels > 2 and not running then
-                summary = summary .. " / +" .. (#labels - 2)
-            end
-            message.text = (message.groupKey and (expanded and "- " or "+ ") or "")
-                .. summary
-                .. (
-                    expanded
-                        and ("\n" .. table.concat(#labels == 1 and extraDetails or details, "\n"))
-                    or ""
-                )
-            message.tool = {
-                label = message.text,
-                status = running and "running" or (failed and "failed" or "completed"),
-            }
-        end
-    end
-    return messages
+    local hasToolActivity = groupId ~= nil
+    flushTools(true)
+    return messages, hasToolActivity, hasReplyText, turnStart
 end
+
+-- An observed chat can receive the new question and its complete reply together.
+function ns.UI.ObserveReplyTurn(view, chat, boundary)
+    local id = chat and chat.id
+    local userId = boundary and boundary.role == "user" and boundary.id
+    local working = chat and chat.status == "working"
+    local live = working
+        or (
+            chat
+            and chat.status == "done"
+            and view.chatId == id
+            and (view.working or (view.loaded and userId and view.userId ~= userId))
+        )
+    view.chatId, view.working, view.userId = id, working, userId
+    view.loaded = chat and chat.messages ~= nil
+    return live
+end
+
 function ns.UI.PositionMessageRow(row, parent, y, width)
     local x = row.speaker == "user" and width - row:GetWidth() or 0
     if row.y ~= y or row.x ~= x then
@@ -289,8 +593,11 @@ function ns.UI.PositionMessageRow(row, parent, y, width)
         row:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
     end
 end
-function ns.UI.MessageGap(previous, speaker)
-    return previous and previous ~= speaker and 12 or 0
+function ns.UI.MessageGap(previous, message)
+    if previous and previous.role == "tool" and isTextReply(message) then
+        return 6
+    end
+    return previous and ns.UI.MessageSpeaker(previous) ~= ns.UI.MessageSpeaker(message) and 12 or 0
 end
 function ns.UI.ChatSignature(chat)
     local parts = { chat and chat.id or "" }
@@ -298,6 +605,7 @@ function ns.UI.ChatSignature(chat)
         parts[#parts + 1] = (message.id or "")
             .. (message.text or "")
             .. (message.tool and message.tool.status or "")
+            .. (message.tool and message.tool.resultPreview or "")
             .. (ns.UI.RichSignature and ns.UI.RichSignature({ message.ui, message.parts }) or "")
     end
     return table.concat(parts, "\31")
@@ -316,11 +624,20 @@ end
 function ns.UI.MessageSpeaker(message)
     return (message.role == "tool" or message.role == "assistant") and "assistant" or message.role
 end
-function ns.UI.RenderMessageRow(row, chat, message, width, showAuthor)
+function ns.UI.RenderMessageRow(row, chat, message, width, showAuthor, animateReply)
     row.replyView = row.replyView or ns.Markdown.ReplyView.New()
+    local sameReply = row.replyView.chatId == chat.id and row.replyView.messageId == message.id
     local display, viewKey = ns.Markdown.ReplyView.Update(row.replyView, chat.id, message)
     message = display
     local tool = message.tool
+    local pendingMessage = message.role == "user"
+        and message.id
+        and ns.pendingMessages
+        and ns.pendingMessages[message.id]
+    local sending = chat.status == "working"
+        and pendingMessage
+        and pendingMessage.chat == chat.id
+        and not pendingMessage.acknowledged
     local signature = chat.id
         .. "\31"
         .. (message.id or "")
@@ -336,9 +653,31 @@ function ns.UI.RenderMessageRow(row, chat, message, width, showAuthor)
         .. tostring(showAuthor)
         .. "\31"
         .. tostring(message.groupKey)
+        .. "\31"
+        .. (message.groupExpanded and "1" or "0")
+        .. "\31"
+        .. (message.toolIndent or 0)
+        .. "\31"
+        .. (message.toolDetail or "")
+        .. "\31"
+        .. tostring(message.turnSpinning)
+        .. "\31"
+        .. (sending and "sending" or "")
     if row.signature ~= signature then
         row.signature = signature
+        local previous = sameReply and row.writingSnapshot
+        local interrupted = sameReply and row.writing
+        finishWriting(row)
+        row.writingSnapshot = nil
+        local animate = animateReply
+            or interrupted
+            or (previous and (previous.streaming or previous.pending))
+            or (message.streaming and chat.status == "working")
+        local writingSource = message.role == "assistant" and animate and (message.text or "")
+            or nil
+        local writingFonts
         local pending = false
+        row.chatId = chat.id
         row.speaker = message.role
         local padding = message.role == "user" and 8 or 0
         if message.role == "user" then
@@ -346,8 +685,24 @@ function ns.UI.RenderMessageRow(row, chat, message, width, showAuthor)
         end
         row:SetWidth(width)
         row.bubble:SetShown(message.role == "user")
+        if message.role == "user" then
+            row.bubble:ClearAllPoints()
+            row.bubble:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+            row.bubble:SetPoint(
+                "BOTTOMRIGHT",
+                row,
+                "BOTTOMRIGHT",
+                0,
+                sending and DELIVERY_HEIGHT or 0
+            )
+        end
         row.groupKey = message.groupKey
         row.disclosure:SetShown(message.groupKey ~= nil)
+        row.chevron:SetShown(message.groupKey ~= nil)
+        if row.toolDetail then
+            row.toolDetail:Hide()
+            row.toolDetailBackground:Hide()
+        end
         row.text:Show()
         row.text:ClearAllPoints()
         local top = message.role == "user" and padding or (showAuthor and 20 or 0)
@@ -366,28 +721,72 @@ function ns.UI.RenderMessageRow(row, chat, message, width, showAuthor)
             if row.rich then
                 row.rich:Hide()
             end
+            local indent = message.toolIndent or 0
             row.icon:ClearAllPoints()
-            row.icon:SetPoint("TOPLEFT", 0, -top - 1)
+            row.icon:SetPoint("TOPLEFT", indent, -top - 1)
             row.icon:Show()
             local state = tool and tool.status or "completed"
-            row.icon:SetTexture(
-                state == "completed" and "Interface\\RaidFrame\\ReadyCheck-Ready"
-                    or (
-                        state == "running" and "Interface\\RaidFrame\\ReadyCheck-Waiting"
-                        or "Interface\\RaidFrame\\ReadyCheck-NotReady"
-                    )
+            local spinning = message.turnSpinning
+                or (indent > 0 and state == "running" and chat.status == "working")
+            local icon = spinning and TOOL_STATES.running
+                or TOOL_STATES[state]
+                or TOOL_STATES.failed
+            ns.UI.Activity.SetIcon(row.icon, icon.cell, icon.tint)
+            ns.UI.Activity.SetSpinner(row, spinning)
+            local textLeft = indent + 20
+            local chevronSpace = row.groupKey and (row.chevron:GetWidth() + CHEVRON_GAP) or 0
+            local textWidth = math.max(1, width - textLeft - chevronSpace)
+            row.text:SetPoint("TOPLEFT", textLeft, -top)
+            row.text:SetWidth(textWidth)
+            row.text:SetTextColor(unpack(TEXT))
+            setText(
+                row.text,
+                ns.Markdown.InlineRenderer.Literal(tool and tool.label or message.text)
             )
-            row.text:SetPoint("TOPLEFT", 21, -top)
-            row.text:SetWidth(width - 21)
-            row.text:SetTextColor(unpack(MUTED))
-            local suffix = state == "running" and "  |cffe0c070Running|r"
-                or (state == "completed" and "" or "  |cffd98575Failed|r")
-            local text, waiting = formatted(tool and tool.label or message.text)
-            pending = waiting == true
-            setText(row.text, text .. suffix)
-            row.height = top + math.max(18, row.text:GetStringHeight()) + 7
+            local headerHeight = math.max(18, row.text:GetStringHeight())
+            local labelWidth = row.text.GetUnboundedStringWidth
+                    and row.text:GetUnboundedStringWidth()
+                or row.text:GetStringWidth()
+            local labelRight = textLeft + math.min(textWidth, math.ceil(labelWidth))
+            if row.groupKey then
+                local chevronLeft = labelRight + CHEVRON_GAP
+                row.chevron:ClearAllPoints()
+                row.chevron:SetPoint("TOPLEFT", row, "TOPLEFT", chevronLeft, -top - 1)
+                ns.UI.Activity.SetIcon(row.chevron, message.groupExpanded and 4 or 3, MUTED)
+                row.disclosure:ClearAllPoints()
+                row.disclosure:SetPoint("TOPLEFT", row, "TOPLEFT", indent, -top)
+                row.disclosure:SetPoint("BOTTOMRIGHT", row, "TOPRIGHT", 0, -top - headerHeight)
+            end
+            row.height = top + headerHeight + 5
+            if message.toolDetail then
+                if not row.toolDetail then
+                    row.toolDetailBackground = row:CreateTexture(nil, "BACKGROUND")
+                    row.toolDetailBackground:SetColorTexture(0.84, 0.72, 0.43, 0.08)
+                    row.toolDetail = label(row, "", MUTED)
+                    row.toolDetail:SetWordWrap(true)
+                    row.toolDetail:SetNonSpaceWrap(true)
+                    row.toolDetail:SetSpacing(2)
+                end
+                row.toolDetail:ClearAllPoints()
+                row.toolDetail:SetPoint("TOPLEFT", textLeft + 8, -row.height - 6)
+                row.toolDetail:SetWidth(width - textLeft - 16)
+                setText(row.toolDetail, ns.Markdown.InlineRenderer.Literal(message.toolDetail))
+                row.toolDetail:Show()
+                row.toolDetailBackground:ClearAllPoints()
+                row.toolDetailBackground:SetPoint("TOPLEFT", row.toolDetail, "TOPLEFT", -8, 6)
+                row.toolDetailBackground:SetPoint(
+                    "BOTTOMRIGHT",
+                    row.toolDetail,
+                    "BOTTOMRIGHT",
+                    8,
+                    -6
+                )
+                row.toolDetailBackground:Show()
+                row.height = row.height + row.toolDetail:GetStringHeight() + 18
+            end
         else
             row.icon:Hide()
+            ns.UI.Activity.SetSpinner(row, false)
             local interleaved = message.parts
                 and #message.parts > 0
                 and not message._markdownSimple
@@ -414,6 +813,7 @@ function ns.UI.RenderMessageRow(row, chat, message, width, showAuthor)
                 end
             end
             row.text:SetShown(not interleaved)
+            writingFonts = writingSource and not interleaved and { row.text } or nil
             row.height = top
                 + math.max(
                     1,
@@ -428,8 +828,16 @@ function ns.UI.RenderMessageRow(row, chat, message, width, showAuthor)
                 row.rich:Show()
                 row.rich:ClearAllPoints()
                 row.rich:SetPoint("TOPLEFT", padding, -(interleaved and top or row.height))
-                local height, waiting =
-                    ns.UI.RenderRichUI(row.rich, chat, message, width - padding * 2)
+                local height, waiting, prose = ns.UI.RenderRichUI(
+                    row.rich,
+                    chat,
+                    message,
+                    width - padding * 2,
+                    writingSource ~= nil
+                )
+                if interleaved then
+                    writingFonts = prose
+                end
                 row.height = row.height + height
                 pending = pending or waiting == true
             end
@@ -449,6 +857,26 @@ function ns.UI.RenderMessageRow(row, chat, message, width, showAuthor)
             row.retry:SetPoint("TOPLEFT", 0, -row.height)
             row.height = row.height + 30
         end
+        if sending then
+            row.delivery = row.delivery or makeDelivery(row)
+            row.delivery.startedAt = ns.workStarted[chat.id] or GetTime()
+            updateDelivery(row.delivery)
+            row.height = row.height + DELIVERY_HEIGHT
+        end
+        if row.delivery then
+            row.delivery:SetShown(sending == true)
+        end
         row:SetHeight(row.height)
+        if writingSource then
+            revealWriting(
+                row,
+                writingFonts,
+                writingSource,
+                previous,
+                interrupted,
+                message.streaming,
+                message._markdownPending
+            )
+        end
     end
 end

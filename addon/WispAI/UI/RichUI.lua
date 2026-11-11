@@ -338,7 +338,7 @@ function ns.UI.PanelAction(chat, message, node, values)
         ns.UI.Refresh()
     end
 end
-function ns.UI.RenderRichUI(host, chat, message, width)
+function ns.UI.RenderRichUI(host, chat, message, width, collectProse)
     if not host.widgets and ns.UI.LinkWidget then
         ns.UI.LinkWidget(host)
     end
@@ -609,6 +609,7 @@ function ns.UI.RenderRichUI(host, chat, message, width)
         ns.Markdown.TextStyle.Hide(host.prose)
     end
     local proseCount = 0
+    local writingFonts = collectProse and {} or nil
     local function indent(value)
         return math.max(0, math.min(tonumber(value) or 0, math.max(0, width - 40)))
     end
@@ -670,6 +671,17 @@ function ns.UI.RenderRichUI(host, chat, message, width)
                     f:Show()
                     y = y + f:GetStringHeight() + 8
                 end
+                if writingFonts then
+                    local f = host.prose[proseCount]
+                    if f and f:IsShown() then
+                        writingFonts[#writingFonts + 1] = f
+                        for _, run in ipairs(f.runs or {}) do
+                            if run:IsShown() then
+                                writingFonts[#writingFonts + 1] = run
+                            end
+                        end
+                    end
+                end
             end
         end
     else
@@ -693,5 +705,5 @@ function ns.UI.RenderRichUI(host, chat, message, width)
     end
     host:SetWidth(width)
     host:SetHeight(math.max(1, y))
-    return y, pending
+    return y, pending, writingFonts
 end

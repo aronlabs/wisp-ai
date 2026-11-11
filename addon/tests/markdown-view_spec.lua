@@ -288,9 +288,128 @@ it(
         settled(ns, original)
         ns.UI.RenderMessageRow(row, chat, original, 600, true)
         assert.is_true(tableWidget:IsShown())
+        row.scripts.OnUpdate(row, 1)
         assert.is_truthy(row.rich.prose[1]:GetText():find("dense", 1, true))
     end
 )
+
+it("reveals streamed prose without cutting UTF-8 or remeasuring the row", function()
+    local env, ns = setup()
+    local original = message("")
+    original.streaming = true
+    local chat = { id = "chat", status = "working", messages = { original } }
+    local row = ns.UI.MakeMessageRow(env.CreateFrame("Frame"))
+    ns.UI.RenderMessageRow(row, chat, original, 210, true)
+    assert.is_nil(row.scripts.OnUpdate)
+    original.text = "Ésta es una primera tanda de texto."
+    ns.UI.RenderMessageRow(row, chat, original, 210, true)
+    local height = row.height
+    assert.equal("É", row.text:GetText())
+    row.scripts.OnUpdate(row, 0.15)
+    local partial = row.text:GetText()
+    assert.is_true(#partial > #"É" and #partial < #original.text)
+    assert.equal(height, row.height)
+
+    original.text = original.text .. " Sigue la segunda."
+    ns.UI.RenderMessageRow(row, chat, original, 210, true)
+    assert.equal(partial, row.text:GetText())
+    row.scripts.OnUpdate(row, 1)
+    assert.equal(original.text, row.text:GetText())
+    assert.is_nil(row.scripts.OnUpdate)
+
+    original.text = original.text .. "\n\nPárrafo nuevo."
+    ns.UI.RenderMessageRow(row, chat, original, 210, true)
+    assert.equal("P", row.rich.prose[2]:GetText())
+    original.text = original.text .. "\n\n**Cierre en negrita.**"
+    original.streaming = false
+    chat.status = "done"
+    ns.UI.RenderMessageRow(row, chat, original, 210, true)
+    assert.equal("P", row.rich.prose[2]:GetText())
+    assert.equal("", row.rich.prose[3]:GetText())
+    row.scripts.OnUpdate(row, 1)
+    assert.equal("Párrafo nuevo.", row.rich.prose[2]:GetText())
+    assert.equal("Cierre en negrita.", row.rich.prose[3]:GetText())
+    assert.is_nil(row.scripts.OnUpdate)
+end)
+
+it("holds the first glyph until the first long reply is formatted", function()
+    local env, ns = setup()
+    local original =
+        message("Primero, revisá la quest.\n\n" .. string.rep("- **Opción** con detalles.\n", 26))
+    original.streaming = false
+    local chat = { id = "chat", status = "done", messages = { original } }
+    local row = ns.UI.MakeMessageRow(env.CreateFrame("Frame"))
+    ns.UI.RenderMessageRow(row, chat, original, 300, true, true)
+    assert.equal("P", row.text:GetText())
+    assert.is_nil(row.scripts.OnUpdate)
+    settled(ns, original)
+    ns.UI.RenderMessageRow(row, chat, original, 300, true)
+    assert.equal("P", row.rich.prose[1]:GetText())
+    assert.equal("", row.rich.prose[2]:GetText())
+    row.scripts.OnUpdate(row, 1)
+    assert.equal("Primero, revisá la quest.", row.rich.prose[1]:GetText())
+    assert.is_nil(row.scripts.OnUpdate)
+end)
+
+it("preserves native markup and finishes the reveal when the row is hidden", function()
+    local env, ns = setup()
+    local original = message("**A bold start**")
+    original.streaming = true
+    local chat = { id = "chat", status = "working", messages = { original } }
+    local row = ns.UI.MakeMessageRow(env.CreateFrame("Frame"))
+    ns.UI.RenderMessageRow(row, chat, original, 210, true)
+    assert.equal("|cffe3c77eA|r", row.text:GetText())
+    row.scripts.OnUpdate(row, 0.1)
+    assert.is_truthy(row.text:GetText():match("^|cffe3c77eA bold .+|r$"))
+    assert.is_true(#row.text:GetText() < #"|cffe3c77eA bold start|r")
+    row.scripts.OnUpdate(row, 1)
+    assert.equal("|cffe3c77eA bold start|r", row.text:GetText())
+
+    original.text = original.text .. "\n\nAnother paragraph."
+    ns.UI.RenderMessageRow(row, chat, original, 210, true)
+    assert.is_function(row.scripts.OnUpdate)
+    row.scripts.OnHide(row)
+    assert.equal("Another paragraph.", row.rich.prose[2]:GetText())
+    assert.is_nil(row.scripts.OnUpdate)
+end)
+
+it("keeps the first formatted paragraph revealing when more paragraphs arrive", function()
+    local env, ns = setup()
+    local original = message("Primero, **revisá la misión** antes de salir.")
+    original.streaming = true
+    local chat = { id = "chat", status = "working", messages = { original } }
+    local row = ns.UI.MakeMessageRow(env.CreateFrame("Frame"))
+    ns.UI.RenderMessageRow(row, chat, original, 400, true)
+    assert.equal("P", row.text:GetText())
+    row.scripts.OnUpdate(row, 0.06)
+    local visible = row.text:GetText()
+    assert.is_true(#visible > 1 and #visible < #"Primero,")
+
+    original.text = original.text .. "\n\nDespués, **volvé al campamento**.\n\nListo."
+    ns.UI.RenderMessageRow(row, chat, original, 400, true)
+    assert.equal(visible, row.rich.prose[1]:GetText())
+    assert.equal("", row.rich.prose[2]:GetText())
+    assert.equal("", row.rich.prose[3]:GetText())
+    row.scripts.OnUpdate(row, 1)
+    assert.equal("Listo.", row.rich.prose[3]:GetText())
+end)
+
+it("clips inline colors around whole native links and textures", function()
+    local _, ns = setup()
+    local renderer = ns.Markdown.InlineRenderer
+    local link = "|Hquest:166|h[Quest ||h label]|h"
+    local icon = "|TIcon:12:12|t"
+    local text = "|cffe3c77eÉ" .. link .. icon .. "|| fin|r"
+    local visible, ranges = renderer.WritingText(text)
+    assert.equal("É\1\1| fin", visible)
+    assert.equal("", (renderer.WritingPrefix(text, visible, ranges, 1)))
+    assert.equal("|cffe3c77eÉ|r", (renderer.WritingPrefix(text, visible, ranges, 2)))
+    assert.equal("|cffe3c77eÉ" .. link .. "|r", (renderer.WritingPrefix(text, visible, ranges, 3)))
+    assert.equal(
+        "|cffe3c77eÉ" .. link .. icon .. "|||r",
+        (renderer.WritingPrefix(text, visible, ranges, 5))
+    )
+end)
 
 it("uses current metadata with a cached view and preserves user native links", function()
     local env, ns = setup()

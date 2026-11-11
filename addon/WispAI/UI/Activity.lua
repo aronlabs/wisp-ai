@@ -1,8 +1,55 @@
 local _, ns = ...
 local label, setText = ns.UI.Widgets.Label, ns.UI.Widgets.SetText
 local GOLD, MUTED = ns.UI.Widgets.GOLD, ns.UI.Widgets.MUTED
+local TOOL_ICONS = "Interface\\AddOns\\WispAI\\Textures\\ToolIcons.tga"
 local header, replyGlow, emptyState, progress
 local progressTick = 0
+
+function ns.UI.Activity.SetIcon(texture, cell, tint)
+    texture:SetTexture(TOOL_ICONS)
+    texture:SetTexCoord(cell / 8, (cell + 1) / 8, 0, 1)
+    texture:SetVertexColor(unpack(tint))
+end
+
+function ns.UI.Activity.SetSpinner(row, spinning)
+    row.spinning = spinning
+    if spinning and not row.spinner then
+        local group = row.icon:CreateAnimationGroup()
+        local spin = group:CreateAnimation("Rotation")
+        spin:SetDegrees(-360)
+        spin:SetDuration(1.3)
+        group:SetLooping("REPEAT")
+        row.spinner = group
+        row:HookScript("OnHide", function()
+            group:Stop()
+        end)
+        row:HookScript("OnShow", function()
+            if row.spinning then
+                group:Play()
+            end
+        end)
+    end
+    if row.spinner then
+        if spinning and row:IsVisible() then
+            if not row.spinner:IsPlaying() then
+                row.spinner:Play()
+            end
+        else
+            row.spinner:Stop()
+        end
+    end
+end
+
+function ns.UI.Activity.IsSending(chat)
+    if chat and chat.status == "working" then
+        for _, pending in pairs(ns.pendingMessages or {}) do
+            if pending.chat == chat.id and not pending.acknowledged then
+                return true
+            end
+        end
+    end
+    return false
+end
 
 function ns.UI.Activity.Refresh(chat)
     local working = chat and chat.status == "working"
@@ -28,7 +75,6 @@ function ns.UI.Activity.Refresh(chat)
             dot:SetShown(emptyState.loading)
         end
     end
-    progress:SetShown(working)
     local title = "Wisp AI"
     if working then
         local now = GetTime()
@@ -36,20 +82,11 @@ function ns.UI.Activity.Refresh(chat)
         local seconds = math.max(0, math.floor(now - ns.workStarted[chat.id]))
         local elapsed = seconds < 60 and (seconds .. "s")
             or string.format("%dm %02ds", math.floor(seconds / 60), seconds % 60)
-        local sending = false
-        for _, pending in pairs(ns.pendingMessages or {}) do
-            if pending.chat == chat.id and not pending.acknowledged then
-                sending = true
-                break
-            end
-        end
+        local sending = ns.UI.Activity.IsSending(chat)
         local compacting = chat.usage and chat.usage.compacting
-        local phase = sending and "Sending" or (compacting and "Compacting" or "Thinking")
-        local dots = string.rep(".", math.floor(now * 2) % 3 + 1)
+        local phase = compacting and "Compacting" or "Thinking"
         setText(progress.elapsed, elapsed)
-        local detail = sending
-                and (seconds >= 15 and "Waiting for bridge confirmation" or "Delivering your message")
-            or "Preparing your reply"
+        local detail = "Preparing your reply"
         if compacting then
             detail = "Summarizing older context to continue this conversation"
         end
@@ -64,9 +101,9 @@ function ns.UI.Activity.Refresh(chat)
                 end
             end
         end
-        setText(progress.title, (activity or phase) .. dots)
+        setText(progress.title, activity or (phase .. "…"))
         setText(progress.detail, detail)
-        title = "Wisp AI - " .. phase .. " " .. elapsed
+        title = "Wisp AI - " .. (sending and "Sending" or phase) .. " " .. elapsed
     elseif chat then
         ns.workStarted[chat.id] = nil
     end
@@ -78,13 +115,20 @@ function ns.UI.Activity.Refresh(chat)
 end
 
 -- Returns the next transcript offset, including the working assistant row.
-function ns.UI.Activity.LayoutProgress(y, width, showAuthor)
+function ns.UI.Activity.LayoutProgress(y, width, showAuthor, visible)
+    progress:SetShown(visible == true)
+    ns.UI.Activity.SetSpinner(progress, visible == true)
+    if not visible then
+        return y
+    end
     if progress.showAuthor ~= showAuthor then
         progress.showAuthor = showAuthor
         progress.author:SetShown(showAuthor)
-        progress:SetHeight(showAuthor and 54 or 34)
+        progress:SetHeight(showAuthor and 43 or 23)
+        progress.icon:ClearAllPoints()
+        progress.icon:SetPoint("TOPLEFT", 0, showAuthor and -21 or -1)
         progress.title:ClearAllPoints()
-        progress.title:SetPoint("TOPLEFT", 0, showAuthor and -20 or 0)
+        progress.title:SetPoint("TOPLEFT", 20, showAuthor and -20 or 0)
         progress.title:SetPoint("RIGHT", -65, 0)
         progress.elapsed:ClearAllPoints()
         progress.elapsed:SetPoint("TOPRIGHT", -2, showAuthor and -20 or 0)
@@ -149,12 +193,15 @@ function ns.UI.Activity.Build(windowHeader, transcript, content)
         emptyState.dots[index] = dot
     end
     progress = CreateFrame("Frame", "WispAIProgress", content)
-    progress:SetHeight(54)
+    progress:SetHeight(43)
+    progress.icon = progress:CreateTexture(nil, "ARTWORK")
+    progress.icon:SetSize(14, 14)
+    ns.UI.Activity.SetIcon(progress.icon, 1, GOLD)
     progress.author = label(progress, "Wisp AI", GOLD)
     progress.author:SetPoint("TOPLEFT", 0, 0)
     progress.title = label(progress, "", MUTED)
     progress.title:SetFontObject(ChatFontNormal)
-    progress.title:SetPoint("TOPLEFT", 0, -20)
+    progress.title:SetPoint("TOPLEFT", 20, -20)
     progress.title:SetPoint("RIGHT", -65, 0)
     progress.title:SetWordWrap(false)
     progress.elapsed = label(progress, "", MUTED)

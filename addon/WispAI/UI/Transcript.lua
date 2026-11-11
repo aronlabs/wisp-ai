@@ -3,6 +3,7 @@ local box, button = ns.UI.Widgets.Box, ns.UI.Widgets.Button
 local transcript, content, scrollBar, newMessages
 local rows, scrollPositions = {}, {}
 local renderedChat
+local replyTurn = {}
 local rendering, scrollRange = false, 0
 
 function ns.UI.ScrollTranscript(delta)
@@ -15,7 +16,7 @@ function ns.UI.Transcript.SetBottomInset(inset)
     scrollBar:SetPoint("BOTTOMRIGHT", -10, inset)
 end
 
-function ns.UI.Transcript.Refresh(chat)
+function ns.UI.Transcript.Refresh(chat, preserveScrollForChat)
     rendering = true
     local id = chat and chat.id or "empty"
     local switched = renderedChat ~= id
@@ -30,10 +31,15 @@ function ns.UI.Transcript.Refresh(chat)
         oldOffset = saved and saved.offset or 0
         follow = not saved or saved.follow
     end
+    if preserveScrollForChat == id then
+        follow = false
+    end
     local width = math.max(100, transcript:GetWidth() - 6)
     local y, used = 0, {}
-    local previousSpeaker
-    for index, message in ipairs(ns.UI.DisplayMessages(chat)) do
+    local previousSpeaker, previousMessage
+    local messages, hasToolActivity, hasReplyText, turnStart = ns.UI.DisplayMessages(chat)
+    local animateTurn = ns.UI.ObserveReplyTurn(replyTurn, chat, messages[turnStart - 1])
+    for index, message in ipairs(messages) do
         if message.role ~= "tool" or ns.db.showTools then
             local key = id .. ":" .. (message.id or tostring(index))
             local row = rows[key]
@@ -43,23 +49,30 @@ function ns.UI.Transcript.Refresh(chat)
             end
             used[key] = true
             local speaker = ns.UI.MessageSpeaker(message)
-            y = y + ns.UI.MessageGap(previousSpeaker, speaker)
+            y = y + ns.UI.MessageGap(previousMessage, message)
             local showAuthor = speaker ~= "assistant" or previousSpeaker ~= speaker
-            ns.UI.RenderMessageRow(row, chat, message, width, showAuthor)
-            previousSpeaker = speaker
-            ns.UI.PositionMessageRow(row, content, y, width)
+            local animateReply = animateTurn and index >= turnStart and message.phase == "reply"
             if not row:IsShown() then
                 row:Show()
             end
+            ns.UI.RenderMessageRow(row, chat, message, width, showAuthor, animateReply)
+            previousSpeaker, previousMessage = speaker, message
+            ns.UI.PositionMessageRow(row, content, y, width)
             if ns.Transport.RecordFirstText then
                 ns.Transport.RecordFirstText(chat, message, row)
             end
             y = y + row.height
         end
     end
-    if chat and chat.status == "working" then
-        y = ns.UI.Activity.LayoutProgress(y, width, previousSpeaker ~= "assistant")
+    local showProgress = chat
+        and chat.status == "working"
+        and not hasToolActivity
+        and not hasReplyText
+        and not ns.UI.Activity.IsSending(chat)
+    if showProgress and previousSpeaker and previousSpeaker ~= "assistant" then
+        y = y + 12
     end
+    y = ns.UI.Activity.LayoutProgress(y, width, previousSpeaker ~= "assistant", showProgress)
     for key, row in pairs(rows) do
         if not used[key] and row:IsShown() then
             row:Hide()
