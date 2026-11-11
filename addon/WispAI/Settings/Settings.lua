@@ -1,8 +1,7 @@
 local _, ns = ...
+local numbers = ns.Shared.Numbers
 local function scalar(value)
-    return type(value) == "string"
-        or type(value) == "boolean"
-        or (type(value) == "number" and value == value and math.abs(value) < math.huge)
+    return type(value) == "string" or type(value) == "boolean" or numbers.IsFinite(value)
 end
 local function plain(value)
     return tostring(value or "")

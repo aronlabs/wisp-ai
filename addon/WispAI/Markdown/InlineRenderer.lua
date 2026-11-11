@@ -1,4 +1,5 @@
 local _, ns = ...
+local sharedText = ns.Shared.Text
 local templates = setmetatable({}, { __mode = "k" })
 
 local function escaped(value)
@@ -36,22 +37,6 @@ local function macroCode(value, info)
         end
     end
     return commands > 0 and table.concat(lines, "\n") or escaped(value)
-end
-
-local function prefix(value, bytes)
-    if #value <= bytes then
-        return value, false
-    end
-    local after = bytes + 1
-    while
-        after > 1
-        and value:byte(after)
-        and value:byte(after) >= 128
-        and value:byte(after) < 192
-    do
-        after = after - 1
-    end
-    return value:sub(1, after - 1), true
 end
 
 -- A template contains static WoW text plus reference keys. Reformatting item
@@ -104,7 +89,7 @@ local function compile(root, limit, fromUser)
                 kind
             )
         elseif node.literal ~= nil then
-            local value, cut = prefix(node.literal, remaining)
+            local value, cut = sharedText.TruncateUtf8Bytes(node.literal, remaining)
             remaining = remaining - #value
             local plain = escaped(value)
             local text = kind == "code_block" and macroCode(value, node.info)
@@ -173,7 +158,9 @@ local function render(node, references, streaming, limit, fromUser, wantRuns)
             value = not ref and streaming and "..."
                 or ns.UI.Emoji.Render(ns.UI.MessageFormat.Reference(part.key, references))
             if #value > 4096 then
-                value = escaped(prefix(tostring(ref and ref.label or "Reference"), 300))
+                value = escaped(
+                    sharedText.TruncateUtf8Bytes(tostring(ref and ref.label or "Reference"), 300)
+                )
             end
             value = value .. part.restore
         end
@@ -220,7 +207,7 @@ local function formatted(value, references, fromUser, streaming)
 end
 
 local function preview(value)
-    local text, clipped = prefix(value, 8000)
+    local text, clipped = sharedText.TruncateUtf8Bytes(value, 8000)
     return ns.UI.Emoji.Render(escaped(text)) .. (clipped and "\n..." or "")
 end
 
