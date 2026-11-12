@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile, cp, access, rename } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile, cp, access, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -23,20 +24,27 @@ const versionHeader = addonVersion ? `## Version: ${addonVersion}\n` : '';
 const payloadDir = path.join(addons, 'WispAI_Payload');
 await mkdir(payloadDir, { recursive: true });
 const payloadFile = path.join(payloadDir, 'Payload.lua');
-const payloadTemporary = payloadFile + '.tmp';
-await writeFile(payloadTemporary, luaJson(JSON.stringify({ v: 1, session: '', connected: false })));
-// The game may load this file while the installer runs; write it in full and
-// swap it in, like the bridge does, so a canal never reads a truncated file.
-for (let attempt = 0; ; attempt++) {
-  try {
-    await rename(payloadTemporary, payloadFile);
-    break;
-  } catch (error) {
-    if (attempt >= 5) {
-      throw error;
+const payloadTemporary = payloadFile + '.' + randomUUID() + '.tmp';
+try {
+  await writeFile(
+    payloadTemporary,
+    luaJson(JSON.stringify({ v: 1, session: '', connected: false })),
+  );
+  // The game may load the payload during installation. Publish it in one rename.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(payloadTemporary, payloadFile);
+      break;
+    } catch (error) {
+      if (attempt >= 5) {
+        throw error;
+      }
+      await delay(30);
     }
-    await delay(30);
   }
+} catch (error) {
+  await rm(payloadTemporary, { force: true }).catch(() => {});
+  throw error;
 }
 for (let n = 1; n <= BIT_COUNT; n++) {
   const name = `WispAI_B${String(n).padStart(3, '0')}`;
